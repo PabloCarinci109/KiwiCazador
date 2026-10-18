@@ -11,6 +11,7 @@
 --]]
 
 local Shared = require(script.Parent.Shared)
+local Config = require(Shared.Config)
 local Util = require(Shared.Util)
 
 local WorldBuilder = {}
