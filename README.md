@@ -19,6 +19,7 @@ interfaz cuando inicia la partida.
 | **Difícil** | Rapidísimo, desconfiado y solo duerme un momento. Además **no ves su estado** en el HUD. |
 | **Multijugador** | 🪶 ¡Supervivencia! Un **kiwi gigante** caza a todos: va **comiéndose jugadores** uno por uno y **gana el último que quede vivo** (hasta 12 jugadores). Llevas rastreador, **rifle ralentizador** y el **rifle de pintura** para frenar a los rivales. |
 | **Kiwi Colosal** | 🪶 ¡El cazador cazado! Un **kiwi gigante** te huele y te persigue: **escóndete y sobrevive**. A mitad de ronda se activa la **ZONA SEGURA** en el centro: **entra al círculo y ganas al instante**, pero el kiwi te **corta el paso** y ronda el borde — frénalo con el ralentizador, esquívalo y métete. Llevas el rastreador y un **rifle ralentizador** (no lo duerme: lo frena unos segundos). |
+| **Asedio al Kiwi** | ⚔️ **¡5 contra 5!** Un equipo (**Defensores**) cuida al kiwi en su casa y el otro (**Cazadores**) entra a **capturarlo con la red** antes de que se acabe el tiempo. **Al mejor de 3 rondas**: si te noquean, volvés al spawn de tu equipo a los 7 segundos. Los Cazadores llevan red, rastreador y pintura; todos llevan **revólver de equipo**. |
 
 En los modos de un jugador hay que atrapar **3 kiwis** antes de que se acabe el tiempo.
 El juego corre hasta **5 partidas a la vez** (una por arena); si todas están ocupadas, aparece
@@ -39,6 +40,28 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 - Las **casas ahora son de dos pisos** (con escalera, planta alta decorada y un **baúl extra**
   arriba) y el granero tiene **silos** de metal al lado. Se puede subir a mirar el mapa desde arriba.
 
+### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0)
+
+- **Nuevo modo Asedio al Kiwi (5 vs 5):** el juego reparte **Cazadores** y **Defensores** en
+  equipos parejos. El kiwi vive en su **casa del nido** (con **correa**: no se aleja de la casa) y
+  los Defensores lo cuidan; los Cazadores entran a **capturarlo con la red** (o tocarlo si está
+  enganchado). **Ronda de 150 segundos**, punto para quien capture / para los Defensores si se
+  acaba el tiempo, y **gana el primero a 2 rondas**. Al noquearte, **volvés a tu spawn a los 7 s**.
+  No hay **fuego amigo** y los equipos se identifican con **colores y brillo entre paredes**.
+- **Tiros estilo Counter Blox:** la dispersión depende del **movimiento**, hay **zona muerta**,
+  **reducción al apuntar/agacharse**, **retroceso con patada de arma y de cámara** (vuelve sola),
+  **caída de daño por distancia** y **¡TIRO A LA CABEZA!** (aviso dorado y multiplicador fuerte).
+- **Miras de verdad:** con el francotirador, clic derecho cicla **5x → 10x → sin mira**; sin mira
+  es un **noscope impreciso** y con mira el disparo sale **perfecto** (y caminás más lento).
+  El rifle tranquilizante, el de pintura y el ralentizador también tienen su **mira** (clic derecho).
+- **HUD estilo Counter:** barra de **marcador de equipos y ronda** arriba, **vida grande** abajo a
+  la izquierda (verde → ámbar → roja), **punto de mira dinámico** que se abre al moverse o
+  disparar, **tabla de posiciones con Tab** y **fogonazo** del cañón en el arma en primera persona.
+- **Movilidad:** **Shift** correr, **Ctrl / Alt / C** agachado en sigilo (la cámara baja y el arma
+  se afirma: menos dispersión). **V** cambia a primera persona.
+- **Créditos:** las fórmulas de disparo, retroceso, cabeza y zoom están inspiradas en el código
+  público de **Counter Blox: Sauce - Restored** (licencia MIT) — ver [`LICENSE-CB.md`](LICENSE-CB.md).
+
 ---
 
 ## Cómo se juega
@@ -53,10 +76,10 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 | **Click derecho** | Con el rifle tranquilizante, el de pintura o el ralentizador: **mira** en primera persona (zoom + cruz, el arma se oculta para ver limpio) |
 | **1 / 2 / 3 / 4 / 5** | Cambiar de herramienta (red / rifle / rastreador / trampa / pintura; en Colosal: rastreador / ralentizador) |
 | **Shift** | Correr (haces mucho ruido: el kiwi te oye y huye) |
-| **Ctrl** o **Alt** | Caminar en sigilo (casi no te oye) |
+| **Ctrl**, **Alt** o **C** | Agachado en sigilo (casi no te oye; la cámara baja y el arma se afirma: menos dispersión) |
 | **V** | Alternar vista en primera persona |
 | **E** | **Esconderte** en un armario, barril o pajar / **abrir un baúl**. Dentro del escondite, E otra vez te saca |
-| **Tab** | Tabla de jugadores de Roblox (ahí ves tus Kiwis y Monedas) |
+| **Tab** | **Tabla estilo Counter** (equipos, marcador y capturas en Asedio) + tabla de jugadores de Roblox |
 
 ### Herramientas
 

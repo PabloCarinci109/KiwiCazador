@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.3.0"
+Config.Version = "1.4.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -161,12 +161,43 @@ Config.Tracker = {
 }
 
 -- Mira (clic derecho para apuntar). Cada arma puede tener su zoom.
+-- El francotirador tiene telescopica de DOS aumentos: 5x y 10x (clic derecho
+-- otra vez cambia de aumento). El rifle tranquilizante es una mira simple.
 Config.Scope = {
 	fov = 30,          -- campo de vision mientras apuntas (mas chico = mas zoom)
 	weapons = {
-		sniper = 16,   -- el francotirador tiene el zoom mas fuerte
+		sniper = 14,   -- 5x (70 / 14)
+		sniper2 = 7,   -- 10x (segundo clic derecho)
 		revolver = 34,
 		arco = 28,
+	},
+}
+
+-- Estilo Counter: los disparos son instantaneos (rayo) y el error sale de
+-- la formula de Counter Blox: Sauce - Restored (MIT, ver LICENSE-CB.md):
+--   error = spread del arma + velocidad * vel
+--   con la mira puesta el error se divide (el francotirador es perfecto)
+--   si el error queda por debajo del minimo, el disparo sale perfecto
+-- La patada de camara tambien es la de Counter:
+--   grados = 2 * (1 - recoil/100), sube y vuelve sola.
+Config.Shoot = {
+	div = 6,            -- divisor del error (mas alto = mas preciso)
+	dead = 1.3,         -- por debajo de esto, disparo perfecto
+	adsDiv = 0.35,      -- con la mira el error se reduce a un tercio
+	crouchDiv = 1.6,    -- agachado (sigilo) el arma se afirma
+	recoilReturn = 9,   -- que tan rapido vuelve la camara de la patada
+	sniperRange = 700,  -- alcance del rayo del francotirador
+	weapons = {
+		rifle = { vel = 0.40, spread = 0.3, dead = 1.2, recoil = 84 },
+		pintura = { vel = 0.40, spread = 0.3, dead = 1.2, recoil = 84 },
+		relente = { vel = 0.40, spread = 0.3, dead = 1.2, recoil = 84 },
+		-- El francotirador sin telescopica es un noscope bien impreciso
+		sniper = { vel = 0.45, spread = 26, dead = 0, randomX = true, adsPerfect = true, recoil = 4 },
+		revolver = { vel = 0.45, spread = 0.3, dead = 1.6, recoil = 26 },
+		arco = { vel = 0.60, spread = 0.3, dead = 1.2, recoil = 72 },
+		cuchillo = { recoil = 92 },
+		lanzallamas = { vel = 0.5, recoil = 88 },
+		cohete = { recoil = 18 },
 	},
 }
 
@@ -219,15 +250,19 @@ Config.Hide = {
 	escapeCoins = 3,      -- monedas por escaparle a una husmeada
 }
 
--- Baules de armas: aparecen en las casas y por el mapa
+-- Baules de armas: aparecen en las casas y por el mapa.
+-- Los pesos son la probabilidad relativa (mayor = sale mas seguido):
+-- el lanzamisiles es el mas raro y el arco ya no es el rey de los baules.
 Config.Loot = {
 	uses = 3,             -- usos por arma encontrada
 	pickupRange = 12,     -- distancia para abrir el baul
 	weapons = {
-		{ id = "cohete", weight = 4 },
-		{ id = "revolver", weight = 3 },
-		{ id = "arco", weight = 3 },
-		{ id = "sniper", weight = 3 },
+		{ id = "revolver", weight = 22 },
+		{ id = "cuchillo", weight = 18 },
+		{ id = "arco", weight = 15 },
+		{ id = "lanzallamas", weight = 14 },
+		{ id = "sniper", weight = 14 },
+		{ id = "cohete", weight = 8 },
 	},
 }
 
@@ -252,7 +287,10 @@ Config.Weapons = {
 		speed = 230,
 		life = 1.6,
 		blast = 0,
-		damage = 20,
+		damage = 46,      -- estilo Counter (Deagle): 3 tiros al cuerpo
+		minDamage = 20,   -- piso de daño cuando el blanco esta lejos
+		falloff = 1,      -- pierde fuerza con la distancia (como Counter)
+		headMult = 2.4,   -- tiro a la cabeza: 110, a la lona de una
 		knockback = 38,
 		slowFactor = 0.55,
 		slowTime = 1.6,
@@ -265,11 +303,17 @@ Config.Weapons = {
 		speed = 165,
 		life = 2.6,
 		blast = 9,
-		damage = 26,
+		damage = 40,
+		minDamage = 18,
+		falloff = 0.8,
+		headMult = 2.2,     -- flechazo en la cabeza: a la lona
 		knockback = 24,
 		slowFactor = 0.35,
 		slowTime = 3.2,
 		size = Vector3.new(0.22, 0.22, 2.0),
+		stick = true,       -- la flecha queda clavada y se puede recoger (+1 uso)
+		pickupRange = 12,   -- distancia para recoger una flecha clavada
+		pickupLife = 60,    -- segundos que la flecha queda en el piso
 	},
 	sniper = {
 		name = "Francotirador",
@@ -278,12 +322,57 @@ Config.Weapons = {
 		speed = 420,
 		life = 5,
 		blast = 0,
-		damage = 48,    -- el golpe mas fuerte contra otros cazadores
+		damage = 100,   -- estilo Counter (AWP): un disparo y a la lona
 		knockback = 58,
 		slowFactor = 0.30,
 		slowTime = 2.0,
 		size = Vector3.new(0.22, 0.22, 2.6),
 	},
+	cuchillo = {
+		name = "Cuchillo",
+		color = Color3.fromRGB(224, 230, 240),
+		cooldown = 0.85,
+		melee = true,   -- no dispara: es un zarpazo cuerpo a cuerpo
+		reach = 8,
+		damage = 34,
+		knockback = 26,
+		slowFactor = 0.50,
+		slowTime = 1.2,
+		size = Vector3.new(0.2, 0.2, 1.4),
+	},
+	lanzallamas = {
+		name = "Lanzallamas",
+		color = Color3.fromRGB(240, 140, 60),
+		cooldown = 1.3,
+		flame = true,   -- chorro corto en cono (no proyectil)
+		reach = 17,     -- alcance del chorro
+		coneAngle = 32, -- medio angulo del cono (grados)
+		damage = 24,    -- daño total por rafaga
+		knockback = 12,
+		slowFactor = 0.60,
+		slowTime = 1.0,
+		size = Vector3.new(0.3, 0.3, 1.6),
+	},
+}
+
+-- Picotazo del kiwi: si lo acorralas contra un rincon, se defiende y te
+-- saca un 10% de la vida de un picotazo (varias veces si te quedas).
+Config.KiwiPeck = {
+	damage = 10,       -- 10% de la vida (100)
+	range = 7,         -- distancia para que te alcance el pico
+	cooldown = 1.5,    -- cada cuanto puede picar si seguis encima
+	knockback = 34,    -- empujon al jugador picoteado
+}
+
+-- Vida de la ciudad (solo el mapa Ciudad de Auckland): calles con autos,
+-- colectivo y tren que atropellan (mitad de la vida), mas semaforos.
+Config.City = {
+	damage = 50,       -- 50% de la vida por atropello
+	speedCar = 44,     -- velocidad de los autos en la avenida
+	speedBus = 30,     -- el colectivo va mas tranquilo
+	speedTrain = 80,   -- el tren pasa rapidisimo por las vias
+	trainWait = 5,     -- segundos que espera en la punta antes de volver
+	hitCooldown = 3,   -- segundos de gracia tras un atropello
 }
 
 Config.Player = {
@@ -442,8 +531,55 @@ Config.Multiplayer = {
 	scoreboardSize = 8,     -- cuantas filas ve el jugador
 }
 
+-- ===============================================================
+-- MODO ASEDIO (5 vs 5)
+-- ===============================================================
+-- Los Defensores cuidan al kiwi en su casa y los Cazadores entran a
+-- capturarlo antes de que se acabe el tiempo. Primero a 2 rondas.
+Config.Asedio = {
+	id = "asedio",
+	name = "Asedio al Kiwi",
+	tag = "¡5 vs 5!",
+	color = Color3.fromRGB(255, 176, 74),
+	blurb = "5 contra 5: un equipo cuida al kiwi en su casa y el otro entra a capturarlo con la red. Al mejor de 3 rondas.",
+	baseDifficulty = "normal",
+	maxPlayers = 10,
+	roundTime = 150,        -- segundos por ronda
+	breakTime = 7,          -- descanso entre rondas
+	roundsToWin = 2,        -- primero a 2 rondas gana la partida
+	respawn = 7,            -- segundos para volver tras un noqueo
+	nestRadius = 46,        -- el kiwi no se aleja mas de esto de su casa
+	attackSpawn = 100,      -- a que distancia del nido aparecen los Cazadores
+	revolverUses = 40,      -- tiros de revolver que recibe cada cazador
+	reward = 60,            -- monedas por capturar al kiwi
+	winBonus = 240,         -- monedas por ganar la partida
+	teamAttack = "Cazadores",
+	teamDefend = "Defensores",
+	colorAttack = Color3.fromRGB(226, 116, 74),
+	colorDefend = Color3.fromRGB(88, 164, 240),
+	toolsAttack = { "red", "rastreador", "pintura" },
+	toolsDefend = { "pintura", "rastreador" },
+}
+
+-- Ficha del modo para el menu (los detalles viven en Config.Asedio)
+Config.Difficulties.asedio = {
+	id = "asedio",
+	name = Config.Asedio.name,
+	tag = Config.Asedio.tag,
+	color = Config.Asedio.color,
+	blurb = Config.Asedio.blurb,
+	tools = Config.Asedio.toolsAttack,
+	round = {
+		quota = 1,
+		timeLimit = Config.Asedio.roundTime,
+		reward = Config.Asedio.reward,
+		winBonus = Config.Asedio.winBonus,
+		timeBonus = 0,
+	},
+}
+
 -- Orden en que se muestran los botones del menu
-Config.ModeOrder = { "facil", "normal", "dificil", "colosal", "multi" }
+Config.ModeOrder = { "facil", "normal", "dificil", "colosal", "multi", "asedio" }
 
 -- ===============================================================
 -- RONDA
@@ -496,11 +632,29 @@ Config.Text = {
 	WeaponOut = "Se te acabó: %s",
 	BoomShout = "¡%s disparó el %s!",
 	BoomHit = "¡Le diste con el %s!",
+	Headshot = "¡TIRO A LA CABEZA!",
+	AsedioRound = "¡Ronda %d! Los %s atacan y los %s defienden al kiwi (marcador %d - %d)",
+	AsedioNext = "Próxima ronda en unos segundos... (ronda %d)",
+	AsedioCapture = "¡Los %s atrapáron al kiwi!",
+	AsedioTimeout = "¡Se acabó el tiempo! Punto para los %s",
+	AsedioMatch = "¡Ganaron los %s la partida!",
+	AsedioTeamAttack = "Eres CAZADOR: entra a la casa y atrapa al kiwi con la red (o tócalo)",
+	AsedioTeamDefend = "Eres DEFENSOR: cuida al kiwi y no dejes que lo toquen",
+	AsedioRespawnWait = "Te noquearon: vuelves en %d segundos",
+	AsedioBack = "¡De vuelta al combate!",
+	AsedioPounce = "El kiwi te saltó encima por acercarte demasiado",
 	SniffCaught = "¡El kiwi encontró a %s escondido y se lo comió!",
 	EatenMenu = "El kiwi te comió. Elige otro modo para volver a jugar.",
 	MapPickNotify = "¡Mapa elegido: %s!",
 	MapFallback = "Ese mapa estaba ocupado: esta partida va en %s.",
 	HurtMsg = "¡%s te dio con %s! (-%d de vida)",
+	HurtGeneric = "¡%s! (-%d de vida)",
+	CarHit = "Te atropelló un auto",
+	BusHit = "Te atropelló el colectivo",
+	TrainHit = "Te atropelló el tren",
+	PeckHit = "El kiwi acorralado te picoteó",
+	ArrowPickup = "Recuperaste la flecha: +1 uso del arco.",
+	ArrowNoBow = "Esa flecha es de un arco. No tienes uno equipado.",
 	KoedAll = "¡%s dejó fuera a %s de un disparo!",
 	KoMenu = "Te noquearon a tiros. Elige otro modo para volver a jugar.",
 	DeathTitle = "¡TE COMIÓ EL KIWI!",

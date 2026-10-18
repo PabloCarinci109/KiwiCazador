@@ -174,12 +174,28 @@ function Session.new(modeId, rng)
 	self.hidden = {}
 	self.hideSpot = {}
 	self.isColosal = modeId == "colosal"
+	self.isAsedio = modeId == "asedio"
 	self.mapVote = {}
 	self.chosenMap = nil
 	self.voteDone = false
 	self.knocked = {}
 
-	if modeId == "multi" then
+	if modeId == "asedio" then
+		self.isMulti = false
+		self.diff = Config.Difficulties[Config.Asedio.baseDifficulty]
+		self.name = Config.Asedio.name
+		self.tag = Config.Asedio.tag
+		self.color = Config.Asedio.color
+		self.timeLimit = Config.Asedio.roundTime
+		self.teamOf = {}
+		self.teams = { attack = {}, defend = {} }
+		self.teamScore = { attack = 0, defend = 0 }
+		self.asedioRound = 1
+		self.teamsReady = false
+		-- Como el multijugador: entre todos votan el mapa y arranca.
+		self.phase = "vote"
+		self.phaseEnds = os.clock() + Config.Vote.multiTime
+	elseif modeId == "multi" then
 		self.isMulti = true
 		self.diff = Config.Difficulties[Config.Multiplayer.baseDifficulty]
 		self.name = Config.Multiplayer.name
@@ -226,6 +242,14 @@ end
 -- Entrega las herramientas segun el modo (colosal solo el rastreador,
 -- multijugador suma el rifle de pintura).
 function Session:giveTools(player)
+	if self.isAsedio then
+		local side = self:asedioSide(player)
+		local only = side == "defend" and Config.Asedio.toolsDefend or Config.Asedio.toolsAttack
+		ToolService.give(player, only)
+		-- Pistola de equipo: revolver con balas de sobra (estilo Counter)
+		ToolService.giveLoot(player, "revolver", Config.Asedio.revolverUses or 40)
+		return
+	end
 	local only = self.diff.tools
 	if self.isMulti then
 		only = Config.Multiplayer.tools
@@ -352,7 +376,9 @@ end
 
 -- ---------------- daño entre cazadores ----------------
 -- Las armas de baul hieren a los jugadores. Al kiwi SOLO lo relentizan.
-function Session:damagePlayer(victim, attacker, weaponName, amount, pos)
+-- sourceLabel: cuando el daño no viene de un cazador (auto, tren, kiwi...)
+-- se usa ese texto en lugar del mensaje de "te dio con X".
+function Session:damagePlayer(victim, attacker, weaponName, amount, pos, sourceLabel)
 	if not self.stats[victim] or self.phase ~= "playing" then
 		return
 	end
@@ -360,16 +386,32 @@ function Session:damagePlayer(victim, attacker, weaponName, amount, pos)
 		return
 	end
 
+	-- Asedio: no hay fuego amigo entre companeros de equipo
+	if self.isAsedio and attacker and attacker ~= victim then
+		local mine = self.teamOf[attacker]
+		local theirs = self.teamOf[victim]
+		if mine and theirs and mine == theirs then
+			self:notify(attacker, "¡Es de tu equipo!", COLOR.warn, 3)
+			return
+		end
+	end
+
 	local data = self.stats[victim]
 	amount = math.max(1, math.floor(amount + 0.5))
 	data.hp = math.max(0, (data.hp or Config.Player.maxHealth) - amount)
 	data.lastHurt = os.clock()
 
-	local attackerName = "el mapa"
-	if attacker and attacker ~= victim then
-		attackerName = attacker.DisplayName ~= "" and attacker.DisplayName or attacker.Name
+	local msg
+	if sourceLabel then
+		msg = string.format(Config.Text.HurtGeneric, sourceLabel, amount)
+	else
+		local attackerName = "el mapa"
+		if attacker and attacker ~= victim then
+			attackerName = attacker.DisplayName ~= "" and attacker.DisplayName or attacker.Name
+		end
+		msg = string.format(Config.Text.HurtMsg, attackerName, weaponName, amount)
 	end
-	self:notify(victim, string.format(Config.Text.HurtMsg, attackerName, weaponName, amount), COLOR.bad, 3)
+	self:notify(victim, msg, COLOR.bad, 3)
 	self:event("hurt", { pos = pos, userId = victim.UserId, amount = amount })
 	self:sendUpdate(victim)
 
@@ -392,6 +434,18 @@ function Session:knockout(victim, attacker)
 	self:notifyAll(string.format(Config.Text.KoedAll, aname, vname), COLOR.warn, 5)
 	self:event("ko", { userId = victim.UserId })
 	setFrozen(victim, true)
+
+	-- Asedio: los noqueados vuelven a su spawn despues de unos segundos
+	if self.isAsedio then
+		self:notify(victim, string.format(Config.Text.AsedioRespawnWait, Config.Asedio.respawn), COLOR.warn, Config.Asedio.respawn)
+		task.delay(Config.Asedio.respawn, function()
+			self.knocked[victim] = nil
+			if self.stats[victim] and not self.finished and self.phase ~= "ended" then
+				self:asedioRespawn(victim)
+			end
+		end)
+		return
+	end
 
 	task.delay(Config.Round.KoHold, function()
 		self.knocked[victim] = nil
@@ -416,8 +470,292 @@ function Session:stepHealth(dt)
 	end
 end
 
+-- ---------------- asedio (5 vs 5) ----------------
+-- Cazadores (entran por el kiwi) y Defensores (lo cuidan en su casa).
+local teamAttackCache, teamDefendCache
+
+local function ensureTeams()
+	local Teams = game:GetService("Teams")
+	if teamAttackCache and teamAttackCache.Parent then
+		return
+	end
+	teamAttackCache = Teams:FindFirstChild(Config.Asedio.teamAttack) or Instance.new("Team")
+	teamAttackCache.Name = Config.Asedio.teamAttack
+	teamAttackCache.TeamColor = BrickColor.new(Config.Asedio.colorAttack)
+	teamAttackCache.AutoAssignable = false
+	teamAttackCache.Parent = Teams
+
+	teamDefendCache = Teams:FindFirstChild(Config.Asedio.teamDefend) or Instance.new("Team")
+	teamDefendCache.Name = Config.Asedio.teamDefend
+	teamDefendCache.TeamColor = BrickColor.new(Config.Asedio.colorDefend)
+	teamDefendCache.AutoAssignable = false
+	teamDefendCache.Parent = Teams
+end
+
+function Session:asedioSide(player)
+	return self.teamOf[player] or "attack"
+end
+
+-- Un jugador que entra a mitad de partida se suma al equipo con menos gente
+function Session:asedioAddToTeam(player)
+	if self.teamOf[player] then
+		return
+	end
+	local side = #self.teams.attack <= #self.teams.defend and "attack" or "defend"
+	self.teamOf[player] = side
+	table.insert(self.teams[side], player)
+	ensureTeams()
+	player.Neutral = false
+	player.Team = side == "attack" and teamAttackCache or teamDefendCache
+	local text = side == "attack" and Config.Text.AsedioTeamAttack or Config.Text.AsedioTeamDefend
+	self:notify(player, text, side == "attack" and Config.Asedio.colorAttack or Config.Asedio.colorDefend, 8)
+end
+
+-- Reparte los equipos al azar, mitad y mitad, al arrancar la partida
+function Session:assignTeams()
+	if not self.isAsedio then
+		return
+	end
+	ensureTeams()
+	local list = {}
+	for _, player in ipairs(self.players) do
+		table.insert(list, player)
+	end
+	for i = #list, 2, -1 do
+		local j = self.rng:NextInteger(1, i)
+		list[i], list[j] = list[j], list[i]
+	end
+	self.teamOf = {}
+	self.teams = { attack = {}, defend = {} }
+	local counts = { attack = 0, defend = 0 }
+	for _, player in ipairs(list) do
+		local side = counts.attack <= counts.defend and "attack" or "defend"
+		counts[side] = counts[side] + 1
+		self.teamOf[player] = side
+		table.insert(self.teams[side], player)
+		player.Neutral = false
+		player.Team = side == "attack" and teamAttackCache or teamDefendCache
+	end
+	self.teamsReady = true
+	for _, player in ipairs(list) do
+		local side = self.teamOf[player]
+		local text = side == "attack" and Config.Text.AsedioTeamAttack or Config.Text.AsedioTeamDefend
+		self:notify(player, text, side == "attack" and Config.Asedio.colorAttack or Config.Asedio.colorDefend, 8)
+	end
+end
+
+-- El kiwi del asedio no come cazadores: da un picotazo y los tira lejos
+function Session:asedioPounce(victim, pos)
+	if not victim or not self.stats[victim] or self.phase ~= "playing" then
+		return
+	end
+	local root = getRoot(victim)
+	if root and pos then
+		local away = root.Position - pos
+		away = Vector3.new(away.X, 0, away.Z)
+		if away.Magnitude < 0.5 then
+			away = Vector3.new(0, 0, 1)
+		end
+		away = away.Unit * 42
+		root.AssemblyLinearVelocity = Vector3.new(away.X, 18, away.Z)
+	end
+	self:event("peck", { pos = pos, userId = victim.UserId })
+	self:damagePlayer(victim, nil, "picotazo", Config.KiwiPeck.damage, pos, Config.Text.AsedioPounce)
+end
+
+-- Vuelve al combate al noqueado (spawn de su equipo, vida llena y armas)
+function Session:asedioRespawn(player)
+	if not self.arena or not self.stats[player] then
+		return
+	end
+	local data = self.stats[player]
+	data.hp = Config.Player.maxHealth
+	self:teleportToArena(player)
+	self:giveTools(player)
+	setFrozen(player, false)
+	self:notify(player, Config.Text.AsedioBack, COLOR.good, 4)
+	self:sendUpdate(player)
+end
+
+-- Limpia la ronda (kiwi, proyectiles, vida) antes de la siguiente
+function Session:asedioReset()
+	if self.kiwi then
+		self.kiwi:destroy()
+		self.kiwi = nil
+	end
+	for _, dart in ipairs(self.projectiles) do
+		dart.part:Destroy()
+	end
+	self.projectiles = {}
+	self:clearTraps()
+	Actions.clearPickups(self)
+	for _, player in ipairs(self.players) do
+		if self.hideSpot[player] then
+			self:exitSpot(player, true)
+		end
+		local data = self.stats[player]
+		if data then
+			data.hp = Config.Player.maxHealth
+		end
+		self.knocked[player] = nil
+	end
+end
+
+-- Punto para un equipo: si llega a las rondas necesarias, se termina
+function Session:asedioScore(side, reason)
+	if not self.isAsedio or self.phase ~= "playing" then
+		return
+	end
+	local score = self.teamScore
+	score[side] = (score[side] or 0) + 1
+	local attackName = Config.Asedio.teamAttack
+	local defendName = Config.Asedio.teamDefend
+
+	if reason == "capture" then
+		self:notifyAll(string.format(Config.Text.AsedioCapture, attackName), Config.Asedio.colorAttack, 6)
+	else
+		self:notifyAll(string.format(Config.Text.AsedioTimeout, defendName), Config.Asedio.colorDefend, 6)
+	end
+	self:notifyAll(string.format("Marcador: %s %d - %d %s", attackName, score.attack, score.defend, defendName), COLOR.info, 6)
+
+	if score.attack >= Config.Asedio.roundsToWin or score.defend >= Config.Asedio.roundsToWin then
+		self.asedioWinner = score.attack >= Config.Asedio.roundsToWin and "attack" or "defend"
+		local winnerName = self.asedioWinner == "attack" and attackName or defendName
+		self:notifyAll(string.format(Config.Text.AsedioMatch, winnerName), COLOR.good, 8)
+		self:endRound(nil, "teamwin")
+		return
+	end
+
+	-- Siguiente ronda: descanso corto y vuelta a empezar en la casa
+	self.asedioRound = (self.asedioRound or 1) + 1
+	self:asedioReset()
+	self:startCountdown()
+	self.phaseEnds = os.clock() + Config.Asedio.breakTime
+	self:notifyAll(string.format(Config.Text.AsedioNext, self.asedioRound), COLOR.info, Config.Asedio.breakTime)
+	self:sendUpdates(true)
+end
+
+-- ---------------- trafico de la ciudad ----------------
+-- Autos, colectivo y tren (solo en el mapa Ciudad). Se mueven por caminos
+-- fijos y atropellan a los cazadores: mitad de la vida y empujon.
+local function vehiclePose(veh, s)
+	local pts, cum = veh.pts, veh.cum
+	for i = 1, #pts - 1 do
+		if s <= cum[i + 1] or i == #pts - 1 then
+			local segLen = math.max(cum[i + 1] - cum[i], 0.001)
+			local t = math.clamp((s - cum[i]) / segLen, 0, 1)
+			local pos = pts[i]:Lerp(pts[i + 1], t)
+			local dir = (pts[i + 1] - pts[i]).Unit
+			if veh.dir < 0 then
+				dir = -dir
+			end
+			return pos, dir
+		end
+	end
+	return pts[1], Vector3.new(0, 0, 1)
+end
+
+local function placeVehicle(veh)
+	local s = veh.dist
+	if veh.dir < 0 then
+		s = veh.total - s
+	end
+	local pos, dir = vehiclePose(veh, math.clamp(s, 0, veh.total))
+	pos = Vector3.new(pos.X, veh.baseY or pos.Y, pos.Z)
+	local cf = CFrame.lookAt(pos, pos + dir)
+	veh.model:PivotTo(cf)
+	veh.pose = cf
+end
+
+function Session:resetTraffic()
+	local arena = self.arena
+	if not arena or not arena.traffic then
+		return
+	end
+	for _, veh in ipairs(arena.traffic) do
+		veh.dist = veh.startDist or 0
+		veh.dir = 1
+		veh.waitUntil = 0
+		veh.lastHit = {}
+		placeVehicle(veh)
+	end
+end
+
+function Session:stepTraffic(dt)
+	local arena = self.arena
+	if not arena or not arena.traffic or #arena.traffic == 0 then
+		return
+	end
+
+	local now = os.clock()
+
+	-- Semaforos: ciclo verde -> amarillo -> rojo (decorativo)
+	if arena.semaphores then
+		local phase = now % 11
+		local active = "green"
+		if phase >= 4.5 and phase < 6 then
+			active = "yellow"
+		elseif phase >= 6 then
+			active = "red"
+		end
+		for _, sem in ipairs(arena.semaphores) do
+			for name, part in pairs(sem) do
+				local on = name == active
+				part.Material = on and Enum.Material.Neon or Enum.Material.SmoothPlastic
+				part.Transparency = on and 0 or 0.55
+			end
+		end
+	end
+
+	for _, veh in ipairs(arena.traffic) do
+		if not veh.waitUntil or now >= veh.waitUntil then
+			veh.dist = veh.dist + veh.speed * dt
+			if veh.dist >= veh.total then
+				if veh.shuttle then
+					veh.dist = 0
+					veh.dir = -veh.dir
+					veh.waitUntil = now + (veh.wait or 4)
+				else
+					veh.dist = veh.dist - veh.total
+				end
+			end
+		end
+		placeVehicle(veh)
+		veh.lastHit = veh.lastHit or {}
+
+		-- Atropello: si un cazador queda dentro del vehiculo pierde la mitad
+		-- de la vida y sale volando.
+		for _, player in ipairs(self.players) do
+			local data = self.stats[player]
+			local root = getRoot(player)
+			if data and root and not self.knocked[player] then
+				if now - (veh.lastHit[player] or 0) >= Config.City.hitCooldown then
+					local localPos = veh.pose:PointToObjectSpace(root.Position)
+					if math.abs(localPos.X) <= veh.halfW + 2.2
+						and math.abs(localPos.Z) <= veh.halfL + 2.2
+						and math.abs(localPos.Y) <= 7 then
+						veh.lastHit[player] = now
+						local away = root.Position - veh.pose.Position
+						away = Vector3.new(away.X, 0, away.Z)
+						if away.Magnitude < 0.5 then
+							away = veh.pose.LookVector
+						end
+						away = away.Unit * 62
+						root.AssemblyLinearVelocity = Vector3.new(away.X, 24, away.Z)
+						self:damagePlayer(player, nil, "atropello", Config.City.damage,
+							veh.pose.Position, veh.label or "Te atropellaron")
+					end
+				end
+			end
+		end
+	end
+end
+
 -- ---------------- jugadores ----------------
 function Session:isFull()
+	if self.isAsedio then
+		return #self.players >= Config.Asedio.maxPlayers
+	end
 	if not self.isMulti then
 		return #self.players >= 1
 	end
@@ -433,6 +771,9 @@ function Session:addPlayer(player)
 	table.insert(self.players, player)
 	playerSession[player] = self
 	ToolService.reset(player)
+	if self.isAsedio and self.teamsReady then
+		self:asedioAddToTeam(player)
+	end
 
 	if self.phase == "vote" then
 		if self.voteDone then
@@ -472,6 +813,19 @@ function Session:removePlayer(player, silent)
 	end
 
 	self.stats[player] = nil
+	if self.isAsedio and self.teamOf and self.teamOf[player] then
+		local side = self.teamOf[player]
+		self.teamOf[player] = nil
+		local list = self.teams and self.teams[side]
+		if list then
+			for index, other in ipairs(list) do
+				if other == player then
+					table.remove(list, index)
+					break
+				end
+			end
+		end
+	end
 	for index, other in ipairs(self.players) do
 		if other == player then
 			table.remove(self.players, index)
@@ -625,6 +979,38 @@ function Session:allocateArena(mapId)
 end
 
 function Session:spawnsFor(player)
+	-- Asedio: cada equipo aparece alrededor de la casa del kiwi
+	if self.isAsedio and self.arena and self.arena.nest then
+		local nest = self.arena.nest.pos
+		local side = self:asedioSide(player)
+		local list = self.teams[side] or {}
+		local index = 1
+		for i, other in ipairs(list) do
+			if other == player then
+				index = i
+				break
+			end
+		end
+		local count = math.max(1, #list)
+		local angle = (index - 1) / count * math.pi * 2
+		local radius = 24
+		if side == "attack" then
+			radius = math.min(Config.Asedio.attackSpawn, (self.arena.halfSize or 150) - 34)
+			angle = angle + 0.7
+		end
+		local point = nest + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+		point = self.arena:clampToBounds(point)
+		local params = RaycastParams.new()
+		params.IgnoreWater = true
+		local ray = workspace:Raycast(Vector3.new(point.X, nest.Y + 70, point.Z), Vector3.new(0, -220, 0), params)
+		if ray and math.abs(ray.Position.Y - nest.Y) <= 9 then
+			point = ray.Position
+		else
+			point = Vector3.new(point.X, self.arena.floorY or nest.Y, point.Z)
+		end
+		return point + Vector3.new(0, 4, 0)
+	end
+
 	local index = 1
 	for i, other in ipairs(self.players) do
 		if other == player then
@@ -660,6 +1046,9 @@ end
 
 -- ---------------- fases ----------------
 function Session:startCountdown()
+	if self.isAsedio and not self.teamsReady then
+		self:assignTeams()
+	end
 	self.phase = "countdown"
 	self.phaseEnds = os.clock() + Config.Round.Countdown
 
@@ -714,10 +1103,17 @@ function Session:startPlaying()
 		end
 	end
 	self:spawnKiwi()
+	self:resetTraffic()
 	self:sendUpdates(true)
 	for _, player in ipairs(self.players) do
 		setFrozen(player, false)
-		if self.isColosal or self.isMulti then
+		if self.isAsedio then
+			local side = self:asedioSide(player)
+			self:notify(player, string.format(Config.Text.AsedioRound, self.asedioRound or 1,
+				Config.Asedio.teamAttack, Config.Asedio.teamDefend,
+				self.teamScore.attack or 0, self.teamScore.defend or 0),
+				side == "attack" and Config.Asedio.colorAttack or Config.Asedio.colorDefend, 7)
+		elseif self.isColosal or self.isMulti then
 			self:notify(player, "¡Escóndete! El kiwi gigante ya salió a buscar.", COLOR.warn, 6)
 		else
 			self:notify(player, "¡A cazar al kiwi!", COLOR.good)
@@ -745,6 +1141,7 @@ function Session:endRound(winner, reason)
 	end
 	self.projectiles = {}
 	self:clearTraps()
+	Actions.clearPickups(self)
 
 	for _, player in ipairs(self.players) do
 		if self.hideSpot[player] then
@@ -785,6 +1182,19 @@ function Session:buildResult(player)
 			won = true
 			coins = coins + self.diff.round.reward
 		end
+	elseif self.isAsedio then
+		local side = self:asedioSide(player)
+		local won = self.asedioWinner == side
+		local attackName = Config.Asedio.teamAttack
+		local defendName = Config.Asedio.teamDefend
+		local score = self.teamScore or { attack = 0, defend = 0 }
+		title = won and "¡Ganó tu equipo!" or "Perdiste la partida"
+		subtitle = string.format("%s %d - %d %s", attackName, score.attack or 0, score.defend or 0, defendName)
+		if won then
+			coins = coins + (Config.Asedio.winBonus or 240)
+		end
+		table.insert(lines, string.format("Tu equipo: %s", side == "attack" and attackName or defendName))
+		table.insert(lines, string.format("Capturas: %d", data.caught or 0))
 	elseif self.isColosal then
 		if self.reason == "safe" then
 			title = "¡Llegaste al refugio!"
@@ -875,11 +1285,16 @@ function Session:finish()
 	end
 	self.projectiles = {}
 	self:clearTraps()
+	Actions.clearPickups(self)
 
 	if Config.Round.HubReturn then
 		self:returnAllToLobby()
 	end
 	for _, player in ipairs(self.players) do
+		if self.isAsedio then
+			player.Team = nil
+			player.Neutral = true
+		end
 		ToolService.clear(player)
 		Net.get("SessionUpdate"):FireClient(player, { active = false })
 		if playerSession[player] == self then
@@ -902,7 +1317,15 @@ function Session:spawnKiwi()
 
 	local cfg = self.diff.kiwi
 	local opts
-	if self.isColosal or self.isMulti then
+	if self.isAsedio then
+		-- El kiwi vive en su casa: no se aleja del nido (modo 5 vs 5)
+		opts = { brain = "hider" }
+		local nest = self.arena and self.arena.nest
+		if nest then
+			opts.spawn = nest.pos
+			opts.leash = { pos = nest.pos, radius = Config.Asedio.nestRadius }
+		end
+	elseif self.isColosal or self.isMulti then
 		if self.isMulti then
 			cfg = Config.Difficulties.colosal.kiwi
 		end
@@ -967,10 +1390,36 @@ function Session:onKiwiEvent(kind, data)
 		end
 		self:event("sniffcatch", { pos = pos, index = data and data.index })
 		if victim and self.stats[victim] then
-			self:giantCatch(victim)
+			if self.isAsedio then
+				self:asedioPounce(victim, pos)
+			else
+				self:giantCatch(victim)
+			end
+		end
+	elseif kind == "peck" then
+		-- Kiwi acorralado: picotazo a quien lo tiene arrinconado
+		local victim = data and data.player
+		if victim and self.stats[victim] and self.phase == "playing" then
+			local root = getRoot(victim)
+			if root and pos then
+				local away = root.Position - pos
+				away = Vector3.new(away.X, 0, away.Z)
+				if away.Magnitude < 0.5 then
+					away = Vector3.new(0, 0, 1)
+				end
+				away = away.Unit * Config.KiwiPeck.knockback
+				root.AssemblyLinearVelocity = Vector3.new(away.X, 16, away.Z)
+			end
+			self:event("peck", { pos = pos, userId = victim.UserId })
+			self:damagePlayer(victim, nil, "picotazo", Config.KiwiPeck.damage, pos, Config.Text.PeckHit)
 		end
 	elseif kind == "catch" then
-		self:giantCatch(data and data.player)
+		local victim = data and data.player
+		if self.isAsedio then
+			self:asedioPounce(victim, pos)
+		else
+			self:giantCatch(victim)
+		end
 	end
 end
 
@@ -994,6 +1443,21 @@ function Session:capture(player, method)
 	end
 	local data = self.stats[player]
 	if not data then
+		return
+	end
+
+	-- Asedio: solo los Cazadores capturan; si toca un Defensor, no pasa nada
+	if self.isAsedio then
+		if self:asedioSide(player) ~= "attack" then
+			self:notify(player, "¡Ese es tu kiwi! Cuídenlo de los Cazadores.", COLOR.warn, 4)
+			return
+		end
+		self.kiwi:capture(player)
+		data.caught = data.caught + 1
+		addCaught(player, 1)
+		addCoins(player, Config.Asedio.reward or 60)
+		self:event("captured", { pos = self.kiwi and self.kiwi:getPosition() })
+		self:asedioScore("attack", "capture")
 		return
 	end
 
@@ -1153,14 +1617,28 @@ function Session:openChest(player, index)
 	for _, entry in ipairs(weapons) do
 		total = total + (entry.weight or 1)
 	end
-	local roll = self.rng:NextInteger(1, math.max(total, 1))
+
+	-- Mas aleatorio: se evita repetir la ultima arma que saco ESE jugador
+	-- (hasta 3 intentos), asi no toca siempre lo mismo.
+	local stats = self.stats[player]
+	local last = stats and stats.lastLoot
 	local pick = weapons[1]
-	for _, entry in ipairs(weapons) do
-		roll = roll - (entry.weight or 1)
-		if roll <= 0 then
-			pick = entry
+	for _ = 1, 3 do
+		local roll = self.rng:NextInteger(1, math.max(total, 1))
+		pick = weapons[1]
+		for _, entry in ipairs(weapons) do
+			roll = roll - (entry.weight or 1)
+			if roll <= 0 then
+				pick = entry
+				break
+			end
+		end
+		if pick.id ~= last then
 			break
 		end
+	end
+	if stats then
+		stats.lastLoot = pick.id
 	end
 
 	-- Un arma de baul a la vez: la anterior se pierde
@@ -1306,10 +1784,16 @@ function Session:step(dt)
 		end
 	elseif self.phase == "playing" then
 		if self.timeLimit and now >= self.startedAt + self.timeLimit then
-			self:notifyAll("¡Se acabó el tiempo!", COLOR.bad)
-			self:endRound(nil, "timeout")
+			if self.isAsedio then
+				-- Se acabó el tiempo: punto para los Defensores
+				self:asedioScore("defend", "timeout")
+			else
+				self:notifyAll("¡Se acabó el tiempo!", COLOR.bad)
+				self:endRound(nil, "timeout")
+			end
 		else
 			self:stepHealth(dt)
+			self:stepTraffic(dt)
 			if self.isColosal then
 				self:stepSafeZone(dt)
 			end
@@ -1347,7 +1831,7 @@ function Session:sendUpdate(player)
 	local objective
 	local progressText
 	if self.phase == "vote" then
-		if self.isMulti then
+		if self.isMulti or self.isAsedio then
 			objective = "¡Voten el mapa de la partida!"
 		else
 			objective = "¡Elige el mapa de la partida!"
@@ -1362,6 +1846,19 @@ function Session:sendUpdate(player)
 			progressText = "¡El kiwi gigante está cerca de ti!"
 		else
 			progressText = string.format("Cazadores vivos: %d", #self.players)
+		end
+	elseif self.isAsedio then
+		local side = self:asedioSide(player)
+		local kiwi = self.kiwi
+		local root = getRoot(player)
+		local near = kiwi and not kiwi.defeated and root
+			and (kiwi:getPosition() - root.Position).Magnitude < 40
+		if side == "attack" then
+			objective = "Entra a la casa del kiwi y atrápalo"
+			progressText = near and "¡El kiwi está cerca!" or "Busca la casa del kiwi"
+		else
+			objective = "Cuida al kiwi de los Cazadores"
+			progressText = near and "¡El kiwi está contigo! Cúbrelo" or "El kiwi está en su casa"
 		end
 	elseif self.isColosal then
 		local zone = self.arena and self.arena.safeZone
@@ -1415,6 +1912,7 @@ function Session:sendUpdate(player)
 			name = other.DisplayName ~= "" and other.DisplayName or other.Name,
 			caught = otherStats and otherStats.caught or 0,
 			isSelf = other == player,
+			team = self.isAsedio and self.teamOf[other] or nil,
 		})
 	end
 	table.sort(ranking, function(a, b)
@@ -1440,6 +1938,11 @@ function Session:sendUpdate(player)
 		players = ranking,
 		playerCount = #self.players,
 		isMulti = self.isMulti,
+		isAsedio = self.isAsedio or nil,
+		team = self.isAsedio and self:asedioSide(player) or nil,
+		teamScore = self.isAsedio and { attack = self.teamScore.attack, defend = self.teamScore.defend } or nil,
+		round = self.isAsedio and self.asedioRound or nil,
+		roundsToWin = self.isAsedio and Config.Asedio.roundsToWin or nil,
 		waiting = self.phase == "vote",
 		vote = self.phase == "vote" and {
 			done = self.voteDone or false,
@@ -1454,8 +1957,10 @@ function Session:sendUpdate(player)
 		progressText = progressText,
 		hidden = self.hidden[player] == true or nil,
 		hideSpot = self.hideSpot[player] or nil,
-		limitedTools = self.diff.tools,
-		paint = not self.isColosal and (self.isMulti or #self.players >= 2),
+		limitedTools = self.isAsedio
+			and (self:asedioSide(player) == "defend" and Config.Asedio.toolsDefend or Config.Asedio.toolsAttack)
+			or self.diff.tools,
+		paint = self.isAsedio or (not self.isColosal and (self.isMulti or #self.players >= 2)),
 	})
 end
 
@@ -1648,6 +2153,23 @@ function GameManager.requestJoin(player, modeId)
 		end
 		if not session then
 			session = Session.new("multi", Random.new())
+			table.insert(sessions, session)
+		end
+		session:addPlayer(player)
+		return
+	end
+
+	if modeId == "asedio" then
+		local session
+		for _, candidate in ipairs(sessions) do
+			if candidate.modeId == "asedio" and not candidate.finished
+				and candidate.phase ~= "ended" and not candidate:isFull() then
+				session = candidate
+				break
+			end
+		end
+		if not session then
+			session = Session.new("asedio", Random.new())
 			table.insert(sessions, session)
 		end
 		session:addPlayer(player)

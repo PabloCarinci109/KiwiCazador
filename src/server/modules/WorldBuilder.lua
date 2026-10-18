@@ -259,6 +259,8 @@ local function buildArena(index, zone, cfg, parent, rng)
 	self.enterList = {}
 	self.chests = {}
 	self.busy = false
+	self.traffic = {}      -- autos, colectivo y tren (mapa Ciudad)
+	self.semaphores = {}   -- semaforos que cambian de luz
 
 	local folder = Instance.new("Folder")
 	folder.Name = "Arena" .. index
@@ -1279,11 +1281,94 @@ local function buildArena(index, zone, cfg, parent, rng)
 		box("Caja", cf * CFrame.new(0, size.Y * 0.5, 0), size, Color3.fromRGB(126, 94, 60), Enum.Material.WoodPlanks)
 	end
 
+	-- Cocina: mesada con pileta, heladera y horno con anafes
+	local function makeKitchenCounter(cf, len, wood)
+		box("Mesada", cf * CFrame.new(0, 2.9, 0), Vector3.new(len, 0.3, 2.2), Color3.fromRGB(196, 198, 202), Enum.Material.Slate)
+		box("MuebleBajo", cf * CFrame.new(0, 1.45, 0), Vector3.new(len, 2.6, 1.9), wood, Enum.Material.WoodPlanks)
+		box("Pileta", cf * CFrame.new(-len * 0.22, 2.95, 0), Vector3.new(2.6, 0.5, 1.5), Color3.fromRGB(164, 170, 176), Enum.Material.Metal)
+		part({
+			Name = "Grifo",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.3, 0.22, 0.22),
+			CFrame = cf * CFrame.new(-len * 0.22, 3.55, -0.7) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = Color3.fromRGB(184, 190, 196),
+			Material = Enum.Material.Metal,
+			CanCollide = false,
+			Parent = props,
+		})
+	end
+
+	local function makeFridge(cf)
+		box("Heladera", cf * CFrame.new(0, 3.2, 0), Vector3.new(3.0, 6.4, 3.0), Color3.fromRGB(226, 228, 232), Enum.Material.Metal)
+		box("HeladeraPuerta", cf * CFrame.new(0, 3.2, 1.6), Vector3.new(2.7, 5.9, 0.2), Color3.fromRGB(206, 210, 216), Enum.Material.Metal)
+		box("HeladeraManija", cf * CFrame.new(-1.05, 3.2, 1.85), Vector3.new(0.2, 2.6, 0.2), Color3.fromRGB(150, 156, 162), Enum.Material.Metal)
+	end
+
+	local function makeStove(cf)
+		box("Horno", cf * CFrame.new(0, 1.6, 0), Vector3.new(3.2, 3.0, 2.6), Color3.fromRGB(210, 212, 216), Enum.Material.Metal)
+		box("HornoPuerta", cf * CFrame.new(0, 1.7, 1.35), Vector3.new(2.5, 1.8, 0.2), Color3.fromRGB(56, 58, 62), Enum.Material.Glass)
+		for i = 1, 4 do
+			local dx = (i % 2 == 0) and 0.78 or -0.78
+			local dz = (i <= 2) and -0.62 or 0.62
+			part({
+				Name = "Anafe",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.26, 1.15, 1.15),
+				CFrame = cf * CFrame.new(dx, 3.24, dz) * CFrame.Angles(0, 0, math.rad(90)),
+				Color = Color3.fromRGB(38, 38, 42),
+				Material = Enum.Material.Metal,
+				CanCollide = false,
+				Parent = props,
+			})
+		end
+	end
+
+	-- Living: sofa, mesa ratona, alfombra y tele
+	local function makeSofa(cf)
+		local cloth = Color3.fromRGB(140, 150, 172)
+		box("SofaAsiento", cf * CFrame.new(0, 1.3, 0), Vector3.new(7.0, 1.0, 2.9), cloth, Enum.Material.Fabric)
+		box("SofaRespaldo", cf * CFrame.new(0, 2.7, 1.1), Vector3.new(7.0, 2.0, 0.8), cloth, Enum.Material.Fabric)
+		box("SofaBrazoA", cf * CFrame.new(-3.2, 1.9, 0), Vector3.new(0.6, 2.0, 2.9), cloth, Enum.Material.Fabric)
+		box("SofaBrazoB", cf * CFrame.new(3.2, 1.9, 0), Vector3.new(0.6, 2.0, 2.9), cloth, Enum.Material.Fabric)
+	end
+
+	local function makeCoffeeTable(cf)
+		box("MesaRatona", cf * CFrame.new(0, 1.1, 0), Vector3.new(4.2, 0.3, 2.4), Color3.fromRGB(122, 90, 60), Enum.Material.Wood)
+		for _, spot in ipairs({ { -1.7, -0.8 }, { 1.7, -0.8 }, { -1.7, 0.8 }, { 1.7, 0.8 } }) do
+			part({
+				Name = "PataRatona",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(1.1, 0.22, 0.22),
+				CFrame = cf * CFrame.new(spot[1], 0.55, spot[2]) * CFrame.Angles(0, 0, math.rad(90)),
+				Color = Color3.fromRGB(96, 70, 46),
+				Material = Enum.Material.Wood,
+				Parent = props,
+			})
+		end
+	end
+
+	local function makeRug(cf, color)
+		return part({
+			Name = "Alfombra",
+			Size = Vector3.new(7, 0.12, 5),
+			CFrame = cf * CFrame.new(0, 0.06, 0),
+			Color = color or Color3.fromRGB(148, 70, 60),
+			Material = Enum.Material.Fabric,
+			CanCollide = false,
+			Parent = props,
+		})
+	end
+
+	local function makeTV(cf)
+		box("Tele", cf * CFrame.new(0, 0, 0), Vector3.new(0.5, 4.4, 6.2), Color3.fromRGB(38, 40, 44), Enum.Material.Metal)
+		box("TelePantalla", cf * CFrame.new(-0.3, 0.1, 0), Vector3.new(0.1, 3.6, 5.4), Color3.fromRGB(70, 112, 142), Enum.Material.Neon)
+	end
+
 	local function makeHouse(pos, angle, variant)
 		local base = CFrame.new(pos) * CFrame.Angles(0, angle, 0)
 		local big = variant == "farm"
-		local W = big and 30 or 26
-		local D = big and 22 or 19
+		local W = big and 38 or 32
+		local D = big and 28 or 24
 		local floorH = 9.4
 		local totalH = floorH * 2
 		local wood = HOUSE_WOOD
@@ -1357,39 +1442,47 @@ local function buildArena(index, zone, cfg, parent, rng)
 			Parent = props,
 		})
 
-		-- Planta baja: comedor y living del lado derecho (la escalera usa la izquierda)
-		makeTable(base * CFrame.new(3, 0.6, -1), wood)
-		makeChair(base * CFrame.new(3, 0.6, 2), wood)
-		makeChair(base * CFrame.new(3, 0.6, -4), wood)
-		makeBed(base * CFrame.new(W * 0.3, 0.6, -D * 0.32), wood)
-		makeShelfProp(base * CFrame.new(8, 0.6, 0.5), wood)
-		makeCrateProp(base * CFrame.new(6.5, 0.6, D * 0.3), Vector3.new(4.4, 4.4, 4.4), wood)
+		-- Planta baja pensada para no trabar puerta ni escalera:
+		-- la escalera usa la pared izquierda, la puerta el medio del frente
+		-- y los muebles van contra las paredes (baul en el rincon del fondo).
+		makeStove(base * CFrame.new(-6.6, 0.6, -D * 0.5 + 1.7))
+		makeKitchenCounter(base * CFrame.new(1.6, 0.6, -D * 0.5 + 1.5), 12, wood)
+		makeFridge(base * CFrame.new(9.4, 0.6, -D * 0.5 + 1.8))
+		makeTable(base * CFrame.new(5.5, 0.6, 2.5), wood)
+		makeChair(base * CFrame.new(5.5, 0.6, 5.6), wood)
+		makeChair(base * CFrame.new(5.5, 0.6, -0.6), wood)
+		makeChair(base * CFrame.new(2.4, 0.6, 2.5) * CFrame.Angles(0, math.rad(90), 0), wood)
+		makeChair(base * CFrame.new(8.6, 0.6, 2.5) * CFrame.Angles(0, math.rad(-90), 0), wood)
+		makeRug(base * CFrame.new(10.2, 0.6, 4.2))
+		makeCoffeeTable(base * CFrame.new(10.6, 0.6, 4.2))
+		makeSofa(base * CFrame.new(W * 0.5 - 2.0, 0.6, 4.2) * CFrame.Angles(0, math.rad(90), 0))
+		makeTV(base * CFrame.new(W * 0.5 - 0.4, 4.7, 4.2))
+		makeCloset(base * CFrame.new(W * 0.5 - 1.7, 0.6, -2) * CFrame.Angles(0, math.rad(-90), 0), "Armario")
 		if big then
-			makeCrateProp(base * CFrame.new(0.5, 0.6, -D * 0.36), Vector3.new(4, 3.2, 4), wood)
-			makeBarrelHide(base * CFrame.new(-4.5, 0.6, -D * 0.05), "Barril")
+			makeCrateProp(base * CFrame.new(5.6, 0.6, -D * 0.5 + 4.4), Vector3.new(4, 3.2, 4), wood)
+			makeBarrelHide(base * CFrame.new(-8.6, 0.6, D * 0.5 - 2.0), "Barril")
 		end
-		makeShelfProp(base * CFrame.new(-4, 0.6, -D * 0.4), wood)
-		makeCloset(base * CFrame.new(W * 0.36, 0.6, D * 0.1) * CFrame.Angles(0, math.rad(-90), 0), "Armario")
-		makeChestProp(base * CFrame.new(-4, 0.6, D * 0.36), "Baúl")
+		-- Baul pegado al rincon del frente (lejos de la puerta y la escalera)
+		makeChestProp(base * CFrame.new(W * 0.5 - 2.2, 0.6, D * 0.5 - 2.2), "Baúl")
 
-		addSpot("casa", "Casa", floorPart, (base * CFrame.new(-3, 0, -D * 0.3)).Position, 2.8, 0.9)
-		addSpot("casa", "Casa", floorPart, (base * CFrame.new(5, 0, D * 0.05)).Position, 2.8, 0.9)
+		addSpot("casa", "Casa", floorPart, (base * CFrame.new(5, 0, -5)).Position, 2.8, 0.9)
+		addSpot("casa", "Casa", floorPart, (base * CFrame.new(-2, 0, 6)).Position, 2.8, 0.9)
 
-		-- Planta alta: dormitorio y baul propios. No hay escondite (armario)
+		-- Planta alta: dos dormitorios con camas. No hay escondite (armario)
 		-- aca arriba: el kiwi no sabe subir escaleras y seria una zona segura.
 		local upY = floorH + 0.8
-		makeBed(base * CFrame.new(W * 0.3, upY, -D * 0.3), wood)
-		makeShelfProp(base * CFrame.new(2, upY, -D * 0.42), wood)
-		makeCrateProp(base * CFrame.new(-3.5, upY, D * 0.3), Vector3.new(4, 3.6, 4), wood)
-		makeShelfProp(base * CFrame.new(W * 0.34, upY, D * 0.08), wood)
-		makeChestProp(base * CFrame.new(2.5, upY, D * 0.34), "Baúl del piso")
+		makeBed(base * CFrame.new(0, upY, -D * 0.5 + 2.2), wood)
+		makeBed(base * CFrame.new(10, upY, -D * 0.5 + 2.2), wood)
+		makeCrateProp(base * CFrame.new(5.0, upY, -D * 0.5 + 2.0), Vector3.new(3, 3.4, 3), wood)
+		makeShelfProp(base * CFrame.new(W * 0.5 - 1.6, upY, -2), wood)
+		makeChestProp(base * CFrame.new(W * 0.5 - 2.2, upY, D * 0.5 - 2.2), "Baúl del piso")
 
 		addIndoor(base, Vector3.new(W - 2, totalH, D - 2))
 	end
 
 	local function makeBarn(pos, angle)
 		local base = CFrame.new(pos) * CFrame.Angles(0, angle, 0)
-		local W, D, wallH = 23, 17, 11
+		local W, D, wallH = 26, 19, 11
 		local wood = HOUSE_WOOD
 		local barnRed = zone.barn or (theme == "ciudad" and Color3.fromRGB(118, 110, 102) or Color3.fromRGB(140, 62, 52))
 		local floorPart = box("PisoGranero", base * CFrame.new(0, 0.3, 0), Vector3.new(W + 1.6, 0.6, D + 1.6), HOUSE_FLOOR, Enum.Material.Slate)
@@ -1485,6 +1578,360 @@ local function buildArena(index, zone, cfg, parent, rng)
 			end
 		end
 		return nil
+	end
+
+	-- ===============================================================
+	-- Vida de la ciudad: avenidas, tiendas, semaforos, autos y tren
+	-- (solo el mapa Ciudad de Auckland)
+	-- ===============================================================
+	if theme == "ciudad" then
+		local asphalt = Color3.fromRGB(46, 46, 52)
+		local sidewalkCol = Color3.fromRGB(148, 146, 140)
+		local R = half - 82            -- radio de la avenida circular
+		local roadW = 34               -- ancho de la calzada
+		local yRoad = floorY + 0.1
+
+		-- Calzada: anillo cuadrado de cuatro tramos
+		local tramos = {
+			{ Vector3.new(0, 0, -R), Vector3.new(2 * R + roadW, 0.24, roadW) },
+			{ Vector3.new(0, 0, R), Vector3.new(2 * R + roadW, 0.24, roadW) },
+			{ Vector3.new(-R, 0, 0), Vector3.new(roadW, 0.24, 2 * R + roadW) },
+			{ Vector3.new(R, 0, 0), Vector3.new(roadW, 0.24, 2 * R + roadW) },
+		}
+		for _, tramo in ipairs(tramos) do
+			box("Avenida", CFrame.new(center.X + tramo[1].X, yRoad, center.Z + tramo[1].Z), tramo[2],
+				asphalt, Enum.Material.Asphalt)
+			-- Lineas blancas del medio
+			local along = tramo[2].X > tramo[2].Z and tramo[2].X or tramo[2].Z
+			local vertical = tramo[2].Z > tramo[2].X
+			local n = math.floor(along / 22)
+			for i = -n, n do
+				local offset = i * 22
+				local pos
+				local size
+				if vertical then
+					pos = Vector3.new(center.X + tramo[1].X, yRoad + 0.18, center.Z + tramo[1].Z + offset)
+					size = Vector3.new(0.8, 0.06, 6)
+				else
+					pos = Vector3.new(center.X + tramo[1].X + offset, yRoad + 0.18, center.Z + tramo[1].Z)
+					size = Vector3.new(6, 0.06, 0.8)
+				end
+				box("LineaVia", CFrame.new(pos), size, Color3.fromRGB(228, 226, 214), Enum.Material.SmoothPlastic)
+			end
+			-- Aceras a los dos lados
+			for _, side in ipairs({ -1, 1 }) do
+				local off, sz
+				if vertical then
+					off = Vector3.new(side * (roadW * 0.5 + 2.5), 0, 0)
+					sz = Vector3.new(5, 0.5, along)
+				else
+					off = Vector3.new(0, 0, side * (roadW * 0.5 + 2.5))
+					sz = Vector3.new(along, 0.5, 5)
+				end
+				box("Acera", CFrame.new(center.X + tramo[1].X + off.X, floorY + 0.25, center.Z + tramo[1].Z + off.Z),
+					sz, sidewalkCol, Enum.Material.Concrete)
+			end
+			-- Muestras ocupadas: que props y casas no invadan la avenida
+			local samples = math.floor(along / 22)
+			for i = -samples, samples do
+				local offset = i * 22
+				local p
+				if vertical then
+					p = Vector3.new(center.X + tramo[1].X, 0, center.Z + tramo[1].Z + offset)
+				else
+					p = Vector3.new(center.X + tramo[1].X + offset, 0, center.Z + tramo[1].Z)
+				end
+				table.insert(occupied, p)
+			end
+		end
+
+		-- Tiendas y comercios bordeando la avenida (con cartel de codigo)
+		local function makeShop(base, name, color)
+			local W, D, H = 24, 15, 12
+			box("Local", base * CFrame.new(0, H * 0.5 + 0.6, 0), Vector3.new(W, H, D),
+				Color3.fromRGB(206, 198, 184), Enum.Material.Concrete)
+			box("LocalTecho", base * CFrame.new(0, H + 1.0, 0), Vector3.new(W + 1.4, 0.6, D + 1.4),
+				Color3.fromRGB(120, 96, 78), Enum.Material.Slate)
+			box("Vitrina", base * CFrame.new(-3.4, 4.6, D * 0.5 + 0.1), Vector3.new(15, 6.4, 0.4),
+				Color3.fromRGB(120, 170, 186), Enum.Material.Glass)
+			box("PuertaLocal", base * CFrame.new(W * 0.32, 3.6, D * 0.5 + 0.12), Vector3.new(4.2, 7.0, 0.4),
+				Color3.fromRGB(60, 54, 48), Enum.Material.WoodPlanks)
+			for i = 0, 5 do
+				local tone = (i % 2 == 0) and color or Color3.fromRGB(238, 236, 228)
+				part({
+					Name = "Toldo",
+					Size = Vector3.new(3.2, 0.22, 3.6),
+					CFrame = base * CFrame.new(-8.25 + i * 3.3, 8.7, D * 0.5 + 1.7) * CFrame.Angles(math.rad(-16), 0, 0),
+					Color = tone,
+					Material = Enum.Material.Fabric,
+					CanCollide = false,
+					Parent = props,
+				})
+			end
+			local sign = box("Cartel", base * CFrame.new(0, 10.7, D * 0.5 + 0.15), Vector3.new(16, 2.4, 0.4),
+				Color3.fromRGB(58, 52, 48), Enum.Material.WoodPlanks)
+			local gui = Instance.new("SurfaceGui")
+			gui.Name = "CartelGui"
+			gui.Face = Enum.NormalId.Back
+			gui.LightInfluence = 0
+			gui.CanvasSize = Vector2.new(800, 120)
+			gui.Parent = sign
+			local label = Instance.new("TextLabel")
+			label.Size = UDim2.fromScale(1, 1)
+			label.BackgroundTransparency = 1
+			label.Font = Enum.Font.GothamBold
+			label.TextScaled = true
+			label.TextColor3 = Color3.fromRGB(250, 244, 230)
+			label.Text = name
+			label.Parent = gui
+		end
+
+		local SHOPS = {
+			{ name = "Panaderia", color = Color3.fromRGB(226, 152, 72) },
+			{ name = "Kiosco", color = Color3.fromRGB(112, 196, 120) },
+			{ name = "Heladeria", color = Color3.fromRGB(120, 190, 226) },
+			{ name = "Ferreteria", color = Color3.fromRGB(206, 96, 84) },
+			{ name = "Cafe", color = Color3.fromRGB(150, 106, 74) },
+			{ name = "Supermercado", color = Color3.fromRGB(228, 200, 90) },
+		}
+		for i, shop in ipairs(SHOPS) do
+			local a = math.rad(25 + (i - 1) * 60)
+			local pos = center + Vector3.new(math.sin(a), 0, math.cos(a)) * (R - 40)
+			pos = Vector3.new(pos.X, 0, pos.Z)
+			makeShop(CFrame.new(pos + Vector3.new(0, floorY, 0)) * CFrame.Angles(0, a, 0), shop.name, shop.color)
+			table.insert(occupied, pos)
+		end
+
+		-- Semaforos en las cuatro esquinas de la avenida
+		local function makeTrafficLight(pos)
+			box("PosteSemaforo", CFrame.new(pos + Vector3.new(0, 7.5, 0)), Vector3.new(0.5, 15, 0.5),
+				Color3.fromRGB(58, 58, 62), Enum.Material.Metal)
+			box("CabezaSemaforo", CFrame.new(pos + Vector3.new(0, 14.6, 0)), Vector3.new(1.4, 4.0, 1.0),
+				Color3.fromRGB(40, 42, 46), Enum.Material.Metal)
+			local lights = {}
+			local function bulb(name, color, dy)
+				lights[name] = part({
+					Name = name,
+					Shape = Enum.PartType.Ball,
+					Size = Vector3.new(0.85, 0.85, 0.85),
+					Position = pos + Vector3.new(0, 14.6 + dy, 0.62),
+					Color = color,
+					Material = Enum.Material.SmoothPlastic,
+					CanCollide = false,
+					Parent = props,
+				})
+			end
+			bulb("red", Color3.fromRGB(210, 60, 50), 1.25)
+			bulb("yellow", Color3.fromRGB(220, 180, 60), 0)
+			bulb("green", Color3.fromRGB(70, 190, 110), -1.25)
+			table.insert(self.semaphores, lights)
+		end
+		for _, corner in ipairs({ { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } }) do
+			local p = center + Vector3.new(corner[1] * (R + 26), floorY, corner[2] * (R + 26))
+			makeTrafficLight(p)
+			table.insert(occupied, Vector3.new(p.X, 0, p.Z))
+		end
+
+		-- Vias del tren pegadas al muro norte
+		local trackZ = center.Z - (half - 44)
+		local trackHalf = half - 30
+		box("ViaA", CFrame.new(center.X, floorY + 0.15, trackZ - 1.2), Vector3.new(trackHalf * 2, 0.3, 0.5),
+			Color3.fromRGB(120, 122, 128), Enum.Material.Metal)
+		box("ViaB", CFrame.new(center.X, floorY + 0.15, trackZ + 1.2), Vector3.new(trackHalf * 2, 0.3, 0.5),
+			Color3.fromRGB(120, 122, 128), Enum.Material.Metal)
+		local sleeperN = math.floor(trackHalf / 12)
+		for i = -sleeperN, sleeperN do
+			box("Durmiente", CFrame.new(center.X + i * 12, floorY + 0.05, trackZ), Vector3.new(2.0, 0.3, 3.6),
+				Color3.fromRGB(96, 74, 54), Enum.Material.WoodPlanks)
+		end
+		local railSamples = math.floor(trackHalf / 26)
+		for i = -railSamples, railSamples do
+			table.insert(occupied, Vector3.new(center.X + i * 26, 0, trackZ))
+		end
+
+		-- Vehiculos: partes de adorno que mueve GameManager (sin fisica)
+		local function vehiclePart(model, name, size, cf, color, material, shape)
+			local p = part({
+				Name = name,
+				Size = size,
+				CFrame = cf,
+				Color = color,
+				Material = material or Enum.Material.Metal,
+				Anchored = true,
+				CanCollide = false,
+				CanQuery = false,
+				CanTouch = false,
+				CastShadow = true,
+				Parent = model,
+			})
+			if shape then
+				p.Shape = shape
+			end
+			p.Massless = true
+			return p
+		end
+
+		local CAR_COLORS = {
+			Color3.fromRGB(176, 66, 58), Color3.fromRGB(64, 110, 176),
+			Color3.fromRGB(202, 172, 70), Color3.fromRGB(96, 160, 110),
+			Color3.fromRGB(220, 220, 224), Color3.fromRGB(120, 90, 160),
+		}
+
+		local function makeCar(color)
+			local model = Instance.new("Model")
+			model.Name = "Auto"
+			model.Parent = folder
+			local body = vehiclePart(model, "Chasis", Vector3.new(5.0, 1.8, 11.0), CFrame.new(0, 0, 0),
+				color, Enum.Material.SmoothPlastic)
+			vehiclePart(model, "Cabina", Vector3.new(4.6, 1.5, 5.4), CFrame.new(0, 1.55, 0.4),
+				Color3.fromRGB(150, 180, 196), Enum.Material.Glass)
+			vehiclePart(model, "TechoAuto", Vector3.new(4.2, 0.3, 5.6), CFrame.new(0, 2.3, 0.4),
+				color, Enum.Material.SmoothPlastic)
+			for _, z in ipairs({ -3.6, 3.6 }) do
+				for _, x in ipairs({ -2.6, 2.6 }) do
+					vehiclePart(model, "Rueda", Vector3.new(1.0, 2.8, 2.8),
+						CFrame.new(x, -1.6, z) * CFrame.Angles(0, 0, math.rad(90)),
+						Color3.fromRGB(34, 34, 36), Enum.Material.Rubber, Enum.PartType.Cylinder)
+				end
+			end
+			vehiclePart(model, "LuzA", Vector3.new(0.9, 0.4, 0.3), CFrame.new(-1.5, 0.4, -5.6),
+				Color3.fromRGB(255, 240, 190), Enum.Material.Neon)
+			vehiclePart(model, "LuzB", Vector3.new(0.9, 0.4, 0.3), CFrame.new(1.5, 0.4, -5.6),
+				Color3.fromRGB(255, 240, 190), Enum.Material.Neon)
+			vehiclePart(model, "LuzTrasera", Vector3.new(3.6, 0.35, 0.25), CFrame.new(0, 0.5, 5.6),
+				Color3.fromRGB(200, 50, 40), Enum.Material.Neon)
+			model.PrimaryPart = body
+			return model
+		end
+
+		local function makeBus()
+			local model = Instance.new("Model")
+			model.Name = "Colectivo"
+			model.Parent = folder
+			local body = vehiclePart(model, "ChasisBus", Vector3.new(5.6, 3.2, 22), CFrame.new(0, 0, 0),
+				Color3.fromRGB(70, 120, 190), Enum.Material.SmoothPlastic)
+			vehiclePart(model, "VentanasBus", Vector3.new(5.7, 1.3, 16), CFrame.new(0, 0.9, 0),
+				Color3.fromRGB(150, 190, 205), Enum.Material.Glass)
+			vehiclePart(model, "TechoBus", Vector3.new(5.2, 0.3, 22.4), CFrame.new(0, 1.75, 0),
+				Color3.fromRGB(238, 238, 240), Enum.Material.SmoothPlastic)
+			vehiclePart(model, "FranjaBus", Vector3.new(5.65, 0.5, 22.1), CFrame.new(0, -0.6, 0),
+				Color3.fromRGB(230, 230, 234), Enum.Material.SmoothPlastic)
+			for _, z in ipairs({ -7.5, 0, 7.5 }) do
+				for _, x in ipairs({ -2.9, 2.9 }) do
+					vehiclePart(model, "RuedaBus", Vector3.new(1.1, 3.0, 3.0),
+						CFrame.new(x, -1.7, z) * CFrame.Angles(0, 0, math.rad(90)),
+						Color3.fromRGB(32, 32, 34), Enum.Material.Rubber, Enum.PartType.Cylinder)
+				end
+			end
+			vehiclePart(model, "LuzBusA", Vector3.new(1.0, 0.5, 0.3), CFrame.new(-1.8, -0.5, -11.1),
+				Color3.fromRGB(255, 240, 190), Enum.Material.Neon)
+			vehiclePart(model, "LuzBusB", Vector3.new(1.0, 0.5, 0.3), CFrame.new(1.8, -0.5, -11.1),
+				Color3.fromRGB(255, 240, 190), Enum.Material.Neon)
+			model.PrimaryPart = body
+			return model
+		end
+
+		local function makeTrain()
+			local model = Instance.new("Model")
+			model.Name = "Tren"
+			model.Parent = folder
+			local body = vehiclePart(model, "Locomotora", Vector3.new(6.0, 4.6, 30), CFrame.new(0, 0, 8),
+				Color3.fromRGB(214, 178, 60), Enum.Material.Metal)
+			vehiclePart(model, "Vagon", Vector3.new(6.0, 4.2, 34), CFrame.new(0, -0.1, -24),
+				Color3.fromRGB(194, 74, 64), Enum.Material.Metal)
+			vehiclePart(model, "VentanaVagon", Vector3.new(6.1, 1.2, 26), CFrame.new(0, 0.4, -24),
+				Color3.fromRGB(150, 190, 205), Enum.Material.Glass)
+			vehiclePart(model, "TechoTren", Vector3.new(5.4, 0.3, 62), CFrame.new(0, 2.4, -8),
+				Color3.fromRGB(92, 84, 76), Enum.Material.Metal)
+			vehiclePart(model, "LuzTren", Vector3.new(1.2, 1.2, 0.4), CFrame.new(0, 0.6, -8.4),
+				Color3.fromRGB(255, 246, 200), Enum.Material.Neon)
+			for _, z in ipairs({ 18, 14, -8, -14, -30, -36 }) do
+				for _, x in ipairs({ -3.1, 3.1 }) do
+					vehiclePart(model, "RuedaTren", Vector3.new(1.0, 2.6, 2.6),
+						CFrame.new(x, -2.4, z) * CFrame.Angles(0, 0, math.rad(90)),
+						Color3.fromRGB(40, 40, 44), Enum.Material.Metal, Enum.PartType.Cylinder)
+				end
+			end
+			model.PrimaryPart = body
+			return model
+		end
+
+		-- Camino del anillo (esquinas cortadas para que doblen suave)
+		local lane = R + 8
+		local ringPts = {}
+		for k = 0, 7 do
+			local ang = k * math.pi / 4
+			local c, s = math.cos(ang), math.sin(ang)
+			local m = math.max(math.abs(c), math.abs(s))
+			local len = lane / m
+			if k % 2 == 1 then
+				len = len * 0.92
+			end
+			table.insert(ringPts, center + Vector3.new(c * len, 0, s * len))
+		end
+		local ringCum, ringTotal = { 0 }, 0
+		for i = 1, #ringPts - 1 do
+			ringTotal = ringTotal + (ringPts[i + 1] - ringPts[i]).Magnitude
+			ringCum[i + 1] = ringTotal
+		end
+
+		-- Deja el vehiculo estacionado en su punto de partida
+		local function parkVehicle(veh)
+			local s = veh.startDist or 0
+			for i = 1, #veh.pts - 1 do
+				if s <= veh.cum[i + 1] or i == #veh.pts - 1 then
+					local segLen = math.max(veh.cum[i + 1] - veh.cum[i], 0.001)
+					local t = math.clamp((s - veh.cum[i]) / segLen, 0, 1)
+					local pos = veh.pts[i]:Lerp(veh.pts[i + 1], t)
+					local dir = (veh.pts[i + 1] - veh.pts[i]).Unit
+					local base = Vector3.new(pos.X, veh.baseY, pos.Z)
+					veh.model:PivotTo(CFrame.lookAt(base, base + dir))
+					return
+				end
+			end
+		end
+
+		local function addVehicle(veh)
+			table.insert(self.traffic, veh)
+			parkVehicle(veh)
+		end
+
+		for i, color in ipairs({ CAR_COLORS[1], CAR_COLORS[2], CAR_COLORS[3] }) do
+			addVehicle({
+				model = makeCar(color),
+				pts = ringPts, cum = ringCum, total = ringTotal,
+				dist = 0, startDist = ringTotal * (i - 1) * 0.31, dir = 1,
+				speed = Config.City.speedCar,
+				baseY = floorY + 3.05,
+				halfW = 3.2, halfL = 6.2,
+				label = Config.Text.CarHit,
+			})
+		end
+		addVehicle({
+			model = makeBus(),
+			pts = ringPts, cum = ringCum, total = ringTotal,
+			dist = 0, startDist = ringTotal * 0.52, dir = 1,
+			speed = Config.City.speedBus,
+			baseY = floorY + 3.25,
+			halfW = 3.6, halfL = 12.0,
+			label = Config.Text.BusHit,
+		})
+
+		local trainPts = {
+			Vector3.new(center.X - trackHalf, 0, trackZ),
+			Vector3.new(center.X + trackHalf, 0, trackZ),
+		}
+		local trainTotal = (trainPts[2] - trainPts[1]).Magnitude
+		addVehicle({
+			model = makeTrain(),
+			pts = trainPts, cum = { 0, trainTotal }, total = trainTotal,
+			dist = 0, startDist = 0, dir = 1,
+			speed = Config.City.speedTrain,
+			shuttle = true, wait = Config.City.trainWait,
+			baseY = floorY + 3.75,
+			halfW = 3.9, halfL = 30,
+			label = Config.Text.TrainHit,
+		})
 	end
 
 	-- Zona central despejada para que aparezca el kiwi
@@ -1715,12 +2162,22 @@ local function buildArena(index, zone, cfg, parent, rng)
 		local anchor = freeSpotFallback(56, { 78, 56, 36, 22 })
 		if anchor then
 			makeHouse(anchor, faceCenter(anchor), "cabin")
-			placeNear(anchor, { 48, 54, 60, 40 }, 46, function(cand)
+			placeNear(anchor, { 48, 54, 60, 40 }, 50, function(cand)
 				makeHouse(cand, faceCenter(cand), "farm")
 			end)
 			placeNear(anchor, { 56, 60, 66, 48 }, 50, function(cand)
 				makeBarn(cand, faceCenter(cand))
 			end)
+		end
+
+		-- Casa del Nido: la usa el modo Asedio (5 vs 5) como guarida del
+		-- kiwi. Existe en todos los mapas para que el asedio tenga su casa.
+		local nestSpot = freeSpotFallback(58, { 84, 58, 40, 26 })
+		if nestSpot then
+			makeHouse(nestSpot, faceCenter(nestSpot), "farm")
+			self.nest = { pos = nestSpot }
+		else
+			self.nest = { pos = anchor or center }
 		end
 
 		-- Una casa mas lejos para variar el mapa
@@ -1731,7 +2188,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 
 		-- La ciudad suma una casa mas y su torre mirador
 		if theme == "ciudad" and anchor then
-			placeNear(anchor, { 64, 74, 50, 36 }, 48, function(cand)
+			placeNear(anchor, { 64, 74, 50, 36 }, 52, function(cand)
 				makeHouse(cand, faceCenter(cand), "farm")
 			end)
 			local skySpot = freeSpotFallback(54, { 82, 60, 40, 24 })

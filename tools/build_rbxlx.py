@@ -104,6 +104,7 @@ def construir():
     agregar_fuente(cliente, "LocalScript", "Main", SRC / "client" / "Main.client.lua")
     modulos_cli, _ = item(cliente, "Folder", "modules")
     agregar_fuente(modulos_cli, "ModuleScript", "HUD", SRC / "client" / "modules" / "HUD.lua")
+    agregar_fuente(modulos_cli, "ModuleScript", "ViewModel", SRC / "client" / "modules" / "ViewModel.lua")
 
     return raiz
 

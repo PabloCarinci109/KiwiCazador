@@ -24,6 +24,7 @@ local Net = require(Shared.Net)
 local Util = require(Shared.Util)
 
 local HUD = require(script.Parent.modules.HUD)
+local ViewModel = require(script.Parent.modules.ViewModel)
 
 local player = Players.LocalPlayer
 local remotes = Net.init()
@@ -31,6 +32,7 @@ local remotes = Net.init()
 local state = { active = false, phase = "none", diff = nil }
 local sprinting = false
 local sneaking = false
+local shotBloom = 0 -- el punto de mira se abre un toque al disparar
 local cooldowns = {
 	red = { left = 0, total = 1 },
 	rifle = { left = 0, total = 1 },
@@ -121,6 +123,25 @@ local function burst(position, color, count)
 	Debris:AddItem(holder, 2)
 end
 
+-- Trazadora estilo Counter: una linea neon que se apaga al instante
+local function tracer(from, dir, length, color, thickness)
+	local beam = Instance.new("Part")
+	beam.Name = "FxTrazadora"
+	beam.Anchored = true
+	beam.CanCollide = false
+	beam.CanQuery = false
+	beam.CanTouch = false
+	beam.CastShadow = false
+	beam.Material = Enum.Material.Neon
+	beam.Color = color or Color3.fromRGB(255, 240, 190)
+	beam.Size = Vector3.new(thickness or 0.1, thickness or 0.1, length)
+	local center = from + dir * (length * 0.5)
+	beam.CFrame = CFrame.lookAt(center, center + dir)
+	beam.Transparency = 0.2
+	beam.Parent = workspace
+	Debris:AddItem(beam, 0.09)
+end
+
 local function distanceToLocal(position)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -139,6 +160,10 @@ local function humanoid()
 end
 
 local hiddenNow = false -- escondido en un armario/barril/pajar: no te moves
+local scoped = false
+local scopeLevel = 0
+local equippedId = nil
+local firstPerson = false -- vista en primera persona (tecla V)
 
 local function applySpeed()
 	local hum = humanoid()
@@ -182,15 +207,22 @@ local function applySpeed()
 	else
 		hum.WalkSpeed = Config.Player.walkSpeed
 	end
+
+	-- Apuntando se camina mas lento (estilo Counter)
+	if scoped then
+		hum.WalkSpeed = math.min(hum.WalkSpeed, Config.Player.walkSpeed * 0.55)
+	end
+
+	-- Agachado la camara baja un poco (estilo Counter)
+	local offset = sneaking and Vector3.new(0, -1.1, 0) or Vector3.new(0, 0, 0)
+	if hum.CameraOffset ~= offset then
+		hum.CameraOffset = offset
+	end
 end
 
 -- ===============================================================
 -- Mira del rifle (clic derecho para apuntar)
 -- ===============================================================
-local scoped = false
-local equippedId = nil
-local firstPerson = false -- vista en primera persona (tecla V)
-
 local function applyCameraMode()
 	local first = scoped or (firstPerson and state.active and state.phase == "playing")
 	local mode = first and Enum.CameraMode.LockFirstPerson or Enum.CameraMode.Classic
@@ -216,14 +248,50 @@ local function setWeaponHidden(hidden)
 	end
 end
 
-local function setScope(enabled)
+-- Armas que apuntan (y que por lo tanto muestran la vista de arma)
+local SCOPE_WEAPONS = {
+	rifle = true, pintura = true, relente = true, revolver = true,
+	arco = true, sniper = true, cuchillo = true, lanzallamas = true, cohete = true,
+}
+
+-- Vista de arma estilo Counter: se ve en primera persona y al apuntar.
+-- Con la telescopica puesta el arma se esconde (solo queda la mira).
+local function refreshViewmodel()
+	local playing = state.active and state.phase == "playing"
+	local show = playing and (scoped or firstPerson)
+	ViewModel.setWeapon(equippedId)
+	ViewModel.setVisible(show)
+	ViewModel.setAds(scoped and equippedId ~= "sniper" and 1 or 0)
+	ViewModel.setHidden(scoped and equippedId == "sniper")
+	-- El arma "de verdad" del personaje se esconde cuando manda la vista
+	setWeaponHidden(scoped or (show and ViewModel.hasWeapon(equippedId)))
+end
+
+local function scopeFov(id, level)
+	local weapons = Config.Scope.weapons or {}
+	if id == "sniper" then
+		return (level or 1) >= 2 and (weapons.sniper2 or 7) or (weapons.sniper or 14)
+	end
+	return weapons[id] or Config.Scope.fov
+end
+
+local function setScope(enabled, level)
 	enabled = enabled and true or false
-	if scoped == enabled then
+	local lvl = enabled and math.max(1, level or 1) or 0
+	if scoped == enabled and scopeLevel == lvl then
 		return
 	end
 	scoped = enabled
-	HUD.setScope(scoped)
-	setWeaponHidden(scoped)
+	scopeLevel = lvl
+
+	-- Telescopica del francotirador: pantalla negra con circulo (Counter)
+	local sniperScope = scoped and equippedId == "sniper"
+	HUD.setScope(scoped, sniperScope)
+	if sniperScope then
+		HUD.setScopeZoom(lvl >= 2 and "10x" or "5x")
+	end
+
+	refreshViewmodel()
 	UserInputService.MouseIconEnabled = not scoped
 
 	local hum = humanoid()
@@ -233,8 +301,7 @@ local function setScope(enabled)
 
 	local camera = workspace.CurrentCamera
 	if camera then
-		local zoom = (Config.Scope.weapons and Config.Scope.weapons[equippedId]) or Config.Scope.fov
-		local goal = scoped and zoom or 70
+		local goal = scoped and scopeFov(equippedId, lvl) or 70
 		TweenService:Create(camera, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			FieldOfView = goal,
 		}):Play()
@@ -243,6 +310,7 @@ local function setScope(enabled)
 	-- Apuntando se pasa a primera persona: la mira ya no tapa la cabeza
 	UserInputService.MouseBehavior = scoped and Enum.MouseBehavior.LockCenter or Enum.MouseBehavior.Default
 	applyCameraMode()
+	applySpeed()
 
 	sound2D(Config.Sounds.ui, 0.25, scoped and 1.5 or 1.1)
 end
@@ -260,11 +328,10 @@ local function refreshEquipped()
 		end
 	end
 	equippedId = found
-	if equippedId ~= "rifle" and equippedId ~= "pintura" and equippedId ~= "relente"
-		and equippedId ~= "revolver" and equippedId ~= "arco" and equippedId ~= "sniper" then
+	if not SCOPE_WEAPONS[equippedId] then
 		setScope(false)
 	end
-	setWeaponHidden(scoped)
+	refreshViewmodel()
 end
 
 -- ===============================================================
@@ -310,7 +377,7 @@ local function fireTool(toolId)
 		return
 	end
 
-	remotes.ToolAction:FireServer(toolId, { aim = aimPoint() })
+	remotes.ToolAction:FireServer(toolId, { aim = aimPoint(), scoped = scoped, sneak = sneaking })
 
 	local total = cooldown and cooldown.total or 1
 	if cooldown then
@@ -333,7 +400,29 @@ local function fireTool(toolId)
 		sound2D(Config.Sounds.dartHit, 0.5, 1.6)
 	elseif toolId == "arco" then
 		sound2D(Config.Sounds.netSwing, 0.6, 1.4)
+	elseif toolId == "sniper" then
+		sound2D(Config.Sounds.dartShot, 0.95, 0.72)
+	elseif toolId == "cuchillo" then
+		sound2D(Config.Sounds.netSwing, 0.55, 1.3)
+	elseif toolId == "lanzallamas" then
+		sound2D(Config.Sounds.dartShot, 0.7, 0.55)
 	end
+
+	-- Patada del arma (estilo Counter)
+	local RECOIL = {
+		rifle = 0.45, pintura = 0.45, relente = 0.45, sniper = 1.1,
+		revolver = 0.7, cohete = 1.0, arco = 0.5, cuchillo = 0.35, lanzallamas = 0.3,
+	}
+	ViewModel.recoil(RECOIL[toolId] or 0)
+	ViewModel.flash()
+
+	-- Patada de camara estilo Counter Blox: 2 * (1 - control) grados
+	local shootCfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[toolId]
+	local control = shootCfg and shootCfg.recoil or 72
+	local kick = math.rad(2 * (1 - control / 100))
+	ViewModel.kickCamera(kick * (1 + math.random() * 0.5), kick * (math.random() * 4 - 2))
+
+	shotBloom = math.min(20, shotBloom + 8)
 end
 
 local hookedTools = {}
@@ -388,24 +477,37 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		return
 	end
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
-		-- Clic derecho: mira (rifle tranquilizante y rifle de pintura)
-		if (equippedId == "rifle" or equippedId == "pintura" or equippedId == "relente"
-			or equippedId == "revolver" or equippedId == "arco" or equippedId == "sniper")
-			and state.active and state.phase == "playing" then
-			setScope(not scoped)
+		-- Clic derecho: mira estilo Counter. El francotirador va ciclando
+		-- la telescopica: 5x -> 10x -> sin mira.
+		if SCOPE_WEAPONS[equippedId] and state.active and state.phase == "playing" then
+			if equippedId == "sniper" then
+				if not scoped then
+					setScope(true, 1)
+				elseif scopeLevel == 1 then
+					setScope(true, 2)
+				else
+					setScope(false)
+				end
+			else
+				setScope(not scoped, 1)
+			end
 		end
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.LeftShift then
 		sprinting = true
 		applySpeed()
-	elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.LeftAlt then
+	elseif input.KeyCode == Enum.KeyCode.Tab then
+		HUD.setScoreboardVisible(true)
+	elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.LeftAlt
+		or input.KeyCode == Enum.KeyCode.C then
 		sneaking = true
 		applySpeed()
 	elseif input.KeyCode == Enum.KeyCode.V then
 		if state.active and state.phase == "playing" then
 			firstPerson = not firstPerson
 			applyCameraMode()
+			refreshViewmodel()
 			sound2D(Config.Sounds.ui, 0.35)
 		end
 	end
@@ -415,9 +517,56 @@ UserInputService.InputEnded:Connect(function(input)
 	if input.KeyCode == Enum.KeyCode.LeftShift then
 		sprinting = false
 		applySpeed()
-	elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.LeftAlt then
+	elseif input.KeyCode == Enum.KeyCode.Tab then
+		HUD.setScoreboardVisible(false)
+	elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.LeftAlt
+		or input.KeyCode == Enum.KeyCode.C then
 		sneaking = false
 		applySpeed()
+	end
+end)
+
+-- ===============================================================
+-- Punto de mira estilo Counter: se abre al moverse o disparar
+-- ===============================================================
+local function spreadErrorLocal(weaponId)
+	local cfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[weaponId]
+	if not cfg then
+		return 0
+	end
+	local speed = 0
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if root then
+		local v = root.AssemblyLinearVelocity
+		speed = math.sqrt(v.X * v.X + v.Z * v.Z)
+	end
+	local error = math.max(cfg.spread or 0, 0) + speed * (cfg.vel or 0)
+	if scoped then
+		error = cfg.adsPerfect and 0 or error * ((Config.Shoot and Config.Shoot.adsDiv) or 0.35)
+	elseif sneaking then
+		error = error / ((Config.Shoot and Config.Shoot.crouchDiv) or 1.6)
+	end
+	local dead = cfg.dead or (Config.Shoot and Config.Shoot.dead) or 0
+	if error < dead then
+		error = 0
+	end
+	return error / ((Config.Shoot and Config.Shoot.div) or 6)
+end
+
+local lastCross = nil
+RunService.RenderStepped:Connect(function(dt)
+	shotBloom = math.max(0, shotBloom - dt * 30)
+	local show = state.active and state.phase == "playing" and not scoped and not hiddenNow
+		and equippedId ~= nil and ViewModel.hasWeapon(equippedId)
+	if show ~= lastCross then
+		lastCross = show
+		HUD.setCrosshair(show, 6, 9)
+	end
+	if show then
+		local grados = spreadErrorLocal(equippedId)
+		HUD.setCrosshair(true, 5 + math.min(grados * 5, 30) + shotBloom * 0.55,
+			7 + math.min(grados * 2, 10))
 	end
 end)
 
@@ -434,6 +583,7 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 		sprinting = false
 		sneaking = false
 		setScope(false)
+		refreshViewmodel()
 		HUD.hideResult()
 		HUD.hideVote()
 		HUD.setMenuVisible(true)
@@ -467,6 +617,7 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 		applyCameraMode()
 		applySpeed()
 	end
+	refreshViewmodel()
 
 	HUD.setMenuVisible(false)
 	HUD.setMenuStatus("")
@@ -545,6 +696,15 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 		end
 	elseif kind == "dartshot" then
 		soundAt(Config.Sounds.dartShot, position or Vector3.new(), 0.9)
+		if position and data.tracer and data.dir then
+			-- Estilo Counter: bala instantanea = trazadora, no proyectil
+			tracer(position, data.dir, 240, Color3.fromRGB(255, 240, 190), 0.1)
+		end
+	elseif kind == "headshot" then
+		if position then
+			soundAt(Config.Sounds.dartHit, position, 1, 1.35)
+			burst(position, Color3.fromRGB(255, 210, 90), 30)
+		end
 	elseif kind == "darthit" then
 		if position then
 			soundAt(Config.Sounds.dartHit, position, 1)
@@ -655,6 +815,43 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 			if distanceToLocal(position) < 70 then
 				sound2D(Config.Sounds.roar, 0.5, 0.7)
 			end
+		end
+	elseif kind == "weaponfx" then
+		-- Animacion distinta para cada arma de baul
+		local weapon = data.weapon
+		local dir = data.dir or Vector3.new(0, 0, -1)
+		if position and weapon == "sniper" then
+			tracer(position, dir, 340, Color3.fromRGB(255, 246, 205), 0.13)
+			burst(position + dir * 1.4, Color3.fromRGB(255, 232, 170), 8)
+		elseif position and weapon == "revolver" then
+			tracer(position, dir, 150, Color3.fromRGB(255, 224, 160), 0.09)
+			burst(position + dir * 0.9, Color3.fromRGB(255, 208, 140), 6)
+		elseif position and weapon == "cuchillo" then
+			burst(position + dir * 3.2, Color3.fromRGB(230, 240, 250), data.hit and 16 or 7)
+		elseif position and weapon == "lanzallamas" then
+			for i = 1, 5 do
+				task.delay(i * 0.055, function()
+					burst(position + dir * (2 + i * 2.3), Color3.fromRGB(255, 140 + i * 14, 60), 16)
+				end)
+			end
+		elseif position and weapon == "arco" then
+			burst(position + dir * 1.2, Color3.fromRGB(180, 225, 150), 5)
+		elseif position and weapon == "cohete" then
+			burst(position + dir * 1.6, Color3.fromRGB(210, 205, 200), 10)
+		end
+	elseif kind == "arrowpick" then
+		if position then
+			burst(position, Color3.fromRGB(180, 230, 150), 12)
+			if distanceToLocal(position) < 90 then
+				soundAt(Config.Sounds.ui, position, 0.6, 1.4)
+			end
+		end
+	elseif kind == "peck" then
+		if position then
+			if distanceToLocal(position) < 90 then
+				soundAt(Config.Sounds.roar, position, 0.75, 1.7)
+			end
+			burst(position, Color3.fromRGB(240, 100, 90), 14)
 		end
 	elseif kind == "chestopen" then
 		if position then

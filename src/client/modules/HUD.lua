@@ -326,6 +326,126 @@ local function buildSessionHud(parent)
 		Text = "100",
 	}, top)
 
+	-- Vida grande abajo a la izquierda (estilo Counter)
+	parts.hpBig = new("TextLabel", {
+		Name = "VidaGrande",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 18, 1, -14),
+		Size = UDim2.new(0, 150, 0, 44),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBlack,
+		TextSize = 36,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(236, 240, 244),
+		TextStrokeTransparency = 0.55,
+		Text = "100",
+	}, top)
+	new("TextLabel", {
+		Name = "VidaTag",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 22, 1, -58),
+		Size = UDim2.new(0, 120, 0, 14),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = COLOR.muted,
+		Text = "VIDA",
+	}, top)
+
+	-- Punto de mira estilo Counter: se abre al moverse o disparar
+	local cross = new("Frame", {
+		Name = "PuntoMira",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0, 2, 0, 2),
+		BackgroundColor3 = Color3.fromRGB(120, 255, 150),
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 20,
+	}, top)
+	parts.crosshair = cross
+	parts.crossLines = {}
+	for _, spec in ipairs({
+		{ name = "Arriba", anchor = Vector2.new(0.5, 1), w = 2, h = 9, axis = "up" },
+		{ name = "Abajo", anchor = Vector2.new(0.5, 0), w = 2, h = 9, axis = "down" },
+		{ name = "Izquierda", anchor = Vector2.new(1, 0.5), w = 9, h = 2, axis = "left" },
+		{ name = "Derecha", anchor = Vector2.new(0, 0.5), w = 9, h = 2, axis = "right" },
+	}) do
+		local line = new("Frame", {
+			Name = spec.name,
+			AnchorPoint = spec.anchor,
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(0, spec.w, 0, spec.h),
+			BackgroundColor3 = Color3.fromRGB(120, 255, 150),
+			BackgroundTransparency = 0.1,
+			BorderSizePixel = 0,
+		}, cross)
+		table.insert(parts.crossLines, { line = line, axis = spec.axis })
+	end
+
+	-- Marcador de equipos (solo modo Asedio 5 vs 5)
+	local teamBar = new("Frame", {
+		Name = "Equipos",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 58),
+		Size = UDim2.new(0, 440, 0, 30),
+		BackgroundColor3 = Color3.fromRGB(14, 16, 20),
+		BackgroundTransparency = 0.22,
+		BorderSizePixel = 0,
+		Visible = false,
+	}, top)
+	corner(6, teamBar)
+	parts.teamBar = teamBar
+	parts.teamAttack = new("TextLabel", {
+		Name = "EquipoA",
+		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(0, 160, 1, 0),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(240, 140, 90),
+		Text = "CAZADORES",
+	}, teamBar)
+	parts.teamDefend = new("TextLabel", {
+		Name = "EquipoB",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -12, 0, 0),
+		Size = UDim2.new(0, 160, 1, 0),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextColor3 = Color3.fromRGB(120, 180, 240),
+		Text = "DEFENSORES",
+	}, teamBar)
+	parts.teamScore = new("TextLabel", {
+		Name = "Tanteador",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 0),
+		Size = UDim2.new(0, 120, 1, 0),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Code,
+		TextSize = 17,
+		TextColor3 = Color3.fromRGB(238, 238, 242),
+		Text = "0 - 0",
+	}, teamBar)
+	parts.teamRound = new("TextLabel", {
+		Name = "Ronda",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 90),
+		Size = UDim2.new(0, 300, 0, 16),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextSize = 13,
+		TextColor3 = COLOR.muted,
+		Text = "Ronda 1",
+		Visible = false,
+	}, top)
+	parts.teamRound = parts.teamRound
+
 	local objective = new("TextLabel", {
 		Name = "Objetivo",
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -598,7 +718,8 @@ local function buildSessionHud(parent)
 end
 
 -- ===============================================================
--- MIRA DEL RIFLE TRANQUILIZANTE (clic derecho)
+-- MIRA ESTILO COUNTER (clic derecho)
+-- El francotirador usa "vidrio": pantalla negra con un circulo limpio.
 -- ===============================================================
 local function buildScope(parent)
 	local scope = new("Frame", {
@@ -610,6 +731,31 @@ local function buildScope(parent)
 	}, parent)
 	parts.scope = scope
 
+	-- Vidrio: cuatro barras negras bien redondeadas dejan el centro limpio
+	local vignette = new("Frame", {
+		Name = "Vidrio",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Visible = false,
+		ZIndex = 1,
+	}, scope)
+	parts.scopeVignette = vignette
+	local function glassBar(name, size, position)
+		local bar = new("Frame", {
+			Name = name,
+			Size = size,
+			Position = position,
+			BackgroundColor3 = Color3.new(0, 0, 0),
+			BorderSizePixel = 0,
+		}, vignette)
+		corner(300, bar)
+		return bar
+	end
+	glassBar("Arriba", UDim2.new(1, 0, 0.44, 0), UDim2.new(0, 0, 0, 0))
+	glassBar("Abajo", UDim2.new(1, 0, 0.44, 0), UDim2.new(0, 0, 0.56, 0))
+	glassBar("Izquierda", UDim2.new(0.44, 0, 1, 0), UDim2.new(0, 0, 0, 0))
+	glassBar("Derecha", UDim2.new(0.44, 0, 1, 0), UDim2.new(0.56, 0, 0, 0))
+
 	local ring = new("Frame", {
 		Name = "Anillo",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -617,6 +763,7 @@ local function buildScope(parent)
 		Size = UDim2.new(0, 180, 0, 180),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
+		ZIndex = 2,
 	}, scope)
 	corner(999, ring)
 	stroke(Color3.fromRGB(235, 240, 245), 1.5, 0.25, ring)
@@ -649,17 +796,31 @@ local function buildScope(parent)
 	}, ring)
 	corner(999, dot)
 
+	-- Aumento actual de la telescopica (5x / 10x)
+	parts.scopeZoom = new("TextLabel", {
+		Name = "Aumento",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 104),
+		Size = UDim2.new(0, 140, 0, 20),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		TextColor3 = Color3.fromRGB(235, 240, 245),
+		TextTransparency = 0.1,
+		Text = "",
+	}, scope)
+
 	new("TextLabel", {
 		Name = "Etiqueta",
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0.5, 100),
+		Position = UDim2.new(0.5, 0, 0.5, 126),
 		Size = UDim2.new(0, 260, 0, 16),
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBold,
 		TextSize = 11,
 		TextColor3 = Color3.fromRGB(200, 210, 220),
 		TextTransparency = 0.25,
-		Text = "MIRA - clic derecho para salir",
+		Text = "MIRA - clic derecho para cambiar / salir",
 	}, scope)
 
 	return scope
@@ -986,6 +1147,84 @@ end
 -- ===============================================================
 -- API
 -- ===============================================================
+-- Tabla de posiciones estilo Counter (se ve manteniendo Tab)
+local function buildScoreboard(screen)
+	local board = new("Frame", {
+		Name = "Tabla",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.46),
+		Size = UDim2.new(0, 560, 0, 300),
+		BackgroundColor3 = Color3.fromRGB(12, 14, 18),
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 30,
+	}, screen)
+	corner(8, board)
+	parts.scoreboard = board
+
+	parts.scoreTitle = new("TextLabel", {
+		Name = "Titulo",
+		Position = UDim2.new(0, 18, 0, 10),
+		Size = UDim2.new(1, -200, 0, 22),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(238, 238, 242),
+		Text = "Kiwi Cazador",
+	}, board)
+	parts.scoreRound = new("TextLabel", {
+		Name = "Ronda",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -18, 0, 10),
+		Size = UDim2.new(0, 220, 0, 22),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Code,
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextColor3 = Color3.fromRGB(200, 206, 214),
+		Text = "",
+	}, board)
+
+	parts.scoreAttack = new("TextLabel", {
+		Name = "ColumnaA",
+		Position = UDim2.new(0, 20, 0, 42),
+		Size = UDim2.new(0.5, -30, 1, -74),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextColor3 = Color3.fromRGB(232, 210, 200),
+		Text = "",
+	}, board)
+	parts.scoreDefend = new("TextLabel", {
+		Name = "ColumnaB",
+		Position = UDim2.new(0.5, 10, 0, 42),
+		Size = UDim2.new(0.5, -30, 1, -74),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextColor3 = Color3.fromRGB(200, 214, 232),
+		Text = "",
+	}, board)
+
+	new("TextLabel", {
+		Name = "Pie",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -8),
+		Size = UDim2.new(1, -36, 0, 16),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextSize = 12,
+		TextColor3 = COLOR.muted,
+		Text = "Mantené Tab para ver la tabla",
+	}, board)
+end
+
 function HUD.init(playerGui, handlers)
 	callbacks = handlers or {}
 	if parts.screen then
@@ -1006,6 +1245,7 @@ function HUD.init(playerGui, handlers)
 	buildResult(screen)
 	buildScope(screen)
 	buildVote(screen)
+	buildScoreboard(screen)
 
 	local hurt = new("Frame", {
 		Name = "Dolor",
@@ -1040,6 +1280,7 @@ function HUD.setMenuVisible(visible)
 	if visible then
 		HUD.clearTracker()
 		HUD.hideVote()
+		HUD.setScoreboardVisible(false)
 	end
 end
 
@@ -1053,6 +1294,81 @@ function HUD.setHealth(hp, maxHp)
 	end
 	if parts.hpText then
 		parts.hpText.Text = tostring(math.floor(hp or maxHp))
+	end
+	if parts.hpBig then
+		parts.hpBig.Text = tostring(math.floor(hp or maxHp))
+		parts.hpBig.TextColor3 = ratio > 0.55 and Color3.fromRGB(236, 240, 244)
+			or (ratio > 0.25 and Color3.fromRGB(238, 196, 92) or Color3.fromRGB(232, 108, 100))
+	end
+end
+
+-- Marcador de equipos estilo Counter (solo en el modo Asedio)
+function HUD.setTeams(team, score, round, toWin, modeName)
+	if not parts.teamBar then
+		return
+	end
+	local show = score ~= nil
+	parts.teamBar.Visible = show
+	if parts.teamRound then
+		parts.teamRound.Visible = show
+	end
+	if not show then
+		return
+	end
+	local attackName = string.upper((Config.Asedio and Config.Asedio.teamAttack) or "Equipo A")
+	local defendName = string.upper((Config.Asedio and Config.Asedio.teamDefend) or "Equipo B")
+	if team == "attack" then
+		attackName = "> " .. attackName
+	elseif team == "defend" then
+		defendName = defendName .. " <"
+	end
+	if parts.teamAttack then
+		parts.teamAttack.Text = attackName
+	end
+	if parts.teamDefend then
+		parts.teamDefend.Text = defendName
+	end
+	if parts.teamScore then
+		parts.teamScore.Text = string.format("%d - %d", score.attack or 0, score.defend or 0)
+	end
+	if parts.teamRound then
+		local best = (toWin or 1) * 2 - 1
+		parts.teamRound.Text = string.format("Ronda %d - al mejor de %d", round or 1, best)
+	end
+end
+
+-- Punto de mira: visible al jugar, se abre segun la dispersion
+function HUD.setCrosshair(visible, gap, length)
+	if not parts.crosshair then
+		return
+	end
+	parts.crosshair.Visible = visible and true or false
+	if not visible then
+		return
+	end
+	gap = math.clamp(gap or 5, 0, 60)
+	length = math.clamp(length or 9, 4, 30)
+	for _, item in ipairs(parts.crossLines or {}) do
+		local line = item.line
+		if item.axis == "up" then
+			line.Position = UDim2.new(0.5, 0, 0.5, -gap)
+			line.Size = UDim2.new(0, 2, 0, length)
+		elseif item.axis == "down" then
+			line.Position = UDim2.new(0.5, 0, 0.5, gap)
+			line.Size = UDim2.new(0, 2, 0, length)
+		elseif item.axis == "left" then
+			line.Position = UDim2.new(0.5, -gap, 0.5, 0)
+			line.Size = UDim2.new(0, length, 0, 2)
+		else
+			line.Position = UDim2.new(0.5, gap, 0.5, 0)
+			line.Size = UDim2.new(0, length, 0, 2)
+		end
+	end
+end
+
+function HUD.setScoreboardVisible(visible)
+	if parts.scoreboard then
+		parts.scoreboard.Visible = visible and true or false
 	end
 end
 
@@ -1231,6 +1547,47 @@ function HUD.updateState(state)
 					TextColor3 = COLOR.muted,
 					Text = tostring(entry.caught),
 				}, row)
+			end
+		end
+	end
+
+	-- Equipos (modo Asedio): marcador arriba + tabla con Tab
+	HUD.setTeams(state.team, state.teamScore, state.round, state.roundsToWin, state.modeName)
+	if parts.scoreboard then
+		local attackName = string.upper((Config.Asedio and Config.Asedio.teamAttack) or "Cazadores")
+		local defendName = string.upper((Config.Asedio and Config.Asedio.teamDefend) or "Defensores")
+		local score = state.teamScore or { attack = 0, defend = 0 }
+		local atk, dfd = {}, {}
+		if state.team then
+			table.insert(atk, string.format("%s   %d", attackName, score.attack or 0))
+			table.insert(dfd, string.format("%s   %d", defendName, score.defend or 0))
+		else
+			table.insert(atk, "JUGADORES")
+		end
+		for _, entry in ipairs(state.players or {}) do
+			local line = string.format("%s%s  (%d)", entry.isSelf and "> " or "   ", entry.name, entry.caught or 0)
+			if state.team and entry.team == "defend" then
+				table.insert(dfd, line)
+			else
+				table.insert(atk, line)
+			end
+		end
+		if parts.scoreAttack then
+			parts.scoreAttack.Text = table.concat(atk, "\n")
+			parts.scoreAttack.TextColor3 = state.team and Color3.fromRGB(232, 210, 200) or COLOR.text
+		end
+		if parts.scoreDefend then
+			parts.scoreDefend.Text = state.team and table.concat(dfd, "\n") or ""
+		end
+		if parts.scoreTitle then
+			parts.scoreTitle.Text = state.modeName or "Kiwi Cazador"
+		end
+		if parts.scoreRound then
+			if state.round then
+				local best = (state.roundsToWin or 1) * 2 - 1
+				parts.scoreRound.Text = string.format("Ronda %d - al mejor de %d", state.round, best)
+			else
+				parts.scoreRound.Text = state.arenaName or ""
 			end
 		end
 	end
@@ -1454,9 +1811,18 @@ function HUD.death(title, subtitle)
 	end)
 end
 
-function HUD.setScope(enabled)
+function HUD.setScope(enabled, sniperScope)
 	if parts.scope then
 		parts.scope.Visible = enabled and true or false
+	end
+	if parts.scopeVignette then
+		parts.scopeVignette.Visible = enabled and sniperScope and true or false
+	end
+end
+
+function HUD.setScopeZoom(text)
+	if parts.scopeZoom then
+		parts.scopeZoom.Text = text or ""
 	end
 end
 

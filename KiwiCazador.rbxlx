@@ -43,7 +43,7 @@
 
 local Config = {}
 
-Config.Version = "1.3.0"
+Config.Version = "1.4.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -194,12 +194,43 @@ Config.Tracker = {
 }
 
 -- Mira (clic derecho para apuntar). Cada arma puede tener su zoom.
+-- El francotirador tiene telescopica de DOS aumentos: 5x y 10x (clic derecho
+-- otra vez cambia de aumento). El rifle tranquilizante es una mira simple.
 Config.Scope = {
 	fov = 30,          -- campo de vision mientras apuntas (mas chico = mas zoom)
 	weapons = {
-		sniper = 16,   -- el francotirador tiene el zoom mas fuerte
+		sniper = 14,   -- 5x (70 / 14)
+		sniper2 = 7,   -- 10x (segundo clic derecho)
 		revolver = 34,
 		arco = 28,
+	},
+}
+
+-- Estilo Counter: los disparos son instantaneos (rayo) y el error sale de
+-- la formula de Counter Blox: Sauce - Restored (MIT, ver LICENSE-CB.md):
+--   error = spread del arma + velocidad * vel
+--   con la mira puesta el error se divide (el francotirador es perfecto)
+--   si el error queda por debajo del minimo, el disparo sale perfecto
+-- La patada de camara tambien es la de Counter:
+--   grados = 2 * (1 - recoil/100), sube y vuelve sola.
+Config.Shoot = {
+	div = 6,            -- divisor del error (mas alto = mas preciso)
+	dead = 1.3,         -- por debajo de esto, disparo perfecto
+	adsDiv = 0.35,      -- con la mira el error se reduce a un tercio
+	crouchDiv = 1.6,    -- agachado (sigilo) el arma se afirma
+	recoilReturn = 9,   -- que tan rapido vuelve la camara de la patada
+	sniperRange = 700,  -- alcance del rayo del francotirador
+	weapons = {
+		rifle = { vel = 0.40, spread = 0.3, dead = 1.2, recoil = 84 },
+		pintura = { vel = 0.40, spread = 0.3, dead = 1.2, recoil = 84 },
+		relente = { vel = 0.40, spread = 0.3, dead = 1.2, recoil = 84 },
+		-- El francotirador sin telescopica es un noscope bien impreciso
+		sniper = { vel = 0.45, spread = 26, dead = 0, randomX = true, adsPerfect = true, recoil = 4 },
+		revolver = { vel = 0.45, spread = 0.3, dead = 1.6, recoil = 26 },
+		arco = { vel = 0.60, spread = 0.3, dead = 1.2, recoil = 72 },
+		cuchillo = { recoil = 92 },
+		lanzallamas = { vel = 0.5, recoil = 88 },
+		cohete = { recoil = 18 },
 	},
 }
 
@@ -252,15 +283,19 @@ Config.Hide = {
 	escapeCoins = 3,      -- monedas por escaparle a una husmeada
 }
 
--- Baules de armas: aparecen en las casas y por el mapa
+-- Baules de armas: aparecen en las casas y por el mapa.
+-- Los pesos son la probabilidad relativa (mayor = sale mas seguido):
+-- el lanzamisiles es el mas raro y el arco ya no es el rey de los baules.
 Config.Loot = {
 	uses = 3,             -- usos por arma encontrada
 	pickupRange = 12,     -- distancia para abrir el baul
 	weapons = {
-		{ id = "cohete", weight = 4 },
-		{ id = "revolver", weight = 3 },
-		{ id = "arco", weight = 3 },
-		{ id = "sniper", weight = 3 },
+		{ id = "revolver", weight = 22 },
+		{ id = "cuchillo", weight = 18 },
+		{ id = "arco", weight = 15 },
+		{ id = "lanzallamas", weight = 14 },
+		{ id = "sniper", weight = 14 },
+		{ id = "cohete", weight = 8 },
 	},
 }
 
@@ -285,7 +320,10 @@ Config.Weapons = {
 		speed = 230,
 		life = 1.6,
 		blast = 0,
-		damage = 20,
+		damage = 46,      -- estilo Counter (Deagle): 3 tiros al cuerpo
+		minDamage = 20,   -- piso de daño cuando el blanco esta lejos
+		falloff = 1,      -- pierde fuerza con la distancia (como Counter)
+		headMult = 2.4,   -- tiro a la cabeza: 110, a la lona de una
 		knockback = 38,
 		slowFactor = 0.55,
 		slowTime = 1.6,
@@ -298,11 +336,17 @@ Config.Weapons = {
 		speed = 165,
 		life = 2.6,
 		blast = 9,
-		damage = 26,
+		damage = 40,
+		minDamage = 18,
+		falloff = 0.8,
+		headMult = 2.2,     -- flechazo en la cabeza: a la lona
 		knockback = 24,
 		slowFactor = 0.35,
 		slowTime = 3.2,
 		size = Vector3.new(0.22, 0.22, 2.0),
+		stick = true,       -- la flecha queda clavada y se puede recoger (+1 uso)
+		pickupRange = 12,   -- distancia para recoger una flecha clavada
+		pickupLife = 60,    -- segundos que la flecha queda en el piso
 	},
 	sniper = {
 		name = "Francotirador",
@@ -311,12 +355,57 @@ Config.Weapons = {
 		speed = 420,
 		life = 5,
 		blast = 0,
-		damage = 48,    -- el golpe mas fuerte contra otros cazadores
+		damage = 100,   -- estilo Counter (AWP): un disparo y a la lona
 		knockback = 58,
 		slowFactor = 0.30,
 		slowTime = 2.0,
 		size = Vector3.new(0.22, 0.22, 2.6),
 	},
+	cuchillo = {
+		name = "Cuchillo",
+		color = Color3.fromRGB(224, 230, 240),
+		cooldown = 0.85,
+		melee = true,   -- no dispara: es un zarpazo cuerpo a cuerpo
+		reach = 8,
+		damage = 34,
+		knockback = 26,
+		slowFactor = 0.50,
+		slowTime = 1.2,
+		size = Vector3.new(0.2, 0.2, 1.4),
+	},
+	lanzallamas = {
+		name = "Lanzallamas",
+		color = Color3.fromRGB(240, 140, 60),
+		cooldown = 1.3,
+		flame = true,   -- chorro corto en cono (no proyectil)
+		reach = 17,     -- alcance del chorro
+		coneAngle = 32, -- medio angulo del cono (grados)
+		damage = 24,    -- daño total por rafaga
+		knockback = 12,
+		slowFactor = 0.60,
+		slowTime = 1.0,
+		size = Vector3.new(0.3, 0.3, 1.6),
+	},
+}
+
+-- Picotazo del kiwi: si lo acorralas contra un rincon, se defiende y te
+-- saca un 10% de la vida de un picotazo (varias veces si te quedas).
+Config.KiwiPeck = {
+	damage = 10,       -- 10% de la vida (100)
+	range = 7,         -- distancia para que te alcance el pico
+	cooldown = 1.5,    -- cada cuanto puede picar si seguis encima
+	knockback = 34,    -- empujon al jugador picoteado
+}
+
+-- Vida de la ciudad (solo el mapa Ciudad de Auckland): calles con autos,
+-- colectivo y tren que atropellan (mitad de la vida), mas semaforos.
+Config.City = {
+	damage = 50,       -- 50% de la vida por atropello
+	speedCar = 44,     -- velocidad de los autos en la avenida
+	speedBus = 30,     -- el colectivo va mas tranquilo
+	speedTrain = 80,   -- el tren pasa rapidisimo por las vias
+	trainWait = 5,     -- segundos que espera en la punta antes de volver
+	hitCooldown = 3,   -- segundos de gracia tras un atropello
 }
 
 Config.Player = {
@@ -475,8 +564,55 @@ Config.Multiplayer = {
 	scoreboardSize = 8,     -- cuantas filas ve el jugador
 }
 
+-- ===============================================================
+-- MODO ASEDIO (5 vs 5)
+-- ===============================================================
+-- Los Defensores cuidan al kiwi en su casa y los Cazadores entran a
+-- capturarlo antes de que se acabe el tiempo. Primero a 2 rondas.
+Config.Asedio = {
+	id = "asedio",
+	name = "Asedio al Kiwi",
+	tag = "¡5 vs 5!",
+	color = Color3.fromRGB(255, 176, 74),
+	blurb = "5 contra 5: un equipo cuida al kiwi en su casa y el otro entra a capturarlo con la red. Al mejor de 3 rondas.",
+	baseDifficulty = "normal",
+	maxPlayers = 10,
+	roundTime = 150,        -- segundos por ronda
+	breakTime = 7,          -- descanso entre rondas
+	roundsToWin = 2,        -- primero a 2 rondas gana la partida
+	respawn = 7,            -- segundos para volver tras un noqueo
+	nestRadius = 46,        -- el kiwi no se aleja mas de esto de su casa
+	attackSpawn = 100,      -- a que distancia del nido aparecen los Cazadores
+	revolverUses = 40,      -- tiros de revolver que recibe cada cazador
+	reward = 60,            -- monedas por capturar al kiwi
+	winBonus = 240,         -- monedas por ganar la partida
+	teamAttack = "Cazadores",
+	teamDefend = "Defensores",
+	colorAttack = Color3.fromRGB(226, 116, 74),
+	colorDefend = Color3.fromRGB(88, 164, 240),
+	toolsAttack = { "red", "rastreador", "pintura" },
+	toolsDefend = { "pintura", "rastreador" },
+}
+
+-- Ficha del modo para el menu (los detalles viven en Config.Asedio)
+Config.Difficulties.asedio = {
+	id = "asedio",
+	name = Config.Asedio.name,
+	tag = Config.Asedio.tag,
+	color = Config.Asedio.color,
+	blurb = Config.Asedio.blurb,
+	tools = Config.Asedio.toolsAttack,
+	round = {
+		quota = 1,
+		timeLimit = Config.Asedio.roundTime,
+		reward = Config.Asedio.reward,
+		winBonus = Config.Asedio.winBonus,
+		timeBonus = 0,
+	},
+}
+
 -- Orden en que se muestran los botones del menu
-Config.ModeOrder = { "facil", "normal", "dificil", "colosal", "multi" }
+Config.ModeOrder = { "facil", "normal", "dificil", "colosal", "multi", "asedio" }
 
 -- ===============================================================
 -- RONDA
@@ -529,11 +665,29 @@ Config.Text = {
 	WeaponOut = "Se te acabó: %s",
 	BoomShout = "¡%s disparó el %s!",
 	BoomHit = "¡Le diste con el %s!",
+	Headshot = "¡TIRO A LA CABEZA!",
+	AsedioRound = "¡Ronda %d! Los %s atacan y los %s defienden al kiwi (marcador %d - %d)",
+	AsedioNext = "Próxima ronda en unos segundos... (ronda %d)",
+	AsedioCapture = "¡Los %s atrapáron al kiwi!",
+	AsedioTimeout = "¡Se acabó el tiempo! Punto para los %s",
+	AsedioMatch = "¡Ganaron los %s la partida!",
+	AsedioTeamAttack = "Eres CAZADOR: entra a la casa y atrapa al kiwi con la red (o tócalo)",
+	AsedioTeamDefend = "Eres DEFENSOR: cuida al kiwi y no dejes que lo toquen",
+	AsedioRespawnWait = "Te noquearon: vuelves en %d segundos",
+	AsedioBack = "¡De vuelta al combate!",
+	AsedioPounce = "El kiwi te saltó encima por acercarte demasiado",
 	SniffCaught = "¡El kiwi encontró a %s escondido y se lo comió!",
 	EatenMenu = "El kiwi te comió. Elige otro modo para volver a jugar.",
 	MapPickNotify = "¡Mapa elegido: %s!",
 	MapFallback = "Ese mapa estaba ocupado: esta partida va en %s.",
 	HurtMsg = "¡%s te dio con %s! (-%d de vida)",
+	HurtGeneric = "¡%s! (-%d de vida)",
+	CarHit = "Te atropelló un auto",
+	BusHit = "Te atropelló el colectivo",
+	TrainHit = "Te atropelló el tren",
+	PeckHit = "El kiwi acorralado te picoteó",
+	ArrowPickup = "Recuperaste la flecha: +1 uso del arco.",
+	ArrowNoBow = "Esa flecha es de un arco. No tienes uno equipado.",
 	KoedAll = "¡%s dejó fuera a %s de un disparo!",
 	KoMenu = "Te noquearon a tiros. Elige otro modo para volver a jugar.",
 	DeathTitle = "¡TE COMIÓ EL KIWI!",
@@ -1130,6 +1284,8 @@ local function buildArena(index, zone, cfg, parent, rng)
 	self.enterList = {}
 	self.chests = {}
 	self.busy = false
+	self.traffic = {}      -- autos, colectivo y tren (mapa Ciudad)
+	self.semaphores = {}   -- semaforos que cambian de luz
 
 	local folder = Instance.new("Folder")
 	folder.Name = "Arena" .. index
@@ -2150,11 +2306,94 @@ local function buildArena(index, zone, cfg, parent, rng)
 		box("Caja", cf * CFrame.new(0, size.Y * 0.5, 0), size, Color3.fromRGB(126, 94, 60), Enum.Material.WoodPlanks)
 	end
 
+	-- Cocina: mesada con pileta, heladera y horno con anafes
+	local function makeKitchenCounter(cf, len, wood)
+		box("Mesada", cf * CFrame.new(0, 2.9, 0), Vector3.new(len, 0.3, 2.2), Color3.fromRGB(196, 198, 202), Enum.Material.Slate)
+		box("MuebleBajo", cf * CFrame.new(0, 1.45, 0), Vector3.new(len, 2.6, 1.9), wood, Enum.Material.WoodPlanks)
+		box("Pileta", cf * CFrame.new(-len * 0.22, 2.95, 0), Vector3.new(2.6, 0.5, 1.5), Color3.fromRGB(164, 170, 176), Enum.Material.Metal)
+		part({
+			Name = "Grifo",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.3, 0.22, 0.22),
+			CFrame = cf * CFrame.new(-len * 0.22, 3.55, -0.7) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = Color3.fromRGB(184, 190, 196),
+			Material = Enum.Material.Metal,
+			CanCollide = false,
+			Parent = props,
+		})
+	end
+
+	local function makeFridge(cf)
+		box("Heladera", cf * CFrame.new(0, 3.2, 0), Vector3.new(3.0, 6.4, 3.0), Color3.fromRGB(226, 228, 232), Enum.Material.Metal)
+		box("HeladeraPuerta", cf * CFrame.new(0, 3.2, 1.6), Vector3.new(2.7, 5.9, 0.2), Color3.fromRGB(206, 210, 216), Enum.Material.Metal)
+		box("HeladeraManija", cf * CFrame.new(-1.05, 3.2, 1.85), Vector3.new(0.2, 2.6, 0.2), Color3.fromRGB(150, 156, 162), Enum.Material.Metal)
+	end
+
+	local function makeStove(cf)
+		box("Horno", cf * CFrame.new(0, 1.6, 0), Vector3.new(3.2, 3.0, 2.6), Color3.fromRGB(210, 212, 216), Enum.Material.Metal)
+		box("HornoPuerta", cf * CFrame.new(0, 1.7, 1.35), Vector3.new(2.5, 1.8, 0.2), Color3.fromRGB(56, 58, 62), Enum.Material.Glass)
+		for i = 1, 4 do
+			local dx = (i % 2 == 0) and 0.78 or -0.78
+			local dz = (i &lt;= 2) and -0.62 or 0.62
+			part({
+				Name = "Anafe",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.26, 1.15, 1.15),
+				CFrame = cf * CFrame.new(dx, 3.24, dz) * CFrame.Angles(0, 0, math.rad(90)),
+				Color = Color3.fromRGB(38, 38, 42),
+				Material = Enum.Material.Metal,
+				CanCollide = false,
+				Parent = props,
+			})
+		end
+	end
+
+	-- Living: sofa, mesa ratona, alfombra y tele
+	local function makeSofa(cf)
+		local cloth = Color3.fromRGB(140, 150, 172)
+		box("SofaAsiento", cf * CFrame.new(0, 1.3, 0), Vector3.new(7.0, 1.0, 2.9), cloth, Enum.Material.Fabric)
+		box("SofaRespaldo", cf * CFrame.new(0, 2.7, 1.1), Vector3.new(7.0, 2.0, 0.8), cloth, Enum.Material.Fabric)
+		box("SofaBrazoA", cf * CFrame.new(-3.2, 1.9, 0), Vector3.new(0.6, 2.0, 2.9), cloth, Enum.Material.Fabric)
+		box("SofaBrazoB", cf * CFrame.new(3.2, 1.9, 0), Vector3.new(0.6, 2.0, 2.9), cloth, Enum.Material.Fabric)
+	end
+
+	local function makeCoffeeTable(cf)
+		box("MesaRatona", cf * CFrame.new(0, 1.1, 0), Vector3.new(4.2, 0.3, 2.4), Color3.fromRGB(122, 90, 60), Enum.Material.Wood)
+		for _, spot in ipairs({ { -1.7, -0.8 }, { 1.7, -0.8 }, { -1.7, 0.8 }, { 1.7, 0.8 } }) do
+			part({
+				Name = "PataRatona",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(1.1, 0.22, 0.22),
+				CFrame = cf * CFrame.new(spot[1], 0.55, spot[2]) * CFrame.Angles(0, 0, math.rad(90)),
+				Color = Color3.fromRGB(96, 70, 46),
+				Material = Enum.Material.Wood,
+				Parent = props,
+			})
+		end
+	end
+
+	local function makeRug(cf, color)
+		return part({
+			Name = "Alfombra",
+			Size = Vector3.new(7, 0.12, 5),
+			CFrame = cf * CFrame.new(0, 0.06, 0),
+			Color = color or Color3.fromRGB(148, 70, 60),
+			Material = Enum.Material.Fabric,
+			CanCollide = false,
+			Parent = props,
+		})
+	end
+
+	local function makeTV(cf)
+		box("Tele", cf * CFrame.new(0, 0, 0), Vector3.new(0.5, 4.4, 6.2), Color3.fromRGB(38, 40, 44), Enum.Material.Metal)
+		box("TelePantalla", cf * CFrame.new(-0.3, 0.1, 0), Vector3.new(0.1, 3.6, 5.4), Color3.fromRGB(70, 112, 142), Enum.Material.Neon)
+	end
+
 	local function makeHouse(pos, angle, variant)
 		local base = CFrame.new(pos) * CFrame.Angles(0, angle, 0)
 		local big = variant == "farm"
-		local W = big and 30 or 26
-		local D = big and 22 or 19
+		local W = big and 38 or 32
+		local D = big and 28 or 24
 		local floorH = 9.4
 		local totalH = floorH * 2
 		local wood = HOUSE_WOOD
@@ -2228,39 +2467,47 @@ local function buildArena(index, zone, cfg, parent, rng)
 			Parent = props,
 		})
 
-		-- Planta baja: comedor y living del lado derecho (la escalera usa la izquierda)
-		makeTable(base * CFrame.new(3, 0.6, -1), wood)
-		makeChair(base * CFrame.new(3, 0.6, 2), wood)
-		makeChair(base * CFrame.new(3, 0.6, -4), wood)
-		makeBed(base * CFrame.new(W * 0.3, 0.6, -D * 0.32), wood)
-		makeShelfProp(base * CFrame.new(8, 0.6, 0.5), wood)
-		makeCrateProp(base * CFrame.new(6.5, 0.6, D * 0.3), Vector3.new(4.4, 4.4, 4.4), wood)
+		-- Planta baja pensada para no trabar puerta ni escalera:
+		-- la escalera usa la pared izquierda, la puerta el medio del frente
+		-- y los muebles van contra las paredes (baul en el rincon del fondo).
+		makeStove(base * CFrame.new(-6.6, 0.6, -D * 0.5 + 1.7))
+		makeKitchenCounter(base * CFrame.new(1.6, 0.6, -D * 0.5 + 1.5), 12, wood)
+		makeFridge(base * CFrame.new(9.4, 0.6, -D * 0.5 + 1.8))
+		makeTable(base * CFrame.new(5.5, 0.6, 2.5), wood)
+		makeChair(base * CFrame.new(5.5, 0.6, 5.6), wood)
+		makeChair(base * CFrame.new(5.5, 0.6, -0.6), wood)
+		makeChair(base * CFrame.new(2.4, 0.6, 2.5) * CFrame.Angles(0, math.rad(90), 0), wood)
+		makeChair(base * CFrame.new(8.6, 0.6, 2.5) * CFrame.Angles(0, math.rad(-90), 0), wood)
+		makeRug(base * CFrame.new(10.2, 0.6, 4.2))
+		makeCoffeeTable(base * CFrame.new(10.6, 0.6, 4.2))
+		makeSofa(base * CFrame.new(W * 0.5 - 2.0, 0.6, 4.2) * CFrame.Angles(0, math.rad(90), 0))
+		makeTV(base * CFrame.new(W * 0.5 - 0.4, 4.7, 4.2))
+		makeCloset(base * CFrame.new(W * 0.5 - 1.7, 0.6, -2) * CFrame.Angles(0, math.rad(-90), 0), "Armario")
 		if big then
-			makeCrateProp(base * CFrame.new(0.5, 0.6, -D * 0.36), Vector3.new(4, 3.2, 4), wood)
-			makeBarrelHide(base * CFrame.new(-4.5, 0.6, -D * 0.05), "Barril")
+			makeCrateProp(base * CFrame.new(5.6, 0.6, -D * 0.5 + 4.4), Vector3.new(4, 3.2, 4), wood)
+			makeBarrelHide(base * CFrame.new(-8.6, 0.6, D * 0.5 - 2.0), "Barril")
 		end
-		makeShelfProp(base * CFrame.new(-4, 0.6, -D * 0.4), wood)
-		makeCloset(base * CFrame.new(W * 0.36, 0.6, D * 0.1) * CFrame.Angles(0, math.rad(-90), 0), "Armario")
-		makeChestProp(base * CFrame.new(-4, 0.6, D * 0.36), "Baúl")
+		-- Baul pegado al rincon del frente (lejos de la puerta y la escalera)
+		makeChestProp(base * CFrame.new(W * 0.5 - 2.2, 0.6, D * 0.5 - 2.2), "Baúl")
 
-		addSpot("casa", "Casa", floorPart, (base * CFrame.new(-3, 0, -D * 0.3)).Position, 2.8, 0.9)
-		addSpot("casa", "Casa", floorPart, (base * CFrame.new(5, 0, D * 0.05)).Position, 2.8, 0.9)
+		addSpot("casa", "Casa", floorPart, (base * CFrame.new(5, 0, -5)).Position, 2.8, 0.9)
+		addSpot("casa", "Casa", floorPart, (base * CFrame.new(-2, 0, 6)).Position, 2.8, 0.9)
 
-		-- Planta alta: dormitorio y baul propios. No hay escondite (armario)
+		-- Planta alta: dos dormitorios con camas. No hay escondite (armario)
 		-- aca arriba: el kiwi no sabe subir escaleras y seria una zona segura.
 		local upY = floorH + 0.8
-		makeBed(base * CFrame.new(W * 0.3, upY, -D * 0.3), wood)
-		makeShelfProp(base * CFrame.new(2, upY, -D * 0.42), wood)
-		makeCrateProp(base * CFrame.new(-3.5, upY, D * 0.3), Vector3.new(4, 3.6, 4), wood)
-		makeShelfProp(base * CFrame.new(W * 0.34, upY, D * 0.08), wood)
-		makeChestProp(base * CFrame.new(2.5, upY, D * 0.34), "Baúl del piso")
+		makeBed(base * CFrame.new(0, upY, -D * 0.5 + 2.2), wood)
+		makeBed(base * CFrame.new(10, upY, -D * 0.5 + 2.2), wood)
+		makeCrateProp(base * CFrame.new(5.0, upY, -D * 0.5 + 2.0), Vector3.new(3, 3.4, 3), wood)
+		makeShelfProp(base * CFrame.new(W * 0.5 - 1.6, upY, -2), wood)
+		makeChestProp(base * CFrame.new(W * 0.5 - 2.2, upY, D * 0.5 - 2.2), "Baúl del piso")
 
 		addIndoor(base, Vector3.new(W - 2, totalH, D - 2))
 	end
 
 	local function makeBarn(pos, angle)
 		local base = CFrame.new(pos) * CFrame.Angles(0, angle, 0)
-		local W, D, wallH = 23, 17, 11
+		local W, D, wallH = 26, 19, 11
 		local wood = HOUSE_WOOD
 		local barnRed = zone.barn or (theme == "ciudad" and Color3.fromRGB(118, 110, 102) or Color3.fromRGB(140, 62, 52))
 		local floorPart = box("PisoGranero", base * CFrame.new(0, 0.3, 0), Vector3.new(W + 1.6, 0.6, D + 1.6), HOUSE_FLOOR, Enum.Material.Slate)
@@ -2356,6 +2603,360 @@ local function buildArena(index, zone, cfg, parent, rng)
 			end
 		end
 		return nil
+	end
+
+	-- ===============================================================
+	-- Vida de la ciudad: avenidas, tiendas, semaforos, autos y tren
+	-- (solo el mapa Ciudad de Auckland)
+	-- ===============================================================
+	if theme == "ciudad" then
+		local asphalt = Color3.fromRGB(46, 46, 52)
+		local sidewalkCol = Color3.fromRGB(148, 146, 140)
+		local R = half - 82            -- radio de la avenida circular
+		local roadW = 34               -- ancho de la calzada
+		local yRoad = floorY + 0.1
+
+		-- Calzada: anillo cuadrado de cuatro tramos
+		local tramos = {
+			{ Vector3.new(0, 0, -R), Vector3.new(2 * R + roadW, 0.24, roadW) },
+			{ Vector3.new(0, 0, R), Vector3.new(2 * R + roadW, 0.24, roadW) },
+			{ Vector3.new(-R, 0, 0), Vector3.new(roadW, 0.24, 2 * R + roadW) },
+			{ Vector3.new(R, 0, 0), Vector3.new(roadW, 0.24, 2 * R + roadW) },
+		}
+		for _, tramo in ipairs(tramos) do
+			box("Avenida", CFrame.new(center.X + tramo[1].X, yRoad, center.Z + tramo[1].Z), tramo[2],
+				asphalt, Enum.Material.Asphalt)
+			-- Lineas blancas del medio
+			local along = tramo[2].X &gt; tramo[2].Z and tramo[2].X or tramo[2].Z
+			local vertical = tramo[2].Z &gt; tramo[2].X
+			local n = math.floor(along / 22)
+			for i = -n, n do
+				local offset = i * 22
+				local pos
+				local size
+				if vertical then
+					pos = Vector3.new(center.X + tramo[1].X, yRoad + 0.18, center.Z + tramo[1].Z + offset)
+					size = Vector3.new(0.8, 0.06, 6)
+				else
+					pos = Vector3.new(center.X + tramo[1].X + offset, yRoad + 0.18, center.Z + tramo[1].Z)
+					size = Vector3.new(6, 0.06, 0.8)
+				end
+				box("LineaVia", CFrame.new(pos), size, Color3.fromRGB(228, 226, 214), Enum.Material.SmoothPlastic)
+			end
+			-- Aceras a los dos lados
+			for _, side in ipairs({ -1, 1 }) do
+				local off, sz
+				if vertical then
+					off = Vector3.new(side * (roadW * 0.5 + 2.5), 0, 0)
+					sz = Vector3.new(5, 0.5, along)
+				else
+					off = Vector3.new(0, 0, side * (roadW * 0.5 + 2.5))
+					sz = Vector3.new(along, 0.5, 5)
+				end
+				box("Acera", CFrame.new(center.X + tramo[1].X + off.X, floorY + 0.25, center.Z + tramo[1].Z + off.Z),
+					sz, sidewalkCol, Enum.Material.Concrete)
+			end
+			-- Muestras ocupadas: que props y casas no invadan la avenida
+			local samples = math.floor(along / 22)
+			for i = -samples, samples do
+				local offset = i * 22
+				local p
+				if vertical then
+					p = Vector3.new(center.X + tramo[1].X, 0, center.Z + tramo[1].Z + offset)
+				else
+					p = Vector3.new(center.X + tramo[1].X + offset, 0, center.Z + tramo[1].Z)
+				end
+				table.insert(occupied, p)
+			end
+		end
+
+		-- Tiendas y comercios bordeando la avenida (con cartel de codigo)
+		local function makeShop(base, name, color)
+			local W, D, H = 24, 15, 12
+			box("Local", base * CFrame.new(0, H * 0.5 + 0.6, 0), Vector3.new(W, H, D),
+				Color3.fromRGB(206, 198, 184), Enum.Material.Concrete)
+			box("LocalTecho", base * CFrame.new(0, H + 1.0, 0), Vector3.new(W + 1.4, 0.6, D + 1.4),
+				Color3.fromRGB(120, 96, 78), Enum.Material.Slate)
+			box("Vitrina", base * CFrame.new(-3.4, 4.6, D * 0.5 + 0.1), Vector3.new(15, 6.4, 0.4),
+				Color3.fromRGB(120, 170, 186), Enum.Material.Glass)
+			box("PuertaLocal", base * CFrame.new(W * 0.32, 3.6, D * 0.5 + 0.12), Vector3.new(4.2, 7.0, 0.4),
+				Color3.fromRGB(60, 54, 48), Enum.Material.WoodPlanks)
+			for i = 0, 5 do
+				local tone = (i % 2 == 0) and color or Color3.fromRGB(238, 236, 228)
+				part({
+					Name = "Toldo",
+					Size = Vector3.new(3.2, 0.22, 3.6),
+					CFrame = base * CFrame.new(-8.25 + i * 3.3, 8.7, D * 0.5 + 1.7) * CFrame.Angles(math.rad(-16), 0, 0),
+					Color = tone,
+					Material = Enum.Material.Fabric,
+					CanCollide = false,
+					Parent = props,
+				})
+			end
+			local sign = box("Cartel", base * CFrame.new(0, 10.7, D * 0.5 + 0.15), Vector3.new(16, 2.4, 0.4),
+				Color3.fromRGB(58, 52, 48), Enum.Material.WoodPlanks)
+			local gui = Instance.new("SurfaceGui")
+			gui.Name = "CartelGui"
+			gui.Face = Enum.NormalId.Back
+			gui.LightInfluence = 0
+			gui.CanvasSize = Vector2.new(800, 120)
+			gui.Parent = sign
+			local label = Instance.new("TextLabel")
+			label.Size = UDim2.fromScale(1, 1)
+			label.BackgroundTransparency = 1
+			label.Font = Enum.Font.GothamBold
+			label.TextScaled = true
+			label.TextColor3 = Color3.fromRGB(250, 244, 230)
+			label.Text = name
+			label.Parent = gui
+		end
+
+		local SHOPS = {
+			{ name = "Panaderia", color = Color3.fromRGB(226, 152, 72) },
+			{ name = "Kiosco", color = Color3.fromRGB(112, 196, 120) },
+			{ name = "Heladeria", color = Color3.fromRGB(120, 190, 226) },
+			{ name = "Ferreteria", color = Color3.fromRGB(206, 96, 84) },
+			{ name = "Cafe", color = Color3.fromRGB(150, 106, 74) },
+			{ name = "Supermercado", color = Color3.fromRGB(228, 200, 90) },
+		}
+		for i, shop in ipairs(SHOPS) do
+			local a = math.rad(25 + (i - 1) * 60)
+			local pos = center + Vector3.new(math.sin(a), 0, math.cos(a)) * (R - 40)
+			pos = Vector3.new(pos.X, 0, pos.Z)
+			makeShop(CFrame.new(pos + Vector3.new(0, floorY, 0)) * CFrame.Angles(0, a, 0), shop.name, shop.color)
+			table.insert(occupied, pos)
+		end
+
+		-- Semaforos en las cuatro esquinas de la avenida
+		local function makeTrafficLight(pos)
+			box("PosteSemaforo", CFrame.new(pos + Vector3.new(0, 7.5, 0)), Vector3.new(0.5, 15, 0.5),
+				Color3.fromRGB(58, 58, 62), Enum.Material.Metal)
+			box("CabezaSemaforo", CFrame.new(pos + Vector3.new(0, 14.6, 0)), Vector3.new(1.4, 4.0, 1.0),
+				Color3.fromRGB(40, 42, 46), Enum.Material.Metal)
+			local lights = {}
+			local function bulb(name, color, dy)
+				lights[name] = part({
+					Name = name,
+					Shape = Enum.PartType.Ball,
+					Size = Vector3.new(0.85, 0.85, 0.85),
+					Position = pos + Vector3.new(0, 14.6 + dy, 0.62),
+					Color = color,
+					Material = Enum.Material.SmoothPlastic,
+					CanCollide = false,
+					Parent = props,
+				})
+			end
+			bulb("red", Color3.fromRGB(210, 60, 50), 1.25)
+			bulb("yellow", Color3.fromRGB(220, 180, 60), 0)
+			bulb("green", Color3.fromRGB(70, 190, 110), -1.25)
+			table.insert(self.semaphores, lights)
+		end
+		for _, corner in ipairs({ { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } }) do
+			local p = center + Vector3.new(corner[1] * (R + 26), floorY, corner[2] * (R + 26))
+			makeTrafficLight(p)
+			table.insert(occupied, Vector3.new(p.X, 0, p.Z))
+		end
+
+		-- Vias del tren pegadas al muro norte
+		local trackZ = center.Z - (half - 44)
+		local trackHalf = half - 30
+		box("ViaA", CFrame.new(center.X, floorY + 0.15, trackZ - 1.2), Vector3.new(trackHalf * 2, 0.3, 0.5),
+			Color3.fromRGB(120, 122, 128), Enum.Material.Metal)
+		box("ViaB", CFrame.new(center.X, floorY + 0.15, trackZ + 1.2), Vector3.new(trackHalf * 2, 0.3, 0.5),
+			Color3.fromRGB(120, 122, 128), Enum.Material.Metal)
+		local sleeperN = math.floor(trackHalf / 12)
+		for i = -sleeperN, sleeperN do
+			box("Durmiente", CFrame.new(center.X + i * 12, floorY + 0.05, trackZ), Vector3.new(2.0, 0.3, 3.6),
+				Color3.fromRGB(96, 74, 54), Enum.Material.WoodPlanks)
+		end
+		local railSamples = math.floor(trackHalf / 26)
+		for i = -railSamples, railSamples do
+			table.insert(occupied, Vector3.new(center.X + i * 26, 0, trackZ))
+		end
+
+		-- Vehiculos: partes de adorno que mueve GameManager (sin fisica)
+		local function vehiclePart(model, name, size, cf, color, material, shape)
+			local p = part({
+				Name = name,
+				Size = size,
+				CFrame = cf,
+				Color = color,
+				Material = material or Enum.Material.Metal,
+				Anchored = true,
+				CanCollide = false,
+				CanQuery = false,
+				CanTouch = false,
+				CastShadow = true,
+				Parent = model,
+			})
+			if shape then
+				p.Shape = shape
+			end
+			p.Massless = true
+			return p
+		end
+
+		local CAR_COLORS = {
+			Color3.fromRGB(176, 66, 58), Color3.fromRGB(64, 110, 176),
+			Color3.fromRGB(202, 172, 70), Color3.fromRGB(96, 160, 110),
+			Color3.fromRGB(220, 220, 224), Color3.fromRGB(120, 90, 160),
+		}
+
+		local function makeCar(color)
+			local model = Instance.new("Model")
+			model.Name = "Auto"
+			model.Parent = folder
+			local body = vehiclePart(model, "Chasis", Vector3.new(5.0, 1.8, 11.0), CFrame.new(0, 0, 0),
+				color, Enum.Material.SmoothPlastic)
+			vehiclePart(model, "Cabina", Vector3.new(4.6, 1.5, 5.4), CFrame.new(0, 1.55, 0.4),
+				Color3.fromRGB(150, 180, 196), Enum.Material.Glass)
+			vehiclePart(model, "TechoAuto", Vector3.new(4.2, 0.3, 5.6), CFrame.new(0, 2.3, 0.4),
+				color, Enum.Material.SmoothPlastic)
+			for _, z in ipairs({ -3.6, 3.6 }) do
+				for _, x in ipairs({ -2.6, 2.6 }) do
+					vehiclePart(model, "Rueda", Vector3.new(1.0, 2.8, 2.8),
+						CFrame.new(x, -1.6, z) * CFrame.Angles(0, 0, math.rad(90)),
+						Color3.fromRGB(34, 34, 36), Enum.Material.Rubber, Enum.PartType.Cylinder)
+				end
+			end
+			vehiclePart(model, "LuzA", Vector3.new(0.9, 0.4, 0.3), CFrame.new(-1.5, 0.4, -5.6),
+				Color3.fromRGB(255, 240, 190), Enum.Material.Neon)
+			vehiclePart(model, "LuzB", Vector3.new(0.9, 0.4, 0.3), CFrame.new(1.5, 0.4, -5.6),
+				Color3.fromRGB(255, 240, 190), Enum.Material.Neon)
+			vehiclePart(model, "LuzTrasera", Vector3.new(3.6, 0.35, 0.25), CFrame.new(0, 0.5, 5.6),
+				Color3.fromRGB(200, 50, 40), Enum.Material.Neon)
+			model.PrimaryPart = body
+			return model
+		end
+
+		local function makeBus()
+			local model = Instance.new("Model")
+			model.Name = "Colectivo"
+			model.Parent = folder
+			local body = vehiclePart(model, "ChasisBus", Vector3.new(5.6, 3.2, 22), CFrame.new(0, 0, 0),
+				Color3.fromRGB(70, 120, 190), Enum.Material.SmoothPlastic)
+			vehiclePart(model, "VentanasBus", Vector3.new(5.7, 1.3, 16), CFrame.new(0, 0.9, 0),
+				Color3.fromRGB(150, 190, 205), Enum.Material.Glass)
+			vehiclePart(model, "TechoBus", Vector3.new(5.2, 0.3, 22.4), CFrame.new(0, 1.75, 0),
+				Color3.fromRGB(238, 238, 240), Enum.Material.SmoothPlastic)
+			vehiclePart(model, "FranjaBus", Vector3.new(5.65, 0.5, 22.1), CFrame.new(0, -0.6, 0),
+				Color3.fromRGB(230, 230, 234), Enum.Material.SmoothPlastic)
+			for _, z in ipairs({ -7.5, 0, 7.5 }) do
+				for _, x in ipairs({ -2.9, 2.9 }) do
+					vehiclePart(model, "RuedaBus", Vector3.new(1.1, 3.0, 3.0),
+						CFrame.new(x, -1.7, z) * CFrame.Angles(0, 0, math.rad(90)),
+						Color3.fromRGB(32, 32, 34), Enum.Material.Rubber, Enum.PartType.Cylinder)
+				end
+			end
+			vehiclePart(model, "LuzBusA", Vector3.new(1.0, 0.5, 0.3), CFrame.new(-1.8, -0.5, -11.1),
+				Color3.fromRGB(255, 240, 190), Enum.Material.Neon)
+			vehiclePart(model, "LuzBusB", Vector3.new(1.0, 0.5, 0.3), CFrame.new(1.8, -0.5, -11.1),
+				Color3.fromRGB(255, 240, 190), Enum.Material.Neon)
+			model.PrimaryPart = body
+			return model
+		end
+
+		local function makeTrain()
+			local model = Instance.new("Model")
+			model.Name = "Tren"
+			model.Parent = folder
+			local body = vehiclePart(model, "Locomotora", Vector3.new(6.0, 4.6, 30), CFrame.new(0, 0, 8),
+				Color3.fromRGB(214, 178, 60), Enum.Material.Metal)
+			vehiclePart(model, "Vagon", Vector3.new(6.0, 4.2, 34), CFrame.new(0, -0.1, -24),
+				Color3.fromRGB(194, 74, 64), Enum.Material.Metal)
+			vehiclePart(model, "VentanaVagon", Vector3.new(6.1, 1.2, 26), CFrame.new(0, 0.4, -24),
+				Color3.fromRGB(150, 190, 205), Enum.Material.Glass)
+			vehiclePart(model, "TechoTren", Vector3.new(5.4, 0.3, 62), CFrame.new(0, 2.4, -8),
+				Color3.fromRGB(92, 84, 76), Enum.Material.Metal)
+			vehiclePart(model, "LuzTren", Vector3.new(1.2, 1.2, 0.4), CFrame.new(0, 0.6, -8.4),
+				Color3.fromRGB(255, 246, 200), Enum.Material.Neon)
+			for _, z in ipairs({ 18, 14, -8, -14, -30, -36 }) do
+				for _, x in ipairs({ -3.1, 3.1 }) do
+					vehiclePart(model, "RuedaTren", Vector3.new(1.0, 2.6, 2.6),
+						CFrame.new(x, -2.4, z) * CFrame.Angles(0, 0, math.rad(90)),
+						Color3.fromRGB(40, 40, 44), Enum.Material.Metal, Enum.PartType.Cylinder)
+				end
+			end
+			model.PrimaryPart = body
+			return model
+		end
+
+		-- Camino del anillo (esquinas cortadas para que doblen suave)
+		local lane = R + 8
+		local ringPts = {}
+		for k = 0, 7 do
+			local ang = k * math.pi / 4
+			local c, s = math.cos(ang), math.sin(ang)
+			local m = math.max(math.abs(c), math.abs(s))
+			local len = lane / m
+			if k % 2 == 1 then
+				len = len * 0.92
+			end
+			table.insert(ringPts, center + Vector3.new(c * len, 0, s * len))
+		end
+		local ringCum, ringTotal = { 0 }, 0
+		for i = 1, #ringPts - 1 do
+			ringTotal = ringTotal + (ringPts[i + 1] - ringPts[i]).Magnitude
+			ringCum[i + 1] = ringTotal
+		end
+
+		-- Deja el vehiculo estacionado en su punto de partida
+		local function parkVehicle(veh)
+			local s = veh.startDist or 0
+			for i = 1, #veh.pts - 1 do
+				if s &lt;= veh.cum[i + 1] or i == #veh.pts - 1 then
+					local segLen = math.max(veh.cum[i + 1] - veh.cum[i], 0.001)
+					local t = math.clamp((s - veh.cum[i]) / segLen, 0, 1)
+					local pos = veh.pts[i]:Lerp(veh.pts[i + 1], t)
+					local dir = (veh.pts[i + 1] - veh.pts[i]).Unit
+					local base = Vector3.new(pos.X, veh.baseY, pos.Z)
+					veh.model:PivotTo(CFrame.lookAt(base, base + dir))
+					return
+				end
+			end
+		end
+
+		local function addVehicle(veh)
+			table.insert(self.traffic, veh)
+			parkVehicle(veh)
+		end
+
+		for i, color in ipairs({ CAR_COLORS[1], CAR_COLORS[2], CAR_COLORS[3] }) do
+			addVehicle({
+				model = makeCar(color),
+				pts = ringPts, cum = ringCum, total = ringTotal,
+				dist = 0, startDist = ringTotal * (i - 1) * 0.31, dir = 1,
+				speed = Config.City.speedCar,
+				baseY = floorY + 3.05,
+				halfW = 3.2, halfL = 6.2,
+				label = Config.Text.CarHit,
+			})
+		end
+		addVehicle({
+			model = makeBus(),
+			pts = ringPts, cum = ringCum, total = ringTotal,
+			dist = 0, startDist = ringTotal * 0.52, dir = 1,
+			speed = Config.City.speedBus,
+			baseY = floorY + 3.25,
+			halfW = 3.6, halfL = 12.0,
+			label = Config.Text.BusHit,
+		})
+
+		local trainPts = {
+			Vector3.new(center.X - trackHalf, 0, trackZ),
+			Vector3.new(center.X + trackHalf, 0, trackZ),
+		}
+		local trainTotal = (trainPts[2] - trainPts[1]).Magnitude
+		addVehicle({
+			model = makeTrain(),
+			pts = trainPts, cum = { 0, trainTotal }, total = trainTotal,
+			dist = 0, startDist = 0, dir = 1,
+			speed = Config.City.speedTrain,
+			shuttle = true, wait = Config.City.trainWait,
+			baseY = floorY + 3.75,
+			halfW = 3.9, halfL = 30,
+			label = Config.Text.TrainHit,
+		})
 	end
 
 	-- Zona central despejada para que aparezca el kiwi
@@ -2586,12 +3187,22 @@ local function buildArena(index, zone, cfg, parent, rng)
 		local anchor = freeSpotFallback(56, { 78, 56, 36, 22 })
 		if anchor then
 			makeHouse(anchor, faceCenter(anchor), "cabin")
-			placeNear(anchor, { 48, 54, 60, 40 }, 46, function(cand)
+			placeNear(anchor, { 48, 54, 60, 40 }, 50, function(cand)
 				makeHouse(cand, faceCenter(cand), "farm")
 			end)
 			placeNear(anchor, { 56, 60, 66, 48 }, 50, function(cand)
 				makeBarn(cand, faceCenter(cand))
 			end)
+		end
+
+		-- Casa del Nido: la usa el modo Asedio (5 vs 5) como guarida del
+		-- kiwi. Existe en todos los mapas para que el asedio tenga su casa.
+		local nestSpot = freeSpotFallback(58, { 84, 58, 40, 26 })
+		if nestSpot then
+			makeHouse(nestSpot, faceCenter(nestSpot), "farm")
+			self.nest = { pos = nestSpot }
+		else
+			self.nest = { pos = anchor or center }
 		end
 
 		-- Una casa mas lejos para variar el mapa
@@ -2602,7 +3213,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 
 		-- La ciudad suma una casa mas y su torre mirador
 		if theme == "ciudad" and anchor then
-			placeNear(anchor, { 64, 74, 50, 36 }, 48, function(cand)
+			placeNear(anchor, { 64, 74, 50, 36 }, 52, function(cand)
 				makeHouse(cand, faceCenter(cand), "farm")
 			end)
 			local skySpot = freeSpotFallback(54, { 82, 60, 40, 24 })
@@ -3054,12 +3665,13 @@ function KiwiController.new(arena, kiwiCfg, rng, callbacks, opts)
 	self.callbacks = callbacks or {}
 	self.brain = opts.brain or "hider"
 	self.giant = self.brain == "seeker"
+	self.leash = opts.leash
 
 	self.rig = KiwiModel.build(arena.folder, opts.scale)
 	self.model = self.rig.model
 	self.rideHeight = self.rig.rideHeight or KiwiModel.RideHeight
 
-	self.pos = arena.kiwiSpawn or arena.center
+	self.pos = opts.spawn or arena.kiwiSpawn or arena.center
 	self.pos = Vector3.new(self.pos.X, arena.floorY + self.rideHeight, self.pos.Z)
 	self.facing = Vector3.new(0, 0, 1)
 	self.lastGroundY = arena.floorY
@@ -3082,6 +3694,8 @@ function KiwiController.new(arena, kiwiCfg, rng, callbacks, opts)
 	self.playersInArena = {}
 	self.goalBait = nil
 	self.baitTimer = 0
+	self.peckCooldown = 0
+	self.peckAnim = 0
 	self.trapTimer = 0
 	self.trapScare = 0
 	self.slowLeft = 0
@@ -3287,6 +3901,54 @@ function KiwiController:whiskers(dir)
 	return nil
 end
 
+-- ===============================================================
+-- Picotazo defensivo (kiwi normal)
+-- ===============================================================
+--[[
+	Si un cazador lo acorrala (sin salida hacia ningun lado) y lo tiene
+	encima, el kiwi se defiende: un picotazo que saca el 10% de la vida.
+]]
+function KiwiController:stepPeck(dt)
+	self.peckCooldown = math.max(0, (self.peckCooldown or 0) - dt)
+	if self.peckAnim &gt; 0 then
+		self.peckAnim = math.max(0, self.peckAnim - dt)
+	end
+	if self.peckCooldown &gt; 0 or self.defeated then
+		return
+	end
+	if self.state == "hidden" or self.state == "sedated" or self.state == "trapped" then
+		return
+	end
+
+	local cfg = Config.KiwiPeck
+	local best, bestDist = nil, cfg.range
+	for _, entry in ipairs(self.playersInArena or {}) do
+		if entry.pos and not entry.hidden then
+			local to = flat(entry.pos - self.pos)
+			local d = to.Magnitude
+			if d &lt;= bestDist and d &gt; 0.1 then
+				best, bestDist = entry, d
+			end
+		end
+	end
+	if not best then
+		return
+	end
+
+	-- Acorralado de verdad: todas las salidas (bigotes) tapadas
+	if self:whiskers(self.facing) ~= nil then
+		return
+	end
+
+	self.peckCooldown = cfg.cooldown
+	self.peckAnim = 0.5
+	local to = flat(best.pos - self.pos)
+	if to.Magnitude &gt; 0.1 then
+		self.facing = to.Unit
+	end
+	self:emit("peck", { player = best.player, pos = self.pos + self.facing * 1.2 })
+end
+
 function KiwiController:currentSpeed()
 	local speed
 	if self.brain == "seeker" then
@@ -3342,6 +4004,16 @@ function KiwiController:moveToward(goal, speed, dt)
 	end
 
 	self.pos = self.arena:clampToBounds(self.pos + finalDir * speed * dt)
+	-- Asedio: el kiwi nunca se aleja demasiado de su casa
+	if self.leash then
+		local away = self.pos - self.leash.pos
+		local flatAway = Vector3.new(away.X, 0, away.Z)
+		local radius = self.leash.radius or 40
+		if flatAway.Magnitude &gt; radius then
+			local pulled = self.leash.pos + flatAway.Unit * radius
+			self.pos = Vector3.new(pulled.X, self.pos.Y, pulled.Z)
+		end
+	end
 	local gy = self:groundY(self.pos)
 	self.pos = Vector3.new(self.pos.X, gy + self.rideHeight, self.pos.Z)
 
@@ -3377,7 +4049,10 @@ function KiwiController:chooseSpot(needsClear)
 			clear = false
 		end
 
-		if clear or not needsClear then
+		-- Asedio: solo le interesan los escondites cerca de su casa
+		local farFromHome = self.leash
+			and (spot.hidePoint - self.leash.pos).Magnitude &gt; (self.leash.radius or 40) * 1.5
+		if (clear or not needsClear) and not farFromHome then
 			local score = 0
 			score = score - (spot.hidePoint - self.pos).Magnitude * 0.55
 			score = score + spot.cover * 70 * self.cfg.coverPreference
@@ -3401,6 +4076,13 @@ function KiwiController:chooseSpot(needsClear)
 end
 
 function KiwiController:randomPointInArena()
+	if self.leash then
+		-- Deambula alrededor de su casa (modo Asedio)
+		local angle = self.rng:NextNumber(0, math.pi * 2)
+		local radius = self.rng:NextNumber(6, self.leash.radius or 40)
+		local point = self.leash.pos + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+		return self.arena:clampToBounds(point)
+	end
 	local half = self.arena.halfSize - 30
 	local angle = self.rng:NextNumber(0, math.pi * 2)
 	local radius = self.rng:NextNumber(20, half)
@@ -3744,6 +4426,7 @@ function KiwiController:step(dt, players, baits)
 
 	self:sense(dt, players)
 	self:staminaUpdate(dt)
+	self:stepPeck(dt)
 
 	if self.state ~= "flee" and self.state ~= "tired" then
 		if self.alert &gt;= 1 or (self.threat and self.threatDist &lt;= self.cfg.flushBase) then
@@ -3801,10 +4484,16 @@ function KiwiController:step(dt, players, baits)
 	self.animPhase = self.animPhase + dt * (6 + speed * 0.55)
 	local headPitch = 0.12 + (1 - self.alert) * 0.22 + math.sin(self.stateTime * 1.4) * 0.06
 	local cf = CFrame.lookAt(self.pos, self.pos + self.facing)
+	-- Picotazo: la cabeza baja de golpe cuando el kiwi se defiende
+	local peck = 0
+	if self.peckAnim &gt; 0 then
+		peck = math.sin((1 - self.peckAnim / 0.5) * math.pi)
+	end
 	self.rig:update(cf, {
 		phase = self.animPhase,
 		legSwing = walkFactor * 0.7,
-		headPitch = headPitch,
+		headPitch = headPitch + peck * 0.8,
+		beak = peck * 0.9,
 	})
 
 	if reached then
@@ -4772,6 +5461,116 @@ local function buildRocketTool(id)
 	return tool
 end
 
+local function buildKnifeTool(id)
+	local tool = prepareLootTool(id)
+	tool.Grip = CFrame.new(0, -0.4, 0.15) * CFrame.Angles(math.rad(-90), 0, 0)
+	local handle = newHandle({
+		Size = Vector3.new(0.3, 0.7, 0.42),
+		Color = Color3.fromRGB(62, 46, 34),
+		Material = Enum.Material.Wood,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Guardia",
+		Size = Vector3.new(0.9, 0.16, 0.5),
+		CFrame = handle.CFrame * CFrame.new(0, 0.7, 0),
+		Color = Color3.fromRGB(150, 152, 164),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Hoja",
+		Size = Vector3.new(0.8, 2.4, 0.14),
+		CFrame = handle.CFrame * CFrame.new(0, 2.0, 0),
+		Color = Color3.fromRGB(226, 232, 240),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Punta",
+		CFrame = handle.CFrame * CFrame.new(0, 3.4, 0) * CFrame.Angles(0, 0, math.rad(45)),
+		Size = Vector3.new(0.55, 0.55, 0.14),
+		Color = Color3.fromRGB(226, 232, 240),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Filo",
+		Size = Vector3.new(0.14, 2.3, 0.16),
+		CFrame = handle.CFrame * CFrame.new(0.34, 2.0, 0),
+		Color = Color3.fromRGB(255, 255, 255),
+		Material = Enum.Material.Neon,
+		Parent = tool,
+	})
+	return tool
+end
+
+local function buildFlamethrowerTool(id)
+	local cfg = Config.Weapons[id]
+	local tool = prepareLootTool(id)
+	tool.Grip = CFrame.new(0, -0.35, 0.3) * CFrame.Angles(math.rad(-90), 0, 0)
+	local handle = newHandle({
+		Size = Vector3.new(0.3, 0.8, 0.5),
+		Color = Color3.fromRGB(70, 70, 66),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Tubo",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(3.6, 0.34, 0.34),
+		CFrame = handle.CFrame * CFrame.new(0, 0.55, -1.4) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(96, 96, 90),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Boquilla",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.7, 0.6, 0.6),
+		CFrame = handle.CFrame * CFrame.new(0, 0.55, -3.2) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(52, 52, 50),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Piloto",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.42, 0.42, 0.42),
+		CFrame = handle.CFrame * CFrame.new(0, 0.55, -3.7),
+		Color = cfg.color,
+		Material = Enum.Material.Neon,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Mochila",
+		Size = Vector3.new(1.5, 2.0, 0.8),
+		CFrame = handle.CFrame * CFrame.new(0, -0.2, 0.7),
+		Color = Color3.fromRGB(140, 60, 48),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "TanqueA",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(1.6, 0.6, 0.6),
+		CFrame = handle.CFrame * CFrame.new(-0.36, 0.35, 0.75) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(178, 76, 58),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "TanqueB",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(1.6, 0.6, 0.6),
+		CFrame = handle.CFrame * CFrame.new(0.36, 0.35, 0.75) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(178, 76, 58),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	return tool
+end
+
 local function buildLootTool(parent, id)
 	if not Config.Weapons[id] then
 		return nil
@@ -4784,6 +5583,10 @@ local function buildLootTool(parent, id)
 		tool = buildBowTool(id)
 	elseif id == "sniper" then
 		tool = buildSniperTool(id)
+	elseif id == "cuchillo" then
+		tool = buildKnifeTool(id)
+	elseif id == "lanzallamas" then
+		tool = buildFlamethrowerTool(id)
 	else
 		tool = buildRocketTool(id)
 	end
@@ -4935,6 +5738,22 @@ function ToolService.giveLoot(player, toolId, uses)
 	end
 end
 
+function ToolService.addLootUses(player, toolId, amount)
+	local cap = Config.Loot.uses
+	local total = 0
+	for _, container in ipairs({ player:FindFirstChildOfClass("Backpack"), player.Character }) do
+		if container then
+			for _, item in ipairs(container:GetChildren()) do
+				if item:IsA("Tool") and item:GetAttribute("ToolId") == toolId then
+					total = math.min(cap, (item:GetAttribute("Uses") or 0) + (amount or 1))
+					item:SetAttribute("Uses", total)
+				end
+			end
+		end
+	end
+	return total
+end
+
 function ToolService.lootUses(player, toolId)
 	for _, container in ipairs({ player:FindFirstChildOfClass("Backpack"), player.Character }) do
 		if container then
@@ -5058,6 +5877,57 @@ local DART_THICKNESS = 0.22
 local NET_HALF_ANGLE = math.rad(55)   -- medio cono de la red
 local AIM_TOLERANCE = math.rad(75)    -- cuanto puede desviarse la mira del dardo
 
+-- Dispersion estilo Counter Blox (licencia MIT, ver LICENSE-CB.md):
+--   error = spread del arma + velocidad * vel
+--   con la mira puesta: error = spread * adsDiv (el sniper es perfecto)
+--   si el error queda por debajo del minimo, el disparo sale perfecto
+function Actions.spreadError(weaponId, root, data)
+	local shoot = Config.Shoot or {}
+	local cfg = (shoot.weapons or {})[weaponId] or {}
+	local speed = 0
+	if root then
+		local velocity = root.AssemblyLinearVelocity
+		speed = math.sqrt(velocity.X * velocity.X + velocity.Z * velocity.Z)
+	end
+
+	local error = math.max(cfg.spread or 0, 0) + speed * (cfg.vel or 0)
+	-- Agachado (Ctrl) el arma se afirma, como en Counter
+	if data and data.sneak and not (data and data.scoped) then
+		error = error / ((Config.Shoot and Config.Shoot.crouchDiv) or 1.6)
+	end
+	if data and data.scoped then
+		if cfg.adsPerfect then
+			error = 0
+		else
+			error = error * (shoot.adsDiv or 0.35)
+		end
+	end
+	local dead = cfg.dead or shoot.dead or 0
+	if error &lt; dead then
+		error = 0
+	end
+	return error
+end
+
+-- Igual que Fire() de Counter Blox: el error se convierte en grados, el
+-- vertical siempre patea hacia arriba (salvo armas con randomX) y el
+-- horizontal/roll sale al azar. Devuelve direccion nueva y grados.
+function Actions.applySpread(dir, weaponId, root, data)
+	local error = Actions.spreadError(weaponId, root, data)
+	if error &lt;= 0 then
+		return dir, 0
+	end
+	local shoot = Config.Shoot or {}
+	local cfg = (shoot.weapons or {})[weaponId] or {}
+	local grados = error / (shoot.div or 6)
+	local rnd = math.random
+	local pitch = cfg.randomX and ((rnd() * 2 - 1) * grados) or grados
+	local yaw = (rnd() * 2 - 1) * grados
+	local roll = (rnd() * 2 - 1) * grados
+	local spread = CFrame.Angles(math.rad(pitch), math.rad(yaw), math.rad(roll))
+	return (CFrame.lookAt(Vector3.new(), dir) * spread).LookVector, grados
+end
+
 -- ===============================================================
 -- Utilidades
 -- ===============================================================
@@ -5173,7 +6043,8 @@ function Actions.net(session, player, data)
 end
 
 -- ===============================================================
--- RIFLE TRANQUILIZANTE
+-- RIFLE TRANQUILIZANTE (estilo Counter: rayo instantaneo con dispersion;
+-- quieto o con la mira puesto es preciso, corriendo disparando no)
 -- ===============================================================
 function Actions.rifle(session, player, data)
 	local cfg = session.diff.rifle
@@ -5187,37 +6058,28 @@ function Actions.rifle(session, player, data)
 	end
 
 	local muzzle, dir = aimDirection(player, root, data)
+	dir = Actions.applySpread(dir, "rifle", root, data)
 
-	local dartPart = Util.makePart({
-		Name = "Dardo",
-		ClassName = "Part",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(DART_LENGTH, DART_THICKNESS, DART_THICKNESS),
-		Color = Color3.fromRGB(226, 232, 240),
-		Material = Enum.Material.SmoothPlastic,
-		Anchored = true,
-		CanCollide = false,
-		CanQuery = false,
-		CanTouch = false,
-		CFrame = CFrame.lookAt(muzzle + dir * 1.2, muzzle + dir * 2.2) * CFrame.Angles(0, math.rad(90), 0),
-		Parent = workspace,
-	})
-	Util.destroyAfter(dartPart, 6)
+	local range = cfg.range or 170
+	local params = Actions.makeDartParams(character)
+	local hit = workspace:Raycast(muzzle, dir * range, params)
 
-	local dart = {
-		kind = "dart",
-		part = dartPart,
-		pos = muzzle + dir * 1.2,
-		dir = dir,
-		speed = cfg.speed,
-		life = 1.6,
-		player = player,
-		params = Actions.makeDartParams(character, dartPart),
-	}
+	if hit then
+		local kiwi = session.kiwi
+		if kiwi and not kiwi.defeated and hit.Instance:IsDescendantOf(kiwi.model) then
+			if kiwi:sedate(session.diff.kiwi.sedateTime, player) then
+				session:notify(player, Config.Text.DartHit, Color3.fromRGB(160, 230, 170))
+				session:event("darthit", { pos = hit.Position })
+			end
+		else
+			session:event("dartmiss", { pos = hit.Position, normal = hit.Normal })
+			session:notify(player, Config.Text.DartMiss, Color3.fromRGB(200, 200, 200))
+			ToolService.startCooldown(player, "rifle", cfg.cooldownOnMiss)
+		end
+	end
 
-	table.insert(session.projectiles, dart)
 	ToolService.startCooldown(player, "rifle", cfg.cooldown)
-	session:event("dartshot", { pos = muzzle, dir = dir })
+	session:event("dartshot", { pos = muzzle, dir = dir, tracer = true })
 end
 
 --[[
@@ -5292,6 +6154,34 @@ function Actions.fireWeapon(session, player, weaponId, data)
 
 	local muzzle, dir = aimDirection(player, root, data)
 
+	-- Cuchillo: zarpazo cuerpo a cuerpo (sin proyectil)
+	if cfg.melee then
+		Actions.melee(session, player, weaponId, cfg, muzzle, dir)
+		ToolService.startCooldown(player, weaponId, cfg.cooldown)
+		ToolService.consumeLoot(player, weaponId)
+		return
+	end
+
+	-- Lanzallamas: chorro corto en cono
+	if cfg.flame then
+		Actions.flame(session, player, weaponId, cfg, muzzle, dir)
+		ToolService.startCooldown(player, weaponId, cfg.cooldown)
+		ToolService.consumeLoot(player, weaponId)
+		return
+	end
+
+	-- Francotirador: bala instantanea estilo Counter. Con la telescopica
+	-- puesta es letal; sin mira es un noscope impreciso.
+	if weaponId == "sniper" then
+		Actions.sniperShot(session, player, cfg, muzzle, dir, data)
+		ToolService.startCooldown(player, weaponId, cfg.cooldown)
+		ToolService.consumeLoot(player, weaponId)
+		return
+	end
+
+	-- Dispersion estilo Counter tambien en los tiros del baul
+	dir = Actions.applySpread(dir, weaponId, root, data)
+
 	local dartPart = Util.makePart({
 		Name = "Proyectil",
 		ClassName = "Part",
@@ -5323,9 +6213,246 @@ function Actions.fireWeapon(session, player, weaponId, data)
 	ToolService.startCooldown(player, weaponId, cfg.cooldown)
 	ToolService.consumeLoot(player, weaponId)
 	session:event("dartshot", { pos = muzzle, dir = dir })
+	session:event("weaponfx", { weapon = weaponId, pos = muzzle, dir = dir })
 end
 
-function Actions.weaponHit(session, dart, pos, victim)
+-- Cuchillo: golpe corto; al kiwi solo lo frena, a los cazadores los hiere.
+function Actions.melee(session, player, weaponId, cfg, muzzle, dir)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { player.Character }
+	params.IgnoreWater = true
+
+	local reach = cfg.reach or 8
+	local hit = workspace:Raycast(muzzle, dir * reach, params)
+	local pos = muzzle + dir * reach
+	local victim = nil
+	if hit then
+		pos = hit.Position
+		local character = hit.Instance:FindFirstAncestorOfClass("Model")
+		victim = character and Players:GetPlayerFromCharacter(character)
+	end
+
+	if victim and victim ~= player then
+		session:damagePlayer(victim, player, cfg.name, cfg.damage, pos)
+		local _, vroot = getRoot(victim)
+		if vroot then
+			local push = flat(dir).Unit * (cfg.knockback or 24)
+			vroot.AssemblyLinearVelocity = Vector3.new(push.X, 14, push.Z)
+		end
+	end
+
+	local kiwi = session.kiwi
+	if kiwi and not kiwi.defeated then
+		if (kiwi:getPosition() - pos).Magnitude &lt;= reach then
+			if kiwi:slow(cfg.slowFactor or 0.5, cfg.slowTime or 1.2) then
+				session:notify(player, string.format(Config.Text.BoomHit, cfg.name), cfg.color, 3)
+			end
+		end
+	end
+
+	session:event("weaponfx", { weapon = weaponId, pos = muzzle, dir = dir, hit = victim ~= nil })
+end
+
+-- Francotirador: rayo instantaneo estilo Counter. Con la mira es letal;
+-- sin mira, noscope impreciso. Al kiwi solo lo frena (nunca lo hiere).
+function Actions.sniperShot(session, player, cfg, muzzle, dir, data)
+	-- Dispersion estilo Counter Blox: sin telescopica el disparo es un
+	-- noscope bien impreciso; con la mira puesta sale perfecto.
+	local _, root = getRoot(player)
+	dir = Actions.applySpread(dir, "sniper", root, data)
+
+	local character = player.Character
+	local params = Actions.makeDartParams(character)
+	local range = (Config.Shoot and Config.Shoot.sniperRange) or 700
+	local hit = workspace:Raycast(muzzle, dir * range, params)
+	local pos = muzzle + dir * range
+	local victim = nil
+	local hitKiwi = false
+
+	if hit then
+		pos = hit.Position
+		local other = hit.Instance:FindFirstAncestorOfClass("Model")
+		victim = other and Players:GetPlayerFromCharacter(other)
+		local kiwi = session.kiwi
+		hitKiwi = kiwi ~= nil and not kiwi.defeated and hit.Instance:IsDescendantOf(kiwi.model)
+	end
+
+	if victim and victim ~= player then
+		session:damagePlayer(victim, player, cfg.name, cfg.damage, pos)
+		local _, vroot = getRoot(victim)
+		if vroot then
+			local push = flat(dir).Unit * (cfg.knockback or 58)
+			vroot.AssemblyLinearVelocity = Vector3.new(push.X, 16, push.Z)
+		end
+	elseif hitKiwi then
+		local kiwi = session.kiwi
+		if kiwi:slow(cfg.slowFactor or 0.3, cfg.slowTime or 2) then
+			session:notify(player, string.format(Config.Text.BoomHit, cfg.name), cfg.color, 3)
+		end
+	elseif hit then
+		session:event("dartmiss", { pos = pos, normal = hit.Normal })
+	end
+
+	session:event("weaponfx", { weapon = "sniper", pos = muzzle, dir = dir, hit = victim ~= nil or hitKiwi })
+end
+
+-- Lanzallamas: cono corto que hiere jugadores con linea de vista y frena al kiwi.
+function Actions.flame(session, player, weaponId, cfg, muzzle, dir)
+	local reach = cfg.reach or 17
+	local cosLimit = math.cos(math.rad(cfg.coneAngle or 32))
+	local aimFlat = flat(dir).Unit
+	local hitAnyone = false
+
+	for _, other in ipairs(session.players) do
+		local _, otherRoot = getRoot(other)
+		if otherRoot and other ~= player then
+			local to = otherRoot.Position - muzzle
+			local dist = to.Magnitude
+			if dist &lt;= reach and dist &gt; 0.5 then
+				local toFlat = flat(to)
+				if toFlat.Magnitude &gt; 0.1 and toFlat.Unit:Dot(aimFlat) &gt;= cosLimit then
+					-- El chorro no atraviesa paredes: linea de vista real
+					local params = RaycastParams.new()
+					params.FilterType = Enum.RaycastFilterType.Exclude
+					params.FilterDescendantsInstances = { player.Character }
+					params.IgnoreWater = true
+					local los = workspace:Raycast(muzzle, to, params)
+					if los == nil or los.Instance:IsDescendantOf(other.Character) then
+						session:damagePlayer(other, player, cfg.name, cfg.damage, otherRoot.Position)
+						local push = toFlat.Unit * (cfg.knockback or 12)
+						otherRoot.AssemblyLinearVelocity = Vector3.new(push.X, 10, push.Z)
+						hitAnyone = true
+					end
+				end
+			end
+		end
+	end
+
+	local kiwi = session.kiwi
+	if kiwi and not kiwi.defeated then
+		local to = kiwi:getPosition() - muzzle
+		if to.Magnitude &lt;= reach then
+			local toFlat = flat(to)
+			if toFlat.Magnitude &gt; 0.1 and toFlat.Unit:Dot(aimFlat) &gt;= cosLimit then
+				if kiwi:slow(cfg.slowFactor or 0.6, cfg.slowTime or 1.0) then
+					session:notify(player, string.format(Config.Text.BoomHit, cfg.name), cfg.color, 3)
+				end
+			end
+		end
+	end
+
+	session:event("weaponfx", { weapon = weaponId, pos = muzzle, dir = dir, hit = hitAnyone })
+end
+
+-- Flecha clavada: queda en el mundo con un cartel para recuperarla (+1 uso).
+function Actions.stickArrow(session, dart, pos, normal)
+	local cfg = Config.Weapons.arco
+	local dir = dart.dir
+
+	local arrow = Util.makePart({
+		Name = "FlechaClavada",
+		Size = Vector3.new(0.14, 0.14, 2.8),
+		Color = cfg.color,
+		Material = Enum.Material.Wood,
+		Anchored = true,
+		CanCollide = false,
+		CanQuery = false,
+		CFrame = CFrame.lookAt(pos - dir * 0.6, pos + dir * 2.2),
+		Parent = workspace,
+	})
+	local tip = Util.makePart({
+		Name = "PuntaFlecha",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.34, 0.34, 0.34),
+		Color = Color3.fromRGB(230, 236, 244),
+		Material = Enum.Material.Metal,
+		Anchored = true,
+		CanCollide = false,
+		CanQuery = false,
+		Position = pos + dir * 0.85,
+		Parent = workspace,
+	})
+	local back = pos - dir * 1.7
+	local feathers = {}
+	for _, side in ipairs({ -1, 1 }) do
+		table.insert(feathers, Util.makePart({
+			Name = "Pluma",
+			Size = Vector3.new(0.55, 0.06, 0.5),
+			Color = Color3.fromRGB(240, 240, 228),
+			Material = Enum.Material.Fabric,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CFrame = CFrame.lookAt(back, back + dir) * CFrame.Angles(0, 0, math.rad(side * 38)),
+			Parent = workspace,
+		}))
+	end
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "RecogerFlecha"
+	prompt.ActionText = "Recoger"
+	prompt.ObjectText = "Flecha"
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = cfg.pickupRange or 12
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = arrow
+
+	local pickup = { parts = { arrow, tip, feathers[1], feathers[2] }, dead = false }
+
+	local function clear()
+		if pickup.dead then
+			return
+		end
+		pickup.dead = true
+		for _, piece in ipairs(pickup.parts) do
+			if piece and piece.Parent then
+				piece:Destroy()
+			end
+		end
+	end
+
+	prompt.Triggered:Connect(function(player)
+		if pickup.dead then
+			return
+		end
+		local _, root = getRoot(player)
+		if not root or (root.Position - arrow.Position).Magnitude &gt; (cfg.pickupRange or 12) + 3 then
+			return
+		end
+		if ToolService.lootUses(player, "arco") &lt;= 0 then
+			session:notify(player, Config.Text.ArrowNoBow, Color3.fromRGB(200, 200, 200), 3)
+			return
+		end
+		ToolService.addLootUses(player, "arco", 1)
+		session:notify(player, Config.Text.ArrowPickup, cfg.color, 3)
+		session:event("arrowpick", { pos = arrow.Position })
+		clear()
+	end)
+
+	task.delay(cfg.pickupLife or 60, clear)
+	session.arrowPickups = session.arrowPickups or {}
+	table.insert(session.arrowPickups, pickup)
+end
+
+-- Limpieza de flechas clavadas al terminar la ronda.
+function Actions.clearPickups(session)
+	if not session.arrowPickups then
+		return
+	end
+	for _, pickup in ipairs(session.arrowPickups) do
+		pickup.dead = true
+		for _, piece in ipairs(pickup.parts) do
+			if piece and piece.Parent then
+				piece:Destroy()
+			end
+		end
+	end
+	session.arrowPickups = {}
+end
+
+function Actions.weaponHit(session, dart, pos, victim, hitPart)
 	local cfg = Config.Weapons[dart.weaponId]
 	if not cfg then
 		return
@@ -5343,10 +6470,38 @@ function Actions.weaponHit(session, dart, pos, victim)
 	end
 
 	local damage = cfg.damage or 0
+	local headshot = false
+
+	-- Caida de daño con la distancia (como Counter): de lejos pega menos
+	if victim and (cfg.falloff or 0) &gt; 0 then
+		local _, shooterRoot = getRoot(dart.player)
+		if shooterRoot then
+			local dist = (pos - shooterRoot.Position).Magnitude
+			local loss = math.max(0, dist / 1.9 - 1) * cfg.falloff
+			damage = math.max(cfg.minDamage or damage * 0.5, damage - loss)
+		end
+	end
+
+	-- Tiro a la cabeza (estilo Counter): se lleva mucho mas daño
+	if victim and cfg.headMult and hitPart then
+		local parent = hitPart.Parent
+		if hitPart.Name == "Head" or (parent and parent.Name == "Head") then
+			damage = damage * cfg.headMult
+			headshot = true
+		end
+	end
 
 	-- Golpe directo: el cazador alcanzado se lleva el daño completo
 	if victim and victim ~= dart.player and damage &gt; 0 then
-		session:damagePlayer(victim, dart.player, cfg.name, damage, pos)
+		local label = cfg.name
+		if headshot then
+			label = Config.Text.Headshot or cfg.name
+		end
+		session:damagePlayer(victim, dart.player, label, damage, pos)
+		if headshot then
+			session:notify(dart.player, Config.Text.Headshot, Color3.fromRGB(255, 210, 90), 2.5)
+			session:event("headshot", { pos = pos, userId = victim.UserId })
+		end
 	end
 
 	-- Onda expansiva: empuja a todos (tambien al que disparo) y hiere un poco
@@ -5406,7 +6561,12 @@ function Actions.stepProjectiles(session, dt)
 			elseif dart.kind == "weapon" then
 				local character = hit.Instance:FindFirstAncestorOfClass("Model")
 				local victim = character and Players:GetPlayerFromCharacter(character)
-				Actions.weaponHit(session, dart, hit.Position, victim)
+				local cfg = Config.Weapons[dart.weaponId]
+				if cfg and cfg.stick then
+					-- La flecha queda clavada donde pego (se puede recoger)
+					Actions.stickArrow(session, dart, hit.Position, hit.Normal)
+				end
+				Actions.weaponHit(session, dart, hit.Position, victim, hit.Instance)
 			else
 				local kiwi = session.kiwi
 				if kiwi and not kiwi.defeated and hit.Instance:IsDescendantOf(kiwi.model) then
@@ -5423,6 +6583,14 @@ function Actions.stepProjectiles(session, dt)
 		else
 			dart.pos = dart.pos + dart.dir * stepLen
 			if dart.life &lt;= 0 then
+				-- Flechas: si se les acaba el vuelo, caen y se clavan en el piso
+				local cfg = dart.weaponId and Config.Weapons[dart.weaponId]
+				if cfg and cfg.stick then
+					local ground = workspace:Raycast(dart.pos, Vector3.new(0, -90, 0), dart.params)
+					if ground then
+						Actions.stickArrow(session, dart, ground.Position, ground.Normal)
+					end
+				end
 				remove = true
 			elseif dart.kind == "paint" then
 				dart.part.CFrame = CFrame.new(dart.pos)
@@ -5969,12 +7137,28 @@ function Session.new(modeId, rng)
 	self.hidden = {}
 	self.hideSpot = {}
 	self.isColosal = modeId == "colosal"
+	self.isAsedio = modeId == "asedio"
 	self.mapVote = {}
 	self.chosenMap = nil
 	self.voteDone = false
 	self.knocked = {}
 
-	if modeId == "multi" then
+	if modeId == "asedio" then
+		self.isMulti = false
+		self.diff = Config.Difficulties[Config.Asedio.baseDifficulty]
+		self.name = Config.Asedio.name
+		self.tag = Config.Asedio.tag
+		self.color = Config.Asedio.color
+		self.timeLimit = Config.Asedio.roundTime
+		self.teamOf = {}
+		self.teams = { attack = {}, defend = {} }
+		self.teamScore = { attack = 0, defend = 0 }
+		self.asedioRound = 1
+		self.teamsReady = false
+		-- Como el multijugador: entre todos votan el mapa y arranca.
+		self.phase = "vote"
+		self.phaseEnds = os.clock() + Config.Vote.multiTime
+	elseif modeId == "multi" then
 		self.isMulti = true
 		self.diff = Config.Difficulties[Config.Multiplayer.baseDifficulty]
 		self.name = Config.Multiplayer.name
@@ -6021,6 +7205,14 @@ end
 -- Entrega las herramientas segun el modo (colosal solo el rastreador,
 -- multijugador suma el rifle de pintura).
 function Session:giveTools(player)
+	if self.isAsedio then
+		local side = self:asedioSide(player)
+		local only = side == "defend" and Config.Asedio.toolsDefend or Config.Asedio.toolsAttack
+		ToolService.give(player, only)
+		-- Pistola de equipo: revolver con balas de sobra (estilo Counter)
+		ToolService.giveLoot(player, "revolver", Config.Asedio.revolverUses or 40)
+		return
+	end
 	local only = self.diff.tools
 	if self.isMulti then
 		only = Config.Multiplayer.tools
@@ -6147,7 +7339,9 @@ end
 
 -- ---------------- daño entre cazadores ----------------
 -- Las armas de baul hieren a los jugadores. Al kiwi SOLO lo relentizan.
-function Session:damagePlayer(victim, attacker, weaponName, amount, pos)
+-- sourceLabel: cuando el daño no viene de un cazador (auto, tren, kiwi...)
+-- se usa ese texto en lugar del mensaje de "te dio con X".
+function Session:damagePlayer(victim, attacker, weaponName, amount, pos, sourceLabel)
 	if not self.stats[victim] or self.phase ~= "playing" then
 		return
 	end
@@ -6155,16 +7349,32 @@ function Session:damagePlayer(victim, attacker, weaponName, amount, pos)
 		return
 	end
 
+	-- Asedio: no hay fuego amigo entre companeros de equipo
+	if self.isAsedio and attacker and attacker ~= victim then
+		local mine = self.teamOf[attacker]
+		local theirs = self.teamOf[victim]
+		if mine and theirs and mine == theirs then
+			self:notify(attacker, "¡Es de tu equipo!", COLOR.warn, 3)
+			return
+		end
+	end
+
 	local data = self.stats[victim]
 	amount = math.max(1, math.floor(amount + 0.5))
 	data.hp = math.max(0, (data.hp or Config.Player.maxHealth) - amount)
 	data.lastHurt = os.clock()
 
-	local attackerName = "el mapa"
-	if attacker and attacker ~= victim then
-		attackerName = attacker.DisplayName ~= "" and attacker.DisplayName or attacker.Name
+	local msg
+	if sourceLabel then
+		msg = string.format(Config.Text.HurtGeneric, sourceLabel, amount)
+	else
+		local attackerName = "el mapa"
+		if attacker and attacker ~= victim then
+			attackerName = attacker.DisplayName ~= "" and attacker.DisplayName or attacker.Name
+		end
+		msg = string.format(Config.Text.HurtMsg, attackerName, weaponName, amount)
 	end
-	self:notify(victim, string.format(Config.Text.HurtMsg, attackerName, weaponName, amount), COLOR.bad, 3)
+	self:notify(victim, msg, COLOR.bad, 3)
 	self:event("hurt", { pos = pos, userId = victim.UserId, amount = amount })
 	self:sendUpdate(victim)
 
@@ -6187,6 +7397,18 @@ function Session:knockout(victim, attacker)
 	self:notifyAll(string.format(Config.Text.KoedAll, aname, vname), COLOR.warn, 5)
 	self:event("ko", { userId = victim.UserId })
 	setFrozen(victim, true)
+
+	-- Asedio: los noqueados vuelven a su spawn despues de unos segundos
+	if self.isAsedio then
+		self:notify(victim, string.format(Config.Text.AsedioRespawnWait, Config.Asedio.respawn), COLOR.warn, Config.Asedio.respawn)
+		task.delay(Config.Asedio.respawn, function()
+			self.knocked[victim] = nil
+			if self.stats[victim] and not self.finished and self.phase ~= "ended" then
+				self:asedioRespawn(victim)
+			end
+		end)
+		return
+	end
 
 	task.delay(Config.Round.KoHold, function()
 		self.knocked[victim] = nil
@@ -6211,8 +7433,292 @@ function Session:stepHealth(dt)
 	end
 end
 
+-- ---------------- asedio (5 vs 5) ----------------
+-- Cazadores (entran por el kiwi) y Defensores (lo cuidan en su casa).
+local teamAttackCache, teamDefendCache
+
+local function ensureTeams()
+	local Teams = game:GetService("Teams")
+	if teamAttackCache and teamAttackCache.Parent then
+		return
+	end
+	teamAttackCache = Teams:FindFirstChild(Config.Asedio.teamAttack) or Instance.new("Team")
+	teamAttackCache.Name = Config.Asedio.teamAttack
+	teamAttackCache.TeamColor = BrickColor.new(Config.Asedio.colorAttack)
+	teamAttackCache.AutoAssignable = false
+	teamAttackCache.Parent = Teams
+
+	teamDefendCache = Teams:FindFirstChild(Config.Asedio.teamDefend) or Instance.new("Team")
+	teamDefendCache.Name = Config.Asedio.teamDefend
+	teamDefendCache.TeamColor = BrickColor.new(Config.Asedio.colorDefend)
+	teamDefendCache.AutoAssignable = false
+	teamDefendCache.Parent = Teams
+end
+
+function Session:asedioSide(player)
+	return self.teamOf[player] or "attack"
+end
+
+-- Un jugador que entra a mitad de partida se suma al equipo con menos gente
+function Session:asedioAddToTeam(player)
+	if self.teamOf[player] then
+		return
+	end
+	local side = #self.teams.attack &lt;= #self.teams.defend and "attack" or "defend"
+	self.teamOf[player] = side
+	table.insert(self.teams[side], player)
+	ensureTeams()
+	player.Neutral = false
+	player.Team = side == "attack" and teamAttackCache or teamDefendCache
+	local text = side == "attack" and Config.Text.AsedioTeamAttack or Config.Text.AsedioTeamDefend
+	self:notify(player, text, side == "attack" and Config.Asedio.colorAttack or Config.Asedio.colorDefend, 8)
+end
+
+-- Reparte los equipos al azar, mitad y mitad, al arrancar la partida
+function Session:assignTeams()
+	if not self.isAsedio then
+		return
+	end
+	ensureTeams()
+	local list = {}
+	for _, player in ipairs(self.players) do
+		table.insert(list, player)
+	end
+	for i = #list, 2, -1 do
+		local j = self.rng:NextInteger(1, i)
+		list[i], list[j] = list[j], list[i]
+	end
+	self.teamOf = {}
+	self.teams = { attack = {}, defend = {} }
+	local counts = { attack = 0, defend = 0 }
+	for _, player in ipairs(list) do
+		local side = counts.attack &lt;= counts.defend and "attack" or "defend"
+		counts[side] = counts[side] + 1
+		self.teamOf[player] = side
+		table.insert(self.teams[side], player)
+		player.Neutral = false
+		player.Team = side == "attack" and teamAttackCache or teamDefendCache
+	end
+	self.teamsReady = true
+	for _, player in ipairs(list) do
+		local side = self.teamOf[player]
+		local text = side == "attack" and Config.Text.AsedioTeamAttack or Config.Text.AsedioTeamDefend
+		self:notify(player, text, side == "attack" and Config.Asedio.colorAttack or Config.Asedio.colorDefend, 8)
+	end
+end
+
+-- El kiwi del asedio no come cazadores: da un picotazo y los tira lejos
+function Session:asedioPounce(victim, pos)
+	if not victim or not self.stats[victim] or self.phase ~= "playing" then
+		return
+	end
+	local root = getRoot(victim)
+	if root and pos then
+		local away = root.Position - pos
+		away = Vector3.new(away.X, 0, away.Z)
+		if away.Magnitude &lt; 0.5 then
+			away = Vector3.new(0, 0, 1)
+		end
+		away = away.Unit * 42
+		root.AssemblyLinearVelocity = Vector3.new(away.X, 18, away.Z)
+	end
+	self:event("peck", { pos = pos, userId = victim.UserId })
+	self:damagePlayer(victim, nil, "picotazo", Config.KiwiPeck.damage, pos, Config.Text.AsedioPounce)
+end
+
+-- Vuelve al combate al noqueado (spawn de su equipo, vida llena y armas)
+function Session:asedioRespawn(player)
+	if not self.arena or not self.stats[player] then
+		return
+	end
+	local data = self.stats[player]
+	data.hp = Config.Player.maxHealth
+	self:teleportToArena(player)
+	self:giveTools(player)
+	setFrozen(player, false)
+	self:notify(player, Config.Text.AsedioBack, COLOR.good, 4)
+	self:sendUpdate(player)
+end
+
+-- Limpia la ronda (kiwi, proyectiles, vida) antes de la siguiente
+function Session:asedioReset()
+	if self.kiwi then
+		self.kiwi:destroy()
+		self.kiwi = nil
+	end
+	for _, dart in ipairs(self.projectiles) do
+		dart.part:Destroy()
+	end
+	self.projectiles = {}
+	self:clearTraps()
+	Actions.clearPickups(self)
+	for _, player in ipairs(self.players) do
+		if self.hideSpot[player] then
+			self:exitSpot(player, true)
+		end
+		local data = self.stats[player]
+		if data then
+			data.hp = Config.Player.maxHealth
+		end
+		self.knocked[player] = nil
+	end
+end
+
+-- Punto para un equipo: si llega a las rondas necesarias, se termina
+function Session:asedioScore(side, reason)
+	if not self.isAsedio or self.phase ~= "playing" then
+		return
+	end
+	local score = self.teamScore
+	score[side] = (score[side] or 0) + 1
+	local attackName = Config.Asedio.teamAttack
+	local defendName = Config.Asedio.teamDefend
+
+	if reason == "capture" then
+		self:notifyAll(string.format(Config.Text.AsedioCapture, attackName), Config.Asedio.colorAttack, 6)
+	else
+		self:notifyAll(string.format(Config.Text.AsedioTimeout, defendName), Config.Asedio.colorDefend, 6)
+	end
+	self:notifyAll(string.format("Marcador: %s %d - %d %s", attackName, score.attack, score.defend, defendName), COLOR.info, 6)
+
+	if score.attack &gt;= Config.Asedio.roundsToWin or score.defend &gt;= Config.Asedio.roundsToWin then
+		self.asedioWinner = score.attack &gt;= Config.Asedio.roundsToWin and "attack" or "defend"
+		local winnerName = self.asedioWinner == "attack" and attackName or defendName
+		self:notifyAll(string.format(Config.Text.AsedioMatch, winnerName), COLOR.good, 8)
+		self:endRound(nil, "teamwin")
+		return
+	end
+
+	-- Siguiente ronda: descanso corto y vuelta a empezar en la casa
+	self.asedioRound = (self.asedioRound or 1) + 1
+	self:asedioReset()
+	self:startCountdown()
+	self.phaseEnds = os.clock() + Config.Asedio.breakTime
+	self:notifyAll(string.format(Config.Text.AsedioNext, self.asedioRound), COLOR.info, Config.Asedio.breakTime)
+	self:sendUpdates(true)
+end
+
+-- ---------------- trafico de la ciudad ----------------
+-- Autos, colectivo y tren (solo en el mapa Ciudad). Se mueven por caminos
+-- fijos y atropellan a los cazadores: mitad de la vida y empujon.
+local function vehiclePose(veh, s)
+	local pts, cum = veh.pts, veh.cum
+	for i = 1, #pts - 1 do
+		if s &lt;= cum[i + 1] or i == #pts - 1 then
+			local segLen = math.max(cum[i + 1] - cum[i], 0.001)
+			local t = math.clamp((s - cum[i]) / segLen, 0, 1)
+			local pos = pts[i]:Lerp(pts[i + 1], t)
+			local dir = (pts[i + 1] - pts[i]).Unit
+			if veh.dir &lt; 0 then
+				dir = -dir
+			end
+			return pos, dir
+		end
+	end
+	return pts[1], Vector3.new(0, 0, 1)
+end
+
+local function placeVehicle(veh)
+	local s = veh.dist
+	if veh.dir &lt; 0 then
+		s = veh.total - s
+	end
+	local pos, dir = vehiclePose(veh, math.clamp(s, 0, veh.total))
+	pos = Vector3.new(pos.X, veh.baseY or pos.Y, pos.Z)
+	local cf = CFrame.lookAt(pos, pos + dir)
+	veh.model:PivotTo(cf)
+	veh.pose = cf
+end
+
+function Session:resetTraffic()
+	local arena = self.arena
+	if not arena or not arena.traffic then
+		return
+	end
+	for _, veh in ipairs(arena.traffic) do
+		veh.dist = veh.startDist or 0
+		veh.dir = 1
+		veh.waitUntil = 0
+		veh.lastHit = {}
+		placeVehicle(veh)
+	end
+end
+
+function Session:stepTraffic(dt)
+	local arena = self.arena
+	if not arena or not arena.traffic or #arena.traffic == 0 then
+		return
+	end
+
+	local now = os.clock()
+
+	-- Semaforos: ciclo verde -&gt; amarillo -&gt; rojo (decorativo)
+	if arena.semaphores then
+		local phase = now % 11
+		local active = "green"
+		if phase &gt;= 4.5 and phase &lt; 6 then
+			active = "yellow"
+		elseif phase &gt;= 6 then
+			active = "red"
+		end
+		for _, sem in ipairs(arena.semaphores) do
+			for name, part in pairs(sem) do
+				local on = name == active
+				part.Material = on and Enum.Material.Neon or Enum.Material.SmoothPlastic
+				part.Transparency = on and 0 or 0.55
+			end
+		end
+	end
+
+	for _, veh in ipairs(arena.traffic) do
+		if not veh.waitUntil or now &gt;= veh.waitUntil then
+			veh.dist = veh.dist + veh.speed * dt
+			if veh.dist &gt;= veh.total then
+				if veh.shuttle then
+					veh.dist = 0
+					veh.dir = -veh.dir
+					veh.waitUntil = now + (veh.wait or 4)
+				else
+					veh.dist = veh.dist - veh.total
+				end
+			end
+		end
+		placeVehicle(veh)
+		veh.lastHit = veh.lastHit or {}
+
+		-- Atropello: si un cazador queda dentro del vehiculo pierde la mitad
+		-- de la vida y sale volando.
+		for _, player in ipairs(self.players) do
+			local data = self.stats[player]
+			local root = getRoot(player)
+			if data and root and not self.knocked[player] then
+				if now - (veh.lastHit[player] or 0) &gt;= Config.City.hitCooldown then
+					local localPos = veh.pose:PointToObjectSpace(root.Position)
+					if math.abs(localPos.X) &lt;= veh.halfW + 2.2
+						and math.abs(localPos.Z) &lt;= veh.halfL + 2.2
+						and math.abs(localPos.Y) &lt;= 7 then
+						veh.lastHit[player] = now
+						local away = root.Position - veh.pose.Position
+						away = Vector3.new(away.X, 0, away.Z)
+						if away.Magnitude &lt; 0.5 then
+							away = veh.pose.LookVector
+						end
+						away = away.Unit * 62
+						root.AssemblyLinearVelocity = Vector3.new(away.X, 24, away.Z)
+						self:damagePlayer(player, nil, "atropello", Config.City.damage,
+							veh.pose.Position, veh.label or "Te atropellaron")
+					end
+				end
+			end
+		end
+	end
+end
+
 -- ---------------- jugadores ----------------
 function Session:isFull()
+	if self.isAsedio then
+		return #self.players &gt;= Config.Asedio.maxPlayers
+	end
 	if not self.isMulti then
 		return #self.players &gt;= 1
 	end
@@ -6228,6 +7734,9 @@ function Session:addPlayer(player)
 	table.insert(self.players, player)
 	playerSession[player] = self
 	ToolService.reset(player)
+	if self.isAsedio and self.teamsReady then
+		self:asedioAddToTeam(player)
+	end
 
 	if self.phase == "vote" then
 		if self.voteDone then
@@ -6267,6 +7776,19 @@ function Session:removePlayer(player, silent)
 	end
 
 	self.stats[player] = nil
+	if self.isAsedio and self.teamOf and self.teamOf[player] then
+		local side = self.teamOf[player]
+		self.teamOf[player] = nil
+		local list = self.teams and self.teams[side]
+		if list then
+			for index, other in ipairs(list) do
+				if other == player then
+					table.remove(list, index)
+					break
+				end
+			end
+		end
+	end
 	for index, other in ipairs(self.players) do
 		if other == player then
 			table.remove(self.players, index)
@@ -6420,6 +7942,38 @@ function Session:allocateArena(mapId)
 end
 
 function Session:spawnsFor(player)
+	-- Asedio: cada equipo aparece alrededor de la casa del kiwi
+	if self.isAsedio and self.arena and self.arena.nest then
+		local nest = self.arena.nest.pos
+		local side = self:asedioSide(player)
+		local list = self.teams[side] or {}
+		local index = 1
+		for i, other in ipairs(list) do
+			if other == player then
+				index = i
+				break
+			end
+		end
+		local count = math.max(1, #list)
+		local angle = (index - 1) / count * math.pi * 2
+		local radius = 24
+		if side == "attack" then
+			radius = math.min(Config.Asedio.attackSpawn, (self.arena.halfSize or 150) - 34)
+			angle = angle + 0.7
+		end
+		local point = nest + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+		point = self.arena:clampToBounds(point)
+		local params = RaycastParams.new()
+		params.IgnoreWater = true
+		local ray = workspace:Raycast(Vector3.new(point.X, nest.Y + 70, point.Z), Vector3.new(0, -220, 0), params)
+		if ray and math.abs(ray.Position.Y - nest.Y) &lt;= 9 then
+			point = ray.Position
+		else
+			point = Vector3.new(point.X, self.arena.floorY or nest.Y, point.Z)
+		end
+		return point + Vector3.new(0, 4, 0)
+	end
+
 	local index = 1
 	for i, other in ipairs(self.players) do
 		if other == player then
@@ -6455,6 +8009,9 @@ end
 
 -- ---------------- fases ----------------
 function Session:startCountdown()
+	if self.isAsedio and not self.teamsReady then
+		self:assignTeams()
+	end
 	self.phase = "countdown"
 	self.phaseEnds = os.clock() + Config.Round.Countdown
 
@@ -6509,10 +8066,17 @@ function Session:startPlaying()
 		end
 	end
 	self:spawnKiwi()
+	self:resetTraffic()
 	self:sendUpdates(true)
 	for _, player in ipairs(self.players) do
 		setFrozen(player, false)
-		if self.isColosal or self.isMulti then
+		if self.isAsedio then
+			local side = self:asedioSide(player)
+			self:notify(player, string.format(Config.Text.AsedioRound, self.asedioRound or 1,
+				Config.Asedio.teamAttack, Config.Asedio.teamDefend,
+				self.teamScore.attack or 0, self.teamScore.defend or 0),
+				side == "attack" and Config.Asedio.colorAttack or Config.Asedio.colorDefend, 7)
+		elseif self.isColosal or self.isMulti then
 			self:notify(player, "¡Escóndete! El kiwi gigante ya salió a buscar.", COLOR.warn, 6)
 		else
 			self:notify(player, "¡A cazar al kiwi!", COLOR.good)
@@ -6540,6 +8104,7 @@ function Session:endRound(winner, reason)
 	end
 	self.projectiles = {}
 	self:clearTraps()
+	Actions.clearPickups(self)
 
 	for _, player in ipairs(self.players) do
 		if self.hideSpot[player] then
@@ -6580,6 +8145,19 @@ function Session:buildResult(player)
 			won = true
 			coins = coins + self.diff.round.reward
 		end
+	elseif self.isAsedio then
+		local side = self:asedioSide(player)
+		local won = self.asedioWinner == side
+		local attackName = Config.Asedio.teamAttack
+		local defendName = Config.Asedio.teamDefend
+		local score = self.teamScore or { attack = 0, defend = 0 }
+		title = won and "¡Ganó tu equipo!" or "Perdiste la partida"
+		subtitle = string.format("%s %d - %d %s", attackName, score.attack or 0, score.defend or 0, defendName)
+		if won then
+			coins = coins + (Config.Asedio.winBonus or 240)
+		end
+		table.insert(lines, string.format("Tu equipo: %s", side == "attack" and attackName or defendName))
+		table.insert(lines, string.format("Capturas: %d", data.caught or 0))
 	elseif self.isColosal then
 		if self.reason == "safe" then
 			title = "¡Llegaste al refugio!"
@@ -6670,11 +8248,16 @@ function Session:finish()
 	end
 	self.projectiles = {}
 	self:clearTraps()
+	Actions.clearPickups(self)
 
 	if Config.Round.HubReturn then
 		self:returnAllToLobby()
 	end
 	for _, player in ipairs(self.players) do
+		if self.isAsedio then
+			player.Team = nil
+			player.Neutral = true
+		end
 		ToolService.clear(player)
 		Net.get("SessionUpdate"):FireClient(player, { active = false })
 		if playerSession[player] == self then
@@ -6697,7 +8280,15 @@ function Session:spawnKiwi()
 
 	local cfg = self.diff.kiwi
 	local opts
-	if self.isColosal or self.isMulti then
+	if self.isAsedio then
+		-- El kiwi vive en su casa: no se aleja del nido (modo 5 vs 5)
+		opts = { brain = "hider" }
+		local nest = self.arena and self.arena.nest
+		if nest then
+			opts.spawn = nest.pos
+			opts.leash = { pos = nest.pos, radius = Config.Asedio.nestRadius }
+		end
+	elseif self.isColosal or self.isMulti then
 		if self.isMulti then
 			cfg = Config.Difficulties.colosal.kiwi
 		end
@@ -6762,10 +8353,36 @@ function Session:onKiwiEvent(kind, data)
 		end
 		self:event("sniffcatch", { pos = pos, index = data and data.index })
 		if victim and self.stats[victim] then
-			self:giantCatch(victim)
+			if self.isAsedio then
+				self:asedioPounce(victim, pos)
+			else
+				self:giantCatch(victim)
+			end
+		end
+	elseif kind == "peck" then
+		-- Kiwi acorralado: picotazo a quien lo tiene arrinconado
+		local victim = data and data.player
+		if victim and self.stats[victim] and self.phase == "playing" then
+			local root = getRoot(victim)
+			if root and pos then
+				local away = root.Position - pos
+				away = Vector3.new(away.X, 0, away.Z)
+				if away.Magnitude &lt; 0.5 then
+					away = Vector3.new(0, 0, 1)
+				end
+				away = away.Unit * Config.KiwiPeck.knockback
+				root.AssemblyLinearVelocity = Vector3.new(away.X, 16, away.Z)
+			end
+			self:event("peck", { pos = pos, userId = victim.UserId })
+			self:damagePlayer(victim, nil, "picotazo", Config.KiwiPeck.damage, pos, Config.Text.PeckHit)
 		end
 	elseif kind == "catch" then
-		self:giantCatch(data and data.player)
+		local victim = data and data.player
+		if self.isAsedio then
+			self:asedioPounce(victim, pos)
+		else
+			self:giantCatch(victim)
+		end
 	end
 end
 
@@ -6789,6 +8406,21 @@ function Session:capture(player, method)
 	end
 	local data = self.stats[player]
 	if not data then
+		return
+	end
+
+	-- Asedio: solo los Cazadores capturan; si toca un Defensor, no pasa nada
+	if self.isAsedio then
+		if self:asedioSide(player) ~= "attack" then
+			self:notify(player, "¡Ese es tu kiwi! Cuídenlo de los Cazadores.", COLOR.warn, 4)
+			return
+		end
+		self.kiwi:capture(player)
+		data.caught = data.caught + 1
+		addCaught(player, 1)
+		addCoins(player, Config.Asedio.reward or 60)
+		self:event("captured", { pos = self.kiwi and self.kiwi:getPosition() })
+		self:asedioScore("attack", "capture")
 		return
 	end
 
@@ -6948,14 +8580,28 @@ function Session:openChest(player, index)
 	for _, entry in ipairs(weapons) do
 		total = total + (entry.weight or 1)
 	end
-	local roll = self.rng:NextInteger(1, math.max(total, 1))
+
+	-- Mas aleatorio: se evita repetir la ultima arma que saco ESE jugador
+	-- (hasta 3 intentos), asi no toca siempre lo mismo.
+	local stats = self.stats[player]
+	local last = stats and stats.lastLoot
 	local pick = weapons[1]
-	for _, entry in ipairs(weapons) do
-		roll = roll - (entry.weight or 1)
-		if roll &lt;= 0 then
-			pick = entry
+	for _ = 1, 3 do
+		local roll = self.rng:NextInteger(1, math.max(total, 1))
+		pick = weapons[1]
+		for _, entry in ipairs(weapons) do
+			roll = roll - (entry.weight or 1)
+			if roll &lt;= 0 then
+				pick = entry
+				break
+			end
+		end
+		if pick.id ~= last then
 			break
 		end
+	end
+	if stats then
+		stats.lastLoot = pick.id
 	end
 
 	-- Un arma de baul a la vez: la anterior se pierde
@@ -7101,10 +8747,16 @@ function Session:step(dt)
 		end
 	elseif self.phase == "playing" then
 		if self.timeLimit and now &gt;= self.startedAt + self.timeLimit then
-			self:notifyAll("¡Se acabó el tiempo!", COLOR.bad)
-			self:endRound(nil, "timeout")
+			if self.isAsedio then
+				-- Se acabó el tiempo: punto para los Defensores
+				self:asedioScore("defend", "timeout")
+			else
+				self:notifyAll("¡Se acabó el tiempo!", COLOR.bad)
+				self:endRound(nil, "timeout")
+			end
 		else
 			self:stepHealth(dt)
+			self:stepTraffic(dt)
 			if self.isColosal then
 				self:stepSafeZone(dt)
 			end
@@ -7142,7 +8794,7 @@ function Session:sendUpdate(player)
 	local objective
 	local progressText
 	if self.phase == "vote" then
-		if self.isMulti then
+		if self.isMulti or self.isAsedio then
 			objective = "¡Voten el mapa de la partida!"
 		else
 			objective = "¡Elige el mapa de la partida!"
@@ -7157,6 +8809,19 @@ function Session:sendUpdate(player)
 			progressText = "¡El kiwi gigante está cerca de ti!"
 		else
 			progressText = string.format("Cazadores vivos: %d", #self.players)
+		end
+	elseif self.isAsedio then
+		local side = self:asedioSide(player)
+		local kiwi = self.kiwi
+		local root = getRoot(player)
+		local near = kiwi and not kiwi.defeated and root
+			and (kiwi:getPosition() - root.Position).Magnitude &lt; 40
+		if side == "attack" then
+			objective = "Entra a la casa del kiwi y atrápalo"
+			progressText = near and "¡El kiwi está cerca!" or "Busca la casa del kiwi"
+		else
+			objective = "Cuida al kiwi de los Cazadores"
+			progressText = near and "¡El kiwi está contigo! Cúbrelo" or "El kiwi está en su casa"
 		end
 	elseif self.isColosal then
 		local zone = self.arena and self.arena.safeZone
@@ -7210,6 +8875,7 @@ function Session:sendUpdate(player)
 			name = other.DisplayName ~= "" and other.DisplayName or other.Name,
 			caught = otherStats and otherStats.caught or 0,
 			isSelf = other == player,
+			team = self.isAsedio and self.teamOf[other] or nil,
 		})
 	end
 	table.sort(ranking, function(a, b)
@@ -7235,6 +8901,11 @@ function Session:sendUpdate(player)
 		players = ranking,
 		playerCount = #self.players,
 		isMulti = self.isMulti,
+		isAsedio = self.isAsedio or nil,
+		team = self.isAsedio and self:asedioSide(player) or nil,
+		teamScore = self.isAsedio and { attack = self.teamScore.attack, defend = self.teamScore.defend } or nil,
+		round = self.isAsedio and self.asedioRound or nil,
+		roundsToWin = self.isAsedio and Config.Asedio.roundsToWin or nil,
 		waiting = self.phase == "vote",
 		vote = self.phase == "vote" and {
 			done = self.voteDone or false,
@@ -7249,8 +8920,10 @@ function Session:sendUpdate(player)
 		progressText = progressText,
 		hidden = self.hidden[player] == true or nil,
 		hideSpot = self.hideSpot[player] or nil,
-		limitedTools = self.diff.tools,
-		paint = not self.isColosal and (self.isMulti or #self.players &gt;= 2),
+		limitedTools = self.isAsedio
+			and (self:asedioSide(player) == "defend" and Config.Asedio.toolsDefend or Config.Asedio.toolsAttack)
+			or self.diff.tools,
+		paint = self.isAsedio or (not self.isColosal and (self.isMulti or #self.players &gt;= 2)),
 	})
 end
 
@@ -7449,6 +9122,23 @@ function GameManager.requestJoin(player, modeId)
 		return
 	end
 
+	if modeId == "asedio" then
+		local session
+		for _, candidate in ipairs(sessions) do
+			if candidate.modeId == "asedio" and not candidate.finished
+				and candidate.phase ~= "ended" and not candidate:isFull() then
+				session = candidate
+				break
+			end
+		end
+		if not session then
+			session = Session.new("asedio", Random.new())
+			table.insert(sessions, session)
+		end
+		session:addPlayer(player)
+		return
+	end
+
 	if not Config.Difficulties[modeId] then
 		return
 	end
@@ -7552,6 +9242,7 @@ local Net = require(Shared.Net)
 local Util = require(Shared.Util)
 
 local HUD = require(script.Parent.modules.HUD)
+local ViewModel = require(script.Parent.modules.ViewModel)
 
 local player = Players.LocalPlayer
 local remotes = Net.init()
@@ -7559,6 +9250,7 @@ local remotes = Net.init()
 local state = { active = false, phase = "none", diff = nil }
 local sprinting = false
 local sneaking = false
+local shotBloom = 0 -- el punto de mira se abre un toque al disparar
 local cooldowns = {
 	red = { left = 0, total = 1 },
 	rifle = { left = 0, total = 1 },
@@ -7649,6 +9341,25 @@ local function burst(position, color, count)
 	Debris:AddItem(holder, 2)
 end
 
+-- Trazadora estilo Counter: una linea neon que se apaga al instante
+local function tracer(from, dir, length, color, thickness)
+	local beam = Instance.new("Part")
+	beam.Name = "FxTrazadora"
+	beam.Anchored = true
+	beam.CanCollide = false
+	beam.CanQuery = false
+	beam.CanTouch = false
+	beam.CastShadow = false
+	beam.Material = Enum.Material.Neon
+	beam.Color = color or Color3.fromRGB(255, 240, 190)
+	beam.Size = Vector3.new(thickness or 0.1, thickness or 0.1, length)
+	local center = from + dir * (length * 0.5)
+	beam.CFrame = CFrame.lookAt(center, center + dir)
+	beam.Transparency = 0.2
+	beam.Parent = workspace
+	Debris:AddItem(beam, 0.09)
+end
+
 local function distanceToLocal(position)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -7667,6 +9378,10 @@ local function humanoid()
 end
 
 local hiddenNow = false -- escondido en un armario/barril/pajar: no te moves
+local scoped = false
+local scopeLevel = 0
+local equippedId = nil
+local firstPerson = false -- vista en primera persona (tecla V)
 
 local function applySpeed()
 	local hum = humanoid()
@@ -7710,15 +9425,22 @@ local function applySpeed()
 	else
 		hum.WalkSpeed = Config.Player.walkSpeed
 	end
+
+	-- Apuntando se camina mas lento (estilo Counter)
+	if scoped then
+		hum.WalkSpeed = math.min(hum.WalkSpeed, Config.Player.walkSpeed * 0.55)
+	end
+
+	-- Agachado la camara baja un poco (estilo Counter)
+	local offset = sneaking and Vector3.new(0, -1.1, 0) or Vector3.new(0, 0, 0)
+	if hum.CameraOffset ~= offset then
+		hum.CameraOffset = offset
+	end
 end
 
 -- ===============================================================
 -- Mira del rifle (clic derecho para apuntar)
 -- ===============================================================
-local scoped = false
-local equippedId = nil
-local firstPerson = false -- vista en primera persona (tecla V)
-
 local function applyCameraMode()
 	local first = scoped or (firstPerson and state.active and state.phase == "playing")
 	local mode = first and Enum.CameraMode.LockFirstPerson or Enum.CameraMode.Classic
@@ -7744,14 +9466,50 @@ local function setWeaponHidden(hidden)
 	end
 end
 
-local function setScope(enabled)
+-- Armas que apuntan (y que por lo tanto muestran la vista de arma)
+local SCOPE_WEAPONS = {
+	rifle = true, pintura = true, relente = true, revolver = true,
+	arco = true, sniper = true, cuchillo = true, lanzallamas = true, cohete = true,
+}
+
+-- Vista de arma estilo Counter: se ve en primera persona y al apuntar.
+-- Con la telescopica puesta el arma se esconde (solo queda la mira).
+local function refreshViewmodel()
+	local playing = state.active and state.phase == "playing"
+	local show = playing and (scoped or firstPerson)
+	ViewModel.setWeapon(equippedId)
+	ViewModel.setVisible(show)
+	ViewModel.setAds(scoped and equippedId ~= "sniper" and 1 or 0)
+	ViewModel.setHidden(scoped and equippedId == "sniper")
+	-- El arma "de verdad" del personaje se esconde cuando manda la vista
+	setWeaponHidden(scoped or (show and ViewModel.hasWeapon(equippedId)))
+end
+
+local function scopeFov(id, level)
+	local weapons = Config.Scope.weapons or {}
+	if id == "sniper" then
+		return (level or 1) &gt;= 2 and (weapons.sniper2 or 7) or (weapons.sniper or 14)
+	end
+	return weapons[id] or Config.Scope.fov
+end
+
+local function setScope(enabled, level)
 	enabled = enabled and true or false
-	if scoped == enabled then
+	local lvl = enabled and math.max(1, level or 1) or 0
+	if scoped == enabled and scopeLevel == lvl then
 		return
 	end
 	scoped = enabled
-	HUD.setScope(scoped)
-	setWeaponHidden(scoped)
+	scopeLevel = lvl
+
+	-- Telescopica del francotirador: pantalla negra con circulo (Counter)
+	local sniperScope = scoped and equippedId == "sniper"
+	HUD.setScope(scoped, sniperScope)
+	if sniperScope then
+		HUD.setScopeZoom(lvl &gt;= 2 and "10x" or "5x")
+	end
+
+	refreshViewmodel()
 	UserInputService.MouseIconEnabled = not scoped
 
 	local hum = humanoid()
@@ -7761,8 +9519,7 @@ local function setScope(enabled)
 
 	local camera = workspace.CurrentCamera
 	if camera then
-		local zoom = (Config.Scope.weapons and Config.Scope.weapons[equippedId]) or Config.Scope.fov
-		local goal = scoped and zoom or 70
+		local goal = scoped and scopeFov(equippedId, lvl) or 70
 		TweenService:Create(camera, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			FieldOfView = goal,
 		}):Play()
@@ -7771,6 +9528,7 @@ local function setScope(enabled)
 	-- Apuntando se pasa a primera persona: la mira ya no tapa la cabeza
 	UserInputService.MouseBehavior = scoped and Enum.MouseBehavior.LockCenter or Enum.MouseBehavior.Default
 	applyCameraMode()
+	applySpeed()
 
 	sound2D(Config.Sounds.ui, 0.25, scoped and 1.5 or 1.1)
 end
@@ -7788,11 +9546,10 @@ local function refreshEquipped()
 		end
 	end
 	equippedId = found
-	if equippedId ~= "rifle" and equippedId ~= "pintura" and equippedId ~= "relente"
-		and equippedId ~= "revolver" and equippedId ~= "arco" and equippedId ~= "sniper" then
+	if not SCOPE_WEAPONS[equippedId] then
 		setScope(false)
 	end
-	setWeaponHidden(scoped)
+	refreshViewmodel()
 end
 
 -- ===============================================================
@@ -7838,7 +9595,7 @@ local function fireTool(toolId)
 		return
 	end
 
-	remotes.ToolAction:FireServer(toolId, { aim = aimPoint() })
+	remotes.ToolAction:FireServer(toolId, { aim = aimPoint(), scoped = scoped, sneak = sneaking })
 
 	local total = cooldown and cooldown.total or 1
 	if cooldown then
@@ -7861,7 +9618,29 @@ local function fireTool(toolId)
 		sound2D(Config.Sounds.dartHit, 0.5, 1.6)
 	elseif toolId == "arco" then
 		sound2D(Config.Sounds.netSwing, 0.6, 1.4)
+	elseif toolId == "sniper" then
+		sound2D(Config.Sounds.dartShot, 0.95, 0.72)
+	elseif toolId == "cuchillo" then
+		sound2D(Config.Sounds.netSwing, 0.55, 1.3)
+	elseif toolId == "lanzallamas" then
+		sound2D(Config.Sounds.dartShot, 0.7, 0.55)
 	end
+
+	-- Patada del arma (estilo Counter)
+	local RECOIL = {
+		rifle = 0.45, pintura = 0.45, relente = 0.45, sniper = 1.1,
+		revolver = 0.7, cohete = 1.0, arco = 0.5, cuchillo = 0.35, lanzallamas = 0.3,
+	}
+	ViewModel.recoil(RECOIL[toolId] or 0)
+	ViewModel.flash()
+
+	-- Patada de camara estilo Counter Blox: 2 * (1 - control) grados
+	local shootCfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[toolId]
+	local control = shootCfg and shootCfg.recoil or 72
+	local kick = math.rad(2 * (1 - control / 100))
+	ViewModel.kickCamera(kick * (1 + math.random() * 0.5), kick * (math.random() * 4 - 2))
+
+	shotBloom = math.min(20, shotBloom + 8)
 end
 
 local hookedTools = {}
@@ -7916,24 +9695,37 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		return
 	end
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
-		-- Clic derecho: mira (rifle tranquilizante y rifle de pintura)
-		if (equippedId == "rifle" or equippedId == "pintura" or equippedId == "relente"
-			or equippedId == "revolver" or equippedId == "arco" or equippedId == "sniper")
-			and state.active and state.phase == "playing" then
-			setScope(not scoped)
+		-- Clic derecho: mira estilo Counter. El francotirador va ciclando
+		-- la telescopica: 5x -&gt; 10x -&gt; sin mira.
+		if SCOPE_WEAPONS[equippedId] and state.active and state.phase == "playing" then
+			if equippedId == "sniper" then
+				if not scoped then
+					setScope(true, 1)
+				elseif scopeLevel == 1 then
+					setScope(true, 2)
+				else
+					setScope(false)
+				end
+			else
+				setScope(not scoped, 1)
+			end
 		end
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.LeftShift then
 		sprinting = true
 		applySpeed()
-	elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.LeftAlt then
+	elseif input.KeyCode == Enum.KeyCode.Tab then
+		HUD.setScoreboardVisible(true)
+	elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.LeftAlt
+		or input.KeyCode == Enum.KeyCode.C then
 		sneaking = true
 		applySpeed()
 	elseif input.KeyCode == Enum.KeyCode.V then
 		if state.active and state.phase == "playing" then
 			firstPerson = not firstPerson
 			applyCameraMode()
+			refreshViewmodel()
 			sound2D(Config.Sounds.ui, 0.35)
 		end
 	end
@@ -7943,9 +9735,56 @@ UserInputService.InputEnded:Connect(function(input)
 	if input.KeyCode == Enum.KeyCode.LeftShift then
 		sprinting = false
 		applySpeed()
-	elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.LeftAlt then
+	elseif input.KeyCode == Enum.KeyCode.Tab then
+		HUD.setScoreboardVisible(false)
+	elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.LeftAlt
+		or input.KeyCode == Enum.KeyCode.C then
 		sneaking = false
 		applySpeed()
+	end
+end)
+
+-- ===============================================================
+-- Punto de mira estilo Counter: se abre al moverse o disparar
+-- ===============================================================
+local function spreadErrorLocal(weaponId)
+	local cfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[weaponId]
+	if not cfg then
+		return 0
+	end
+	local speed = 0
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if root then
+		local v = root.AssemblyLinearVelocity
+		speed = math.sqrt(v.X * v.X + v.Z * v.Z)
+	end
+	local error = math.max(cfg.spread or 0, 0) + speed * (cfg.vel or 0)
+	if scoped then
+		error = cfg.adsPerfect and 0 or error * ((Config.Shoot and Config.Shoot.adsDiv) or 0.35)
+	elseif sneaking then
+		error = error / ((Config.Shoot and Config.Shoot.crouchDiv) or 1.6)
+	end
+	local dead = cfg.dead or (Config.Shoot and Config.Shoot.dead) or 0
+	if error &lt; dead then
+		error = 0
+	end
+	return error / ((Config.Shoot and Config.Shoot.div) or 6)
+end
+
+local lastCross = nil
+RunService.RenderStepped:Connect(function(dt)
+	shotBloom = math.max(0, shotBloom - dt * 30)
+	local show = state.active and state.phase == "playing" and not scoped and not hiddenNow
+		and equippedId ~= nil and ViewModel.hasWeapon(equippedId)
+	if show ~= lastCross then
+		lastCross = show
+		HUD.setCrosshair(show, 6, 9)
+	end
+	if show then
+		local grados = spreadErrorLocal(equippedId)
+		HUD.setCrosshair(true, 5 + math.min(grados * 5, 30) + shotBloom * 0.55,
+			7 + math.min(grados * 2, 10))
 	end
 end)
 
@@ -7962,6 +9801,7 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 		sprinting = false
 		sneaking = false
 		setScope(false)
+		refreshViewmodel()
 		HUD.hideResult()
 		HUD.hideVote()
 		HUD.setMenuVisible(true)
@@ -7995,6 +9835,7 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 		applyCameraMode()
 		applySpeed()
 	end
+	refreshViewmodel()
 
 	HUD.setMenuVisible(false)
 	HUD.setMenuStatus("")
@@ -8073,6 +9914,15 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 		end
 	elseif kind == "dartshot" then
 		soundAt(Config.Sounds.dartShot, position or Vector3.new(), 0.9)
+		if position and data.tracer and data.dir then
+			-- Estilo Counter: bala instantanea = trazadora, no proyectil
+			tracer(position, data.dir, 240, Color3.fromRGB(255, 240, 190), 0.1)
+		end
+	elseif kind == "headshot" then
+		if position then
+			soundAt(Config.Sounds.dartHit, position, 1, 1.35)
+			burst(position, Color3.fromRGB(255, 210, 90), 30)
+		end
 	elseif kind == "darthit" then
 		if position then
 			soundAt(Config.Sounds.dartHit, position, 1)
@@ -8183,6 +10033,43 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 			if distanceToLocal(position) &lt; 70 then
 				sound2D(Config.Sounds.roar, 0.5, 0.7)
 			end
+		end
+	elseif kind == "weaponfx" then
+		-- Animacion distinta para cada arma de baul
+		local weapon = data.weapon
+		local dir = data.dir or Vector3.new(0, 0, -1)
+		if position and weapon == "sniper" then
+			tracer(position, dir, 340, Color3.fromRGB(255, 246, 205), 0.13)
+			burst(position + dir * 1.4, Color3.fromRGB(255, 232, 170), 8)
+		elseif position and weapon == "revolver" then
+			tracer(position, dir, 150, Color3.fromRGB(255, 224, 160), 0.09)
+			burst(position + dir * 0.9, Color3.fromRGB(255, 208, 140), 6)
+		elseif position and weapon == "cuchillo" then
+			burst(position + dir * 3.2, Color3.fromRGB(230, 240, 250), data.hit and 16 or 7)
+		elseif position and weapon == "lanzallamas" then
+			for i = 1, 5 do
+				task.delay(i * 0.055, function()
+					burst(position + dir * (2 + i * 2.3), Color3.fromRGB(255, 140 + i * 14, 60), 16)
+				end)
+			end
+		elseif position and weapon == "arco" then
+			burst(position + dir * 1.2, Color3.fromRGB(180, 225, 150), 5)
+		elseif position and weapon == "cohete" then
+			burst(position + dir * 1.6, Color3.fromRGB(210, 205, 200), 10)
+		end
+	elseif kind == "arrowpick" then
+		if position then
+			burst(position, Color3.fromRGB(180, 230, 150), 12)
+			if distanceToLocal(position) &lt; 90 then
+				soundAt(Config.Sounds.ui, position, 0.6, 1.4)
+			end
+		end
+	elseif kind == "peck" then
+		if position then
+			if distanceToLocal(position) &lt; 90 then
+				soundAt(Config.Sounds.roar, position, 0.75, 1.7)
+			end
+			burst(position, Color3.fromRGB(240, 100, 90), 14)
 		end
 	elseif kind == "chestopen" then
 		if position then
@@ -8678,6 +10565,126 @@ local function buildSessionHud(parent)
 		Text = "100",
 	}, top)
 
+	-- Vida grande abajo a la izquierda (estilo Counter)
+	parts.hpBig = new("TextLabel", {
+		Name = "VidaGrande",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 18, 1, -14),
+		Size = UDim2.new(0, 150, 0, 44),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBlack,
+		TextSize = 36,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(236, 240, 244),
+		TextStrokeTransparency = 0.55,
+		Text = "100",
+	}, top)
+	new("TextLabel", {
+		Name = "VidaTag",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 22, 1, -58),
+		Size = UDim2.new(0, 120, 0, 14),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = COLOR.muted,
+		Text = "VIDA",
+	}, top)
+
+	-- Punto de mira estilo Counter: se abre al moverse o disparar
+	local cross = new("Frame", {
+		Name = "PuntoMira",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0, 2, 0, 2),
+		BackgroundColor3 = Color3.fromRGB(120, 255, 150),
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 20,
+	}, top)
+	parts.crosshair = cross
+	parts.crossLines = {}
+	for _, spec in ipairs({
+		{ name = "Arriba", anchor = Vector2.new(0.5, 1), w = 2, h = 9, axis = "up" },
+		{ name = "Abajo", anchor = Vector2.new(0.5, 0), w = 2, h = 9, axis = "down" },
+		{ name = "Izquierda", anchor = Vector2.new(1, 0.5), w = 9, h = 2, axis = "left" },
+		{ name = "Derecha", anchor = Vector2.new(0, 0.5), w = 9, h = 2, axis = "right" },
+	}) do
+		local line = new("Frame", {
+			Name = spec.name,
+			AnchorPoint = spec.anchor,
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(0, spec.w, 0, spec.h),
+			BackgroundColor3 = Color3.fromRGB(120, 255, 150),
+			BackgroundTransparency = 0.1,
+			BorderSizePixel = 0,
+		}, cross)
+		table.insert(parts.crossLines, { line = line, axis = spec.axis })
+	end
+
+	-- Marcador de equipos (solo modo Asedio 5 vs 5)
+	local teamBar = new("Frame", {
+		Name = "Equipos",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 58),
+		Size = UDim2.new(0, 440, 0, 30),
+		BackgroundColor3 = Color3.fromRGB(14, 16, 20),
+		BackgroundTransparency = 0.22,
+		BorderSizePixel = 0,
+		Visible = false,
+	}, top)
+	corner(6, teamBar)
+	parts.teamBar = teamBar
+	parts.teamAttack = new("TextLabel", {
+		Name = "EquipoA",
+		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(0, 160, 1, 0),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(240, 140, 90),
+		Text = "CAZADORES",
+	}, teamBar)
+	parts.teamDefend = new("TextLabel", {
+		Name = "EquipoB",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -12, 0, 0),
+		Size = UDim2.new(0, 160, 1, 0),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextColor3 = Color3.fromRGB(120, 180, 240),
+		Text = "DEFENSORES",
+	}, teamBar)
+	parts.teamScore = new("TextLabel", {
+		Name = "Tanteador",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 0),
+		Size = UDim2.new(0, 120, 1, 0),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Code,
+		TextSize = 17,
+		TextColor3 = Color3.fromRGB(238, 238, 242),
+		Text = "0 - 0",
+	}, teamBar)
+	parts.teamRound = new("TextLabel", {
+		Name = "Ronda",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 90),
+		Size = UDim2.new(0, 300, 0, 16),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextSize = 13,
+		TextColor3 = COLOR.muted,
+		Text = "Ronda 1",
+		Visible = false,
+	}, top)
+	parts.teamRound = parts.teamRound
+
 	local objective = new("TextLabel", {
 		Name = "Objetivo",
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -8950,7 +10957,8 @@ local function buildSessionHud(parent)
 end
 
 -- ===============================================================
--- MIRA DEL RIFLE TRANQUILIZANTE (clic derecho)
+-- MIRA ESTILO COUNTER (clic derecho)
+-- El francotirador usa "vidrio": pantalla negra con un circulo limpio.
 -- ===============================================================
 local function buildScope(parent)
 	local scope = new("Frame", {
@@ -8962,6 +10970,31 @@ local function buildScope(parent)
 	}, parent)
 	parts.scope = scope
 
+	-- Vidrio: cuatro barras negras bien redondeadas dejan el centro limpio
+	local vignette = new("Frame", {
+		Name = "Vidrio",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Visible = false,
+		ZIndex = 1,
+	}, scope)
+	parts.scopeVignette = vignette
+	local function glassBar(name, size, position)
+		local bar = new("Frame", {
+			Name = name,
+			Size = size,
+			Position = position,
+			BackgroundColor3 = Color3.new(0, 0, 0),
+			BorderSizePixel = 0,
+		}, vignette)
+		corner(300, bar)
+		return bar
+	end
+	glassBar("Arriba", UDim2.new(1, 0, 0.44, 0), UDim2.new(0, 0, 0, 0))
+	glassBar("Abajo", UDim2.new(1, 0, 0.44, 0), UDim2.new(0, 0, 0.56, 0))
+	glassBar("Izquierda", UDim2.new(0.44, 0, 1, 0), UDim2.new(0, 0, 0, 0))
+	glassBar("Derecha", UDim2.new(0.44, 0, 1, 0), UDim2.new(0.56, 0, 0, 0))
+
 	local ring = new("Frame", {
 		Name = "Anillo",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -8969,6 +11002,7 @@ local function buildScope(parent)
 		Size = UDim2.new(0, 180, 0, 180),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
+		ZIndex = 2,
 	}, scope)
 	corner(999, ring)
 	stroke(Color3.fromRGB(235, 240, 245), 1.5, 0.25, ring)
@@ -9001,17 +11035,31 @@ local function buildScope(parent)
 	}, ring)
 	corner(999, dot)
 
+	-- Aumento actual de la telescopica (5x / 10x)
+	parts.scopeZoom = new("TextLabel", {
+		Name = "Aumento",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 104),
+		Size = UDim2.new(0, 140, 0, 20),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		TextColor3 = Color3.fromRGB(235, 240, 245),
+		TextTransparency = 0.1,
+		Text = "",
+	}, scope)
+
 	new("TextLabel", {
 		Name = "Etiqueta",
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0.5, 100),
+		Position = UDim2.new(0.5, 0, 0.5, 126),
 		Size = UDim2.new(0, 260, 0, 16),
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBold,
 		TextSize = 11,
 		TextColor3 = Color3.fromRGB(200, 210, 220),
 		TextTransparency = 0.25,
-		Text = "MIRA - clic derecho para salir",
+		Text = "MIRA - clic derecho para cambiar / salir",
 	}, scope)
 
 	return scope
@@ -9338,6 +11386,84 @@ end
 -- ===============================================================
 -- API
 -- ===============================================================
+-- Tabla de posiciones estilo Counter (se ve manteniendo Tab)
+local function buildScoreboard(screen)
+	local board = new("Frame", {
+		Name = "Tabla",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.46),
+		Size = UDim2.new(0, 560, 0, 300),
+		BackgroundColor3 = Color3.fromRGB(12, 14, 18),
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 30,
+	}, screen)
+	corner(8, board)
+	parts.scoreboard = board
+
+	parts.scoreTitle = new("TextLabel", {
+		Name = "Titulo",
+		Position = UDim2.new(0, 18, 0, 10),
+		Size = UDim2.new(1, -200, 0, 22),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(238, 238, 242),
+		Text = "Kiwi Cazador",
+	}, board)
+	parts.scoreRound = new("TextLabel", {
+		Name = "Ronda",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -18, 0, 10),
+		Size = UDim2.new(0, 220, 0, 22),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Code,
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextColor3 = Color3.fromRGB(200, 206, 214),
+		Text = "",
+	}, board)
+
+	parts.scoreAttack = new("TextLabel", {
+		Name = "ColumnaA",
+		Position = UDim2.new(0, 20, 0, 42),
+		Size = UDim2.new(0.5, -30, 1, -74),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextColor3 = Color3.fromRGB(232, 210, 200),
+		Text = "",
+	}, board)
+	parts.scoreDefend = new("TextLabel", {
+		Name = "ColumnaB",
+		Position = UDim2.new(0.5, 10, 0, 42),
+		Size = UDim2.new(0.5, -30, 1, -74),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextColor3 = Color3.fromRGB(200, 214, 232),
+		Text = "",
+	}, board)
+
+	new("TextLabel", {
+		Name = "Pie",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -8),
+		Size = UDim2.new(1, -36, 0, 16),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextSize = 12,
+		TextColor3 = COLOR.muted,
+		Text = "Mantené Tab para ver la tabla",
+	}, board)
+end
+
 function HUD.init(playerGui, handlers)
 	callbacks = handlers or {}
 	if parts.screen then
@@ -9358,6 +11484,7 @@ function HUD.init(playerGui, handlers)
 	buildResult(screen)
 	buildScope(screen)
 	buildVote(screen)
+	buildScoreboard(screen)
 
 	local hurt = new("Frame", {
 		Name = "Dolor",
@@ -9392,6 +11519,7 @@ function HUD.setMenuVisible(visible)
 	if visible then
 		HUD.clearTracker()
 		HUD.hideVote()
+		HUD.setScoreboardVisible(false)
 	end
 end
 
@@ -9405,6 +11533,81 @@ function HUD.setHealth(hp, maxHp)
 	end
 	if parts.hpText then
 		parts.hpText.Text = tostring(math.floor(hp or maxHp))
+	end
+	if parts.hpBig then
+		parts.hpBig.Text = tostring(math.floor(hp or maxHp))
+		parts.hpBig.TextColor3 = ratio &gt; 0.55 and Color3.fromRGB(236, 240, 244)
+			or (ratio &gt; 0.25 and Color3.fromRGB(238, 196, 92) or Color3.fromRGB(232, 108, 100))
+	end
+end
+
+-- Marcador de equipos estilo Counter (solo en el modo Asedio)
+function HUD.setTeams(team, score, round, toWin, modeName)
+	if not parts.teamBar then
+		return
+	end
+	local show = score ~= nil
+	parts.teamBar.Visible = show
+	if parts.teamRound then
+		parts.teamRound.Visible = show
+	end
+	if not show then
+		return
+	end
+	local attackName = string.upper((Config.Asedio and Config.Asedio.teamAttack) or "Equipo A")
+	local defendName = string.upper((Config.Asedio and Config.Asedio.teamDefend) or "Equipo B")
+	if team == "attack" then
+		attackName = "&gt; " .. attackName
+	elseif team == "defend" then
+		defendName = defendName .. " &lt;"
+	end
+	if parts.teamAttack then
+		parts.teamAttack.Text = attackName
+	end
+	if parts.teamDefend then
+		parts.teamDefend.Text = defendName
+	end
+	if parts.teamScore then
+		parts.teamScore.Text = string.format("%d - %d", score.attack or 0, score.defend or 0)
+	end
+	if parts.teamRound then
+		local best = (toWin or 1) * 2 - 1
+		parts.teamRound.Text = string.format("Ronda %d - al mejor de %d", round or 1, best)
+	end
+end
+
+-- Punto de mira: visible al jugar, se abre segun la dispersion
+function HUD.setCrosshair(visible, gap, length)
+	if not parts.crosshair then
+		return
+	end
+	parts.crosshair.Visible = visible and true or false
+	if not visible then
+		return
+	end
+	gap = math.clamp(gap or 5, 0, 60)
+	length = math.clamp(length or 9, 4, 30)
+	for _, item in ipairs(parts.crossLines or {}) do
+		local line = item.line
+		if item.axis == "up" then
+			line.Position = UDim2.new(0.5, 0, 0.5, -gap)
+			line.Size = UDim2.new(0, 2, 0, length)
+		elseif item.axis == "down" then
+			line.Position = UDim2.new(0.5, 0, 0.5, gap)
+			line.Size = UDim2.new(0, 2, 0, length)
+		elseif item.axis == "left" then
+			line.Position = UDim2.new(0.5, -gap, 0.5, 0)
+			line.Size = UDim2.new(0, length, 0, 2)
+		else
+			line.Position = UDim2.new(0.5, gap, 0.5, 0)
+			line.Size = UDim2.new(0, length, 0, 2)
+		end
+	end
+end
+
+function HUD.setScoreboardVisible(visible)
+	if parts.scoreboard then
+		parts.scoreboard.Visible = visible and true or false
 	end
 end
 
@@ -9583,6 +11786,47 @@ function HUD.updateState(state)
 					TextColor3 = COLOR.muted,
 					Text = tostring(entry.caught),
 				}, row)
+			end
+		end
+	end
+
+	-- Equipos (modo Asedio): marcador arriba + tabla con Tab
+	HUD.setTeams(state.team, state.teamScore, state.round, state.roundsToWin, state.modeName)
+	if parts.scoreboard then
+		local attackName = string.upper((Config.Asedio and Config.Asedio.teamAttack) or "Cazadores")
+		local defendName = string.upper((Config.Asedio and Config.Asedio.teamDefend) or "Defensores")
+		local score = state.teamScore or { attack = 0, defend = 0 }
+		local atk, dfd = {}, {}
+		if state.team then
+			table.insert(atk, string.format("%s   %d", attackName, score.attack or 0))
+			table.insert(dfd, string.format("%s   %d", defendName, score.defend or 0))
+		else
+			table.insert(atk, "JUGADORES")
+		end
+		for _, entry in ipairs(state.players or {}) do
+			local line = string.format("%s%s  (%d)", entry.isSelf and "&gt; " or "   ", entry.name, entry.caught or 0)
+			if state.team and entry.team == "defend" then
+				table.insert(dfd, line)
+			else
+				table.insert(atk, line)
+			end
+		end
+		if parts.scoreAttack then
+			parts.scoreAttack.Text = table.concat(atk, "\n")
+			parts.scoreAttack.TextColor3 = state.team and Color3.fromRGB(232, 210, 200) or COLOR.text
+		end
+		if parts.scoreDefend then
+			parts.scoreDefend.Text = state.team and table.concat(dfd, "\n") or ""
+		end
+		if parts.scoreTitle then
+			parts.scoreTitle.Text = state.modeName or "Kiwi Cazador"
+		end
+		if parts.scoreRound then
+			if state.round then
+				local best = (state.roundsToWin or 1) * 2 - 1
+				parts.scoreRound.Text = string.format("Ronda %d - al mejor de %d", state.round, best)
+			else
+				parts.scoreRound.Text = state.arenaName or ""
 			end
 		end
 	end
@@ -9806,9 +12050,18 @@ function HUD.death(title, subtitle)
 	end)
 end
 
-function HUD.setScope(enabled)
+function HUD.setScope(enabled, sniperScope)
 	if parts.scope then
 		parts.scope.Visible = enabled and true or false
+	end
+	if parts.scopeVignette then
+		parts.scopeVignette.Visible = enabled and sniperScope and true or false
+	end
+end
+
+function HUD.setScopeZoom(text)
+	if parts.scopeZoom then
+		parts.scopeZoom.Text = text or ""
 	end
 end
 
@@ -9823,6 +12076,381 @@ function HUD.fade(toBlack, duration)
 end
 
 return HUD
+</ProtectedString>
+						</Properties>
+					</Item>
+					<Item class="ModuleScript" referent="RBX025">
+						<Properties>
+							<string name="Name">ViewModel</string>
+							<ProtectedString name="Source">--[[
+	ViewModel.lua  (cliente)
+	Arma en primera persona estilo Counter: el arma se ve pegada a la
+	camara, con bamboleo al caminar, inercia al girar la vista, patada
+	al disparar y pose de mira (clic derecho). El francotirador con la
+	telescopica puesta esconde el arma y deja solo la mira.
+
+	Son puras partes de adorno pegadas a la camara (CanCollide = false,
+	CanQuery = false): no tocan la fisica ni pasan por el servidor.
+--]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+local ViewModel = {}
+
+local folder        -- carpeta viva dentro de la camara
+local models = {}   -- cache de armas construidas
+local currentId
+local current
+local visible = false
+local hiddenByScope = false
+local ads = 0          -- 0 = cadera, 1 = apuntando
+local adsGoal = 0
+local bobPhase = 0
+local sway = Vector2.new(0, 0)
+local lastCamCF = nil
+local recoil = 0       -- patada: se va sola
+local recoilRoll = 0   -- volcado al azar de la patada (estilo Counter)
+local camKick = Vector2.new(0, 0) -- patada de camara (radianes)
+local flashTimer = 0   -- fogonazo del canon
+
+-- Posicion del arma respecto de la camara
+local HIP = CFrame.new(0.85, -0.95, -1.45)
+local ADS = CFrame.new(0.02, -0.55, -1.1)
+
+-- ===============================================================
+-- Construccion de las armas (cajas simples, estilo Counter)
+-- ===============================================================
+local function piece(model, size, cf, color, material, shape)
+	local p = Instance.new("Part")
+	p.Name = "Pieza"
+	p.Size = size
+	p.CFrame = cf
+	p.Color = color or Color3.fromRGB(40, 42, 48)
+	p.Material = material or Enum.Material.Metal
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Locked = true
+	p.Massless = true
+	if shape then
+		p.Shape = shape
+	end
+	p.Parent = folder
+	table.insert(model.pieces, { part = p, cf = cf })
+	return p
+end
+
+-- Rifle base (tranquilizante, pintura y relente comparten cuerpo)
+local function buildRifle(tint, accent)
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.62, 0.85, 3.1), CFrame.new(0, -0.1, -0.6), Color3.fromRGB(52, 55, 62))
+	piece(model, Vector3.new(0.26, 0.26, 2.4), CFrame.new(0, 0.06, -2.9), Color3.fromRGB(34, 36, 42))
+	piece(model, Vector3.new(0.5, 0.75, 1.5), CFrame.new(0, -0.28, 1.6), tint or Color3.fromRGB(122, 92, 62), Enum.Material.Wood)
+	piece(model, Vector3.new(0.42, 0.95, 0.75), CFrame.new(0, -0.85, -0.55) * CFrame.Angles(math.rad(14), 0, 0), Color3.fromRGB(44, 47, 54))
+	piece(model, Vector3.new(0.4, 0.95, 0.6), CFrame.new(0, -0.9, 0.8) * CFrame.Angles(math.rad(-12), 0, 0), Color3.fromRGB(40, 42, 48))
+	piece(model, Vector3.new(0.3, 0.28, 1.15), CFrame.new(0, 0.6, -0.7), accent or Color3.fromRGB(58, 62, 70))
+	model.muzzle = Vector3.new(0, 0.06, -4.15)
+	return model
+end
+
+-- Francotirador: cañon largo, apagallamas y telescopica grande
+local function buildSniper()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.6, 0.8, 3.0), CFrame.new(0, -0.1, -0.4), Color3.fromRGB(46, 52, 50))
+	piece(model, Vector3.new(0.22, 0.22, 3.2), CFrame.new(0, 0.08, -3.4), Color3.fromRGB(30, 34, 34))
+	piece(model, Vector3.new(0.5, 0.5, 0.45), CFrame.new(0, 0.08, -4.95), Color3.fromRGB(62, 68, 68))
+	piece(model, Vector3.new(0.5, 0.75, 1.8), CFrame.new(0, -0.32, 1.55), Color3.fromRGB(58, 72, 60), Enum.Material.WoodPlanks)
+	piece(model, Vector3.new(0.44, 1.0, 0.7), CFrame.new(0, -0.88, -0.35) * CFrame.Angles(math.rad(12), 0, 0), Color3.fromRGB(40, 44, 44))
+	-- Telescopica (cilindro apoyado a lo largo del arma)
+	piece(model, Vector3.new(2.1, 0.4, 0.4), CFrame.new(0, 0.8, -0.9) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(22, 24, 28), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.18, 0.42, 0.42), CFrame.new(0, 0.8, -1.98) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(60, 70, 74), Enum.Material.Glass, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.16, 0.34, 0.34), CFrame.new(0, 0.8, 0.18) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(60, 70, 74), Enum.Material.Glass, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.16, 0.16, 0.16), CFrame.new(0, 0.8, -2.14), Color3.fromRGB(140, 235, 255), Enum.Material.Neon)
+	model.muzzle = Vector3.new(0, 0.08, -5.25)
+	return model
+end
+
+local function buildRevolver()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.34, 0.5, 0.9), CFrame.new(0, 0, -0.35), Color3.fromRGB(96, 100, 110))
+	piece(model, Vector3.new(0.42, 0.42, 0.62), CFrame.new(0, 0.02, -0.15) * CFrame.Angles(0, 0, 0),
+		Color3.fromRGB(150, 154, 164), nil, Enum.PartType.Cylinder)  -- tambor
+	piece(model, Vector3.new(0.2, 0.2, 1.5), CFrame.new(0, 0.08, -1.4), Color3.fromRGB(60, 64, 72))
+	piece(model, Vector3.new(0.34, 0.8, 0.5), CFrame.new(0, -0.62, 0.28) * CFrame.Angles(math.rad(-16), 0, 0),
+		Color3.fromRGB(96, 66, 42), Enum.Material.Wood)
+	model.muzzle = Vector3.new(0, 0.08, -2.25)
+	return model
+end
+
+local function buildArco()
+	local model = { pieces = {} }
+	-- Arco curvado con 3 tramos + cuerda
+	piece(model, Vector3.new(0.22, 2.0, 0.22), CFrame.new(0, 0.9, -0.6) * CFrame.Angles(0, 0, math.rad(-24)), Color3.fromRGB(112, 84, 54), Enum.Material.Wood)
+	piece(model, Vector3.new(0.22, 2.0, 0.22), CFrame.new(0, -0.9, -0.6) * CFrame.Angles(0, 0, math.rad(24)), Color3.fromRGB(112, 84, 54), Enum.Material.Wood)
+	piece(model, Vector3.new(0.16, 0.16, 0.16), CFrame.new(-0.42, 0, -0.6), Color3.fromRGB(150, 196, 118), Enum.Material.Neon)
+	piece(model, Vector3.new(0.08, 3.4, 0.08), CFrame.new(-0.42, 0, -0.6), Color3.fromRGB(232, 236, 240), Enum.Material.SmoothPlastic)
+	-- Mano/puño
+	piece(model, Vector3.new(0.4, 0.5, 0.5), CFrame.new(0, 0, -0.6), Color3.fromRGB(120, 90, 58), Enum.Material.Fabric)
+	model.muzzle = Vector3.new(-0.42, 0, -0.9)
+	return model
+end
+
+local function buildCuchillo()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.3, 0.7, 0.4), CFrame.new(0, -0.7, -0.4), Color3.fromRGB(62, 46, 34), Enum.Material.Wood)
+	piece(model, Vector3.new(0.85, 0.16, 0.45), CFrame.new(0, -0.28, -0.4), Color3.fromRGB(130, 134, 144))
+	piece(model, Vector3.new(0.72, 2.3, 0.12), CFrame.new(0, 0.95, -0.4), Color3.fromRGB(226, 232, 240))
+	piece(model, Vector3.new(0.1, 2.2, 0.14), CFrame.new(0.3, 0.95, -0.4), Color3.fromRGB(255, 255, 255), Enum.Material.Neon)
+	model.muzzle = Vector3.new(0, 2.2, -0.4)
+	return model
+end
+
+local function buildLanzallamas()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.36, 0.7, 1.6), CFrame.new(0.2, 0, -0.8), Color3.fromRGB(70, 70, 66))
+	piece(model, Vector3.new(1.7, 0.34, 0.34), CFrame.new(0.2, 0.1, -2.0) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(96, 96, 90), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.5, 0.55, 0.55), CFrame.new(0.2, 0.1, -2.9) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(52, 52, 50), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.3, 0.3, 0.3), CFrame.new(0.2, 0.1, -3.24), Color3.fromRGB(255, 150, 60), Enum.Material.Neon)
+	-- Mochila con tanques
+	piece(model, Vector3.new(0.32, 0.32, 1.5), CFrame.new(-0.35, -0.75, 0.6) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(178, 76, 58), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.32, 0.32, 1.5), CFrame.new(0.22, -0.75, 0.6) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(178, 76, 58), nil, Enum.PartType.Cylinder)
+	model.muzzle = Vector3.new(0.2, 0.1, -3.45)
+	return model
+end
+
+local function buildCohete()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.85, 0.85, 3.6), CFrame.new(0, 0.15, -1.1) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(70, 84, 66), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.95, 0.95, 0.4), CFrame.new(0, 0.15, -2.85) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(48, 52, 48), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.4, 0.9, 0.6), CFrame.new(0, -0.5, -0.5) * CFrame.Angles(math.rad(-10), 0, 0),
+		Color3.fromRGB(52, 56, 52))
+	piece(model, Vector3.new(0.3, 0.3, 0.7), CFrame.new(0, 0.8, -1.2), Color3.fromRGB(40, 44, 40))
+	piece(model, Vector3.new(0.16, 0.16, 0.16), CFrame.new(0, 0.95, -1.5), Color3.fromRGB(200, 80, 60), Enum.Material.Neon)
+	model.muzzle = Vector3.new(0, 0.15, -3.2)
+	return model
+end
+
+local BUILDERS = {
+	rifle = function() return buildRifle(nil, nil) end,
+	pintura = function() return buildRifle(Color3.fromRGB(120, 84, 108), Color3.fromRGB(230, 120, 190)) end,
+	relente = function() return buildRifle(Color3.fromRGB(96, 116, 126), Color3.fromRGB(110, 220, 235)) end,
+	sniper = buildSniper,
+	revolver = buildRevolver,
+	arco = buildArco,
+	cuchillo = buildCuchillo,
+	lanzallamas = buildLanzallamas,
+	cohete = buildCohete,
+}
+
+-- ===============================================================
+-- Carpeta viva (se recrea si cambia la camara)
+-- ===============================================================
+local function ensureFolder()
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return nil
+	end
+	if folder and folder.Parent ~= camera then
+		folder = nil
+		models = {}
+		current = nil
+		currentId = nil
+	end
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = "VistaArmas"
+		folder.Parent = camera
+	end
+	return folder
+end
+
+-- ===============================================================
+-- API
+-- ===============================================================
+function ViewModel.setWeapon(id)
+	if not id then
+		currentId = nil
+		current = nil
+		return
+	end
+	if id == currentId then
+		return
+	end
+	currentId = id
+	current = nil
+	if not BUILDERS[id] then
+		return
+	end
+	ensureFolder()
+	if not folder then
+		return
+	end
+	if not models[id] then
+		models[id] = BUILDERS[id]()
+	end
+	current = models[id]
+	-- Fogonazo: una bolita neon en la boca del canon
+	if current and not current.flash then
+		local flash = piece(current, Vector3.new(0.72, 0.5, 0.5),
+			CFrame.new(current.muzzle or Vector3.new(0, 0, -2)) * CFrame.Angles(0, math.rad(90), 0),
+			Color3.fromRGB(255, 236, 168), Enum.Material.Neon, Enum.PartType.Cylinder)
+		flash.Transparency = 1
+		flash.CastShadow = false
+		current.flash = flash
+	end
+	-- Deja la pose ya lista para que no se vea saltar
+	ads = adsGoal
+end
+
+function ViewModel.setVisible(value)
+	visible = value and true or false
+end
+
+function ViewModel.setAds(goal)
+	adsGoal = math.clamp(goal or 0, 0, 1)
+end
+
+function ViewModel.setHidden(value)
+	hiddenByScope = value and true or false
+end
+
+function ViewModel.recoil(amount)
+	recoil = math.min(1.6, recoil + (amount or 0.5))
+	recoilRoll = (math.random() * 2 - 1) * 0.18 * (amount or 0.5)
+end
+
+-- Patada de camara estilo Counter Blox: sube de golpe y vuelve sola
+function ViewModel.kickCamera(pitch, yaw)
+	camKick = Vector2.new(camKick.X + (pitch or 0), camKick.Y + (yaw or 0))
+end
+
+function ViewModel.flash()
+	flashTimer = 0.055
+end
+
+function ViewModel.hasWeapon(id)
+	return BUILDERS[id or currentId] ~= nil
+end
+
+function ViewModel.getMuzzle()
+	local camera = workspace.CurrentCamera
+	if not camera or not current then
+		return nil
+	end
+	local base = camera.CFrame * HIP:Lerp(ADS, ads)
+	local world = base * (current.muzzle or Vector3.new(0, 0, -2))
+	return world, camera.CFrame.LookVector
+end
+
+-- ===============================================================
+-- Bucle (despues de que la camara se mueve, asi no tiembla)
+-- ===============================================================
+local function stepUnbound(dt)
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+
+	ads = ads + (adsGoal - ads) * math.min(dt * 11, 1)
+	recoil = recoil * math.max(0, 1 - dt * 9)
+	flashTimer = math.max(0, flashTimer - dt)
+
+	local show = visible and current and not hiddenByScope
+	for _, model in pairs(models) do
+		local parent = (model == current and show) and folder or nil
+		for _, item in ipairs(model.pieces) do
+			if item.part.Parent ~= parent then
+				item.part.Parent = parent
+			end
+		end
+	end
+
+	local camCF = camera.CFrame
+
+	-- Patada de camara (se aplica despues de que la camara se movio)
+	if math.abs(camKick.X) &gt; 0.00002 or math.abs(camKick.Y) &gt; 0.00002 then
+		local kicked = camCF * CFrame.Angles(camKick.X, camKick.Y, 0)
+		camera.CFrame = kicked
+		camCF = kicked
+		camKick = camKick * math.max(0, 1 - dt * 9)
+	end
+
+	if not (current and show) then
+		lastCamCF = camCF
+		return
+	end
+
+	-- Inercia: el arma se atrasa un poco cuando giras la vista
+	if lastCamCF then
+		local look = camCF.LookVector
+		local lastLook = lastCamCF.LookVector
+		local yaw = math.atan2(look.X, look.Z) - math.atan2(lastLook.X, lastLook.Z)
+		if yaw &gt; math.pi then
+			yaw = yaw - math.pi * 2
+		elseif yaw &lt; -math.pi then
+			yaw = yaw + math.pi * 2
+		end
+		local pitch = math.asin(math.clamp(look.Y, -1, 1)) - math.asin(math.clamp(lastLook.Y, -1, 1))
+		local interesting = Vector2.new(
+			math.clamp(yaw * 6, -0.09, 0.09),
+			math.clamp(pitch * 6, -0.09, 0.09))
+		sway = sway:Lerp(interesting, math.min(dt * 9, 1))
+	else
+		sway = Vector2.new(0, 0)
+	end
+
+	-- Bamboleo al caminar
+	local speed = 0
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if root then
+		local v = root.AssemblyLinearVelocity
+		speed = math.sqrt(v.X * v.X + v.Z * v.Z)
+	end
+	bobPhase = bobPhase + dt * (4 + speed * 0.85)
+	local bobAmt = math.clamp(speed / 16, 0, 1) * (1 - ads * 0.75)
+	local bobX = math.cos(bobPhase) * 0.05 * bobAmt
+	local bobY = math.abs(math.sin(bobPhase)) * 0.045 * bobAmt
+
+	local base = camCF * HIP:Lerp(ADS, ads)
+		* CFrame.new(bobX + sway.X * 2.6, bobY + sway.Y * 2.2, recoil * 0.5)
+	local final = base * CFrame.Angles(-sway.Y * 2.4 - recoil * 0.2, -sway.X * 2.4, recoilRoll * recoil * 2)
+
+	for _, item in ipairs(current.pieces) do
+		item.part.CFrame = final * item.cf
+	end
+
+	-- Fogonazo: se ve un instante al disparar
+	if current.flash then
+		if flashTimer &gt; 0 then
+			local s = 0.5 + math.random() * 0.4
+			current.flash.Size = Vector3.new(0.72 * s, s, s)
+			current.flash.Transparency = 0
+		elseif current.flash.Transparency ~= 1 then
+			current.flash.Transparency = 1
+		end
+	end
+
+	lastCamCF = camCF
+end
+
+RunService:BindToRenderStep("KiwiVistaArmas", Enum.RenderPriority.Camera.Value + 1, stepUnbound)
+
+return ViewModel
 </ProtectedString>
 						</Properties>
 					</Item>

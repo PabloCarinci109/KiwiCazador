@@ -52,12 +52,13 @@ function KiwiController.new(arena, kiwiCfg, rng, callbacks, opts)
 	self.callbacks = callbacks or {}
 	self.brain = opts.brain or "hider"
 	self.giant = self.brain == "seeker"
+	self.leash = opts.leash
 
 	self.rig = KiwiModel.build(arena.folder, opts.scale)
 	self.model = self.rig.model
 	self.rideHeight = self.rig.rideHeight or KiwiModel.RideHeight
 
-	self.pos = arena.kiwiSpawn or arena.center
+	self.pos = opts.spawn or arena.kiwiSpawn or arena.center
 	self.pos = Vector3.new(self.pos.X, arena.floorY + self.rideHeight, self.pos.Z)
 	self.facing = Vector3.new(0, 0, 1)
 	self.lastGroundY = arena.floorY
@@ -80,6 +81,8 @@ function KiwiController.new(arena, kiwiCfg, rng, callbacks, opts)
 	self.playersInArena = {}
 	self.goalBait = nil
 	self.baitTimer = 0
+	self.peckCooldown = 0
+	self.peckAnim = 0
 	self.trapTimer = 0
 	self.trapScare = 0
 	self.slowLeft = 0
@@ -285,6 +288,54 @@ function KiwiController:whiskers(dir)
 	return nil
 end
 
+-- ===============================================================
+-- Picotazo defensivo (kiwi normal)
+-- ===============================================================
+--[[
+	Si un cazador lo acorrala (sin salida hacia ningun lado) y lo tiene
+	encima, el kiwi se defiende: un picotazo que saca el 10% de la vida.
+]]
+function KiwiController:stepPeck(dt)
+	self.peckCooldown = math.max(0, (self.peckCooldown or 0) - dt)
+	if self.peckAnim > 0 then
+		self.peckAnim = math.max(0, self.peckAnim - dt)
+	end
+	if self.peckCooldown > 0 or self.defeated then
+		return
+	end
+	if self.state == "hidden" or self.state == "sedated" or self.state == "trapped" then
+		return
+	end
+
+	local cfg = Config.KiwiPeck
+	local best, bestDist = nil, cfg.range
+	for _, entry in ipairs(self.playersInArena or {}) do
+		if entry.pos and not entry.hidden then
+			local to = flat(entry.pos - self.pos)
+			local d = to.Magnitude
+			if d <= bestDist and d > 0.1 then
+				best, bestDist = entry, d
+			end
+		end
+	end
+	if not best then
+		return
+	end
+
+	-- Acorralado de verdad: todas las salidas (bigotes) tapadas
+	if self:whiskers(self.facing) ~= nil then
+		return
+	end
+
+	self.peckCooldown = cfg.cooldown
+	self.peckAnim = 0.5
+	local to = flat(best.pos - self.pos)
+	if to.Magnitude > 0.1 then
+		self.facing = to.Unit
+	end
+	self:emit("peck", { player = best.player, pos = self.pos + self.facing * 1.2 })
+end
+
 function KiwiController:currentSpeed()
 	local speed
 	if self.brain == "seeker" then
@@ -340,6 +391,16 @@ function KiwiController:moveToward(goal, speed, dt)
 	end
 
 	self.pos = self.arena:clampToBounds(self.pos + finalDir * speed * dt)
+	-- Asedio: el kiwi nunca se aleja demasiado de su casa
+	if self.leash then
+		local away = self.pos - self.leash.pos
+		local flatAway = Vector3.new(away.X, 0, away.Z)
+		local radius = self.leash.radius or 40
+		if flatAway.Magnitude > radius then
+			local pulled = self.leash.pos + flatAway.Unit * radius
+			self.pos = Vector3.new(pulled.X, self.pos.Y, pulled.Z)
+		end
+	end
 	local gy = self:groundY(self.pos)
 	self.pos = Vector3.new(self.pos.X, gy + self.rideHeight, self.pos.Z)
 
@@ -375,7 +436,10 @@ function KiwiController:chooseSpot(needsClear)
 			clear = false
 		end
 
-		if clear or not needsClear then
+		-- Asedio: solo le interesan los escondites cerca de su casa
+		local farFromHome = self.leash
+			and (spot.hidePoint - self.leash.pos).Magnitude > (self.leash.radius or 40) * 1.5
+		if (clear or not needsClear) and not farFromHome then
 			local score = 0
 			score = score - (spot.hidePoint - self.pos).Magnitude * 0.55
 			score = score + spot.cover * 70 * self.cfg.coverPreference
@@ -399,6 +463,13 @@ function KiwiController:chooseSpot(needsClear)
 end
 
 function KiwiController:randomPointInArena()
+	if self.leash then
+		-- Deambula alrededor de su casa (modo Asedio)
+		local angle = self.rng:NextNumber(0, math.pi * 2)
+		local radius = self.rng:NextNumber(6, self.leash.radius or 40)
+		local point = self.leash.pos + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+		return self.arena:clampToBounds(point)
+	end
 	local half = self.arena.halfSize - 30
 	local angle = self.rng:NextNumber(0, math.pi * 2)
 	local radius = self.rng:NextNumber(20, half)
@@ -742,6 +813,7 @@ function KiwiController:step(dt, players, baits)
 
 	self:sense(dt, players)
 	self:staminaUpdate(dt)
+	self:stepPeck(dt)
 
 	if self.state ~= "flee" and self.state ~= "tired" then
 		if self.alert >= 1 or (self.threat and self.threatDist <= self.cfg.flushBase) then
@@ -799,10 +871,16 @@ function KiwiController:step(dt, players, baits)
 	self.animPhase = self.animPhase + dt * (6 + speed * 0.55)
 	local headPitch = 0.12 + (1 - self.alert) * 0.22 + math.sin(self.stateTime * 1.4) * 0.06
 	local cf = CFrame.lookAt(self.pos, self.pos + self.facing)
+	-- Picotazo: la cabeza baja de golpe cuando el kiwi se defiende
+	local peck = 0
+	if self.peckAnim > 0 then
+		peck = math.sin((1 - self.peckAnim / 0.5) * math.pi)
+	end
 	self.rig:update(cf, {
 		phase = self.animPhase,
 		legSwing = walkFactor * 0.7,
-		headPitch = headPitch,
+		headPitch = headPitch + peck * 0.8,
+		beak = peck * 0.9,
 	})
 
 	if reached then
