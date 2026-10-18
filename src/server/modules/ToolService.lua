@@ -579,53 +579,126 @@ local function buildKnifeTool(parent)
 	tool:SetAttribute("ToolId", "cuchillo")
 	tool.Grip = CFrame.new(0, -0.4, 0.15) * CFrame.Angles(math.rad(-90), 0, 0)
 	local acero = Color3.fromRGB(198, 204, 214)
-	local aceroOscuro = Color3.fromRGB(132, 138, 150)
+	local aceroClaro = Color3.fromRGB(228, 234, 244)
+	local filo = Color3.fromRGB(240, 245, 251)
+	local mango = Color3.fromRGB(52, 56, 64)
+	local placa = Color3.fromRGB(38, 41, 48)
+	local agujero = Color3.fromRGB(10, 11, 13)
+	local pin = Color3.fromRGB(214, 220, 230)
 
 	-- Mango en la mano (el Handle) y el gemelo pegado al lado
 	local handle = newHandle({
-		Size = Vector3.new(0.18, 0.85, 0.36),
-		Color = aceroOscuro,
+		Size = Vector3.new(0.20, 0.95, 0.10),
+		Color = mango,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "PlacaMano",
+		Size = Vector3.new(0.16, 0.86, 0.02),
+		CFrame = handle.CFrame * CFrame.new(0, 0, 0.05),
+		Color = placa,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
 		Name = "MangoB",
-		Size = Vector3.new(0.18, 0.85, 0.36),
+		Size = Vector3.new(0.20, 0.95, 0.10),
 		CFrame = handle.CFrame * CFrame.new(0.24, 0, 0),
-		Color = aceroOscuro,
+		Color = mango,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
+		Name = "PlacaB",
+		Size = Vector3.new(0.16, 0.86, 0.02),
+		CFrame = handle.CFrame * CFrame.new(0.24, 0, 0.05),
+		Color = placa,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	-- Agujeros de los mangos: cilindros oscuros que los cruzan de lado a lado
+	for lado = 0, 1 do
+		for i = 1, 3 do
+			weldPiece(handle, {
+				Name = "Agujero",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.12, 0.105, 0.105),
+				CFrame = handle.CFrame * CFrame.new(lado * 0.24, -0.30 + (i - 1) * 0.30, 0)
+					* CFrame.Angles(0, math.rad(90), 0),
+				Color = agujero,
+				Material = Enum.Material.SmoothPlastic,
+				Parent = tool,
+			})
+		end
+	end
+	-- Pasador que cruza los dos mangos + tornillo a la vista
+	weldPiece(handle, {
 		Name = "Pivote",
-		Size = Vector3.new(0.46, 0.12, 0.4),
-		CFrame = handle.CFrame * CFrame.new(0.12, 0.5, 0),
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.42, 0.10, 0.10),
+		CFrame = handle.CFrame * CFrame.new(0.12, 0.55, 0) * CFrame.Angles(0, math.rad(90), 0),
+		Color = pin,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Tornillo",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.06, 0.05, 0.05),
+		CFrame = handle.CFrame * CFrame.new(0.12, 0.55, 0.07) * CFrame.Angles(0, math.rad(90), 0),
+		Color = aceroClaro,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	-- Hoja: cuerpo, punta en rombo, contrafilo y filo
+	weldPiece(handle, {
+		Name = "Hoja",
+		Size = Vector3.new(0.22, 1.20, 0.06),
+		CFrame = handle.CFrame * CFrame.new(0.12, 1.18, 0),
 		Color = acero,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
-		Name = "Hoja",
-		Size = Vector3.new(0.12, 1.7, 0.3),
-		CFrame = handle.CFrame * CFrame.new(0.12, 1.42, 0),
-		Color = Color3.fromRGB(228, 234, 244),
+		Name = "Punta",
+		Size = Vector3.new(0.15, 0.15, 0.06),
+		CFrame = handle.CFrame * CFrame.new(0.12, 1.83, 0) * CFrame.Angles(0, 0, math.rad(45)),
+		Color = aceroClaro,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
-		Name = "Punta",
-		Size = Vector3.new(0.44, 0.44, 0.3),
-		CFrame = handle.CFrame * CFrame.new(0.12, 2.42, 0) * CFrame.Angles(0, 0, math.rad(45)),
-		Color = Color3.fromRGB(228, 234, 244),
+		Name = "Contrafilo",
+		Size = Vector3.new(0.05, 0.46, 0.065),
+		CFrame = handle.CFrame * CFrame.new(0.175, 1.55, 0) * CFrame.Angles(0, 0, math.rad(6)),
+		Color = aceroClaro,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
 		Name = "Filo",
-		Size = Vector3.new(0.1, 1.5, 0.1),
-		CFrame = handle.CFrame * CFrame.new(0.2, 1.35, 0),
-		Color = Color3.fromRGB(255, 255, 255),
-		Material = Enum.Material.Neon,
+		Size = Vector3.new(0.03, 0.95, 0.065),
+		CFrame = handle.CFrame * CFrame.new(0.025, 1.05, 0),
+		Color = filo,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	-- Pestillo colgando del mango de afuera
+	weldPiece(handle, {
+		Name = "Pestillo",
+		Size = Vector3.new(0.05, 0.20, 0.04),
+		CFrame = handle.CFrame * CFrame.new(0.24, -0.60, 0) * CFrame.Angles(0, 0, math.rad(4)),
+		Color = aceroClaro,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "PestilloPie",
+		Size = Vector3.new(0.07, 0.045, 0.05),
+		CFrame = handle.CFrame * CFrame.new(0.24, -0.71, 0),
+		Color = acero,
+		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	-- El cuchillo tambien entra a la carpeta de plantillas: era el unico

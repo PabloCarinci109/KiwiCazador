@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="cielo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#081120"/>
+      <stop offset="0.42" stop-color="#0C2730"/>
+      <stop offset="1" stop-color="#051018"/>
+    </linearGradient>
+    <radialGradient id="lunaGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#E7F4D2" stop-opacity="0.55"/>
+      <stop offset="0.45" stop-color="#BFE0B4" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#BFE0B4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="brilloKiwi" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#2E6A5C" stop-opacity="0.72"/>
+      <stop offset="0.6" stop-color="#1B4A44" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#1B4A44" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vineta" cx="0.5" cy="0.48" r="0.72">
+      <stop offset="0.55" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.55"/>
+    </radialGradient>
+    <linearGradient id="cuerpo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8A6035"/>
+      <stop offset="0.55" stop-color="#6C4726"/>
+      <stop offset="1" stop-color="#4A2E16"/>
+    </linearGradient>
+    <linearGradient id="panza" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#B58A57"/>
+      <stop offset="1" stop-color="#8A5F33"/>
+    </linearGradient>
+    <linearGradient id="pico" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E4CBA2"/>
+      <stop offset="1" stop-color="#B08F62"/>
+    </linearGradient>
+    <linearGradient id="acero" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#9FABBB"/>
+      <stop offset="0.32" stop-color="#E9F0F8"/>
+      <stop offset="0.55" stop-color="#C3CDDA"/>
+      <stop offset="1" stop-color="#7C8796"/>
+    </linearGradient>
+    <linearGradient id="mango" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2E323B"/>
+      <stop offset="0.45" stop-color="#434955"/>
+      <stop offset="1" stop-color="#1C1F25"/>
+    </linearGradient>
+    <linearGradient id="monteLejos" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#143540"/>
+      <stop offset="1" stop-color="#0D2229"/>
+    </linearGradient>
+    <linearGradient id="monteCerca" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0C2027"/>
+      <stop offset="1" stop-color="#071419"/>
+    </linearGradient>
+  </defs>
+
+  <!-- cielo -->
+  <rect width="1024" height="1024" fill="url(#cielo)"/>
+
+  <!-- estrellas -->
+  <g fill="#D6E9FF">
+    <circle cx="92" cy="120" r="2.4" opacity="0.75"/>
+    <circle cx="176" cy="64" r="1.6" opacity="0.5"/>
+    <circle cx="268" cy="150" r="2" opacity="0.6"/>
+    <circle cx="330" cy="72" r="1.4" opacity="0.42"/>
+    <circle cx="420" cy="126" r="1.8" opacity="0.55"/>
+    <circle cx="512" cy="58" r="1.5" opacity="0.45"/>
+    <circle cx="640" cy="112" r="2.1" opacity="0.6"/>
+    <circle cx="712" cy="52" r="1.5" opacity="0.4"/>
+    <circle cx="936" cy="96" r="2.2" opacity="0.6"/>
+    <circle cx="980" cy="196" r="1.5" opacity="0.42"/>
+    <circle cx="60" cy="268" r="1.6" opacity="0.45"/>
+    <circle cx="150" cy="350" r="2" opacity="0.5"/>
+    <circle cx="864" cy="420" r="1.6" opacity="0.4"/>
+    <circle cx="962" cy="330" r="1.9" opacity="0.5"/>
+  </g>
+
+  <!-- luna -->
+  <circle cx="806" cy="306" r="196" fill="url(#lunaGlow)"/>
+  <circle cx="806" cy="306" r="74" fill="#EAF5DA"/>
+  <circle cx="780" cy="286" r="14" fill="#D3E4BE" opacity="0.75"/>
+  <circle cx="822" cy="326" r="10" fill="#D3E4BE" opacity="0.65"/>
+  <circle cx="816" cy="282" r="7" fill="#D3E4BE" opacity="0.55"/>
+
+  <!-- montañas -->
+  <path d="M0 700 L110 566 L206 662 L318 512 L438 672 L540 588 L664 716 L770 604 L900 726 L1024 622 L1024 1024 L0 1024 Z"
+        fill="url(#monteLejos)"/>
+  <path d="M0 786 L132 676 L244 772 L362 660 L470 780 L590 690 L716 800 L838 700 L962 806 L1024 754 L1024 1024 L0 1024 Z"
+        fill="url(#monteCerca)"/>
+
+  <!-- resplandor del héroe -->
+  <circle cx="470" cy="700" r="352" fill="url(#brilloKiwi)"/>
+
+  <!-- cuchillo mariposa: segundo protagonista, a la derecha -->
+  <g transform="translate(835 702) rotate(20)">
+    <path d="M -38 6 L -38 -292 L -14 -400 L 0 -440 L 14 -400 L 38 -292 L 38 4 Z" fill="url(#acero)"/>
+    <path d="M -38 -288 L -38 4 L -25 4 L -25 -286 Z" fill="#F4F8FF" opacity="0.9"/>
+    <path d="M 17 -372 L 37 -292 L 28 -292 L 10 -364 Z" fill="#EEF4FD" opacity="0.7"/>
+    <rect x="-42" y="-8" width="84" height="28" rx="7" fill="#C9D2DF"/>
+    <circle cx="0" cy="14" r="17" fill="#E6ECF4"/>
+    <circle cx="0" cy="14" r="7" fill="#7C8694"/>
+    <rect x="-74" y="26" width="68" height="260" rx="22" fill="url(#mango)"/>
+    <rect x="6" y="26" width="68" height="260" rx="22" fill="url(#mango)"/>
+    <rect x="-68" y="34" width="56" height="244" rx="18" fill="#363B46" opacity="0.85"/>
+    <rect x="12" y="34" width="56" height="244" rx="18" fill="#363B46" opacity="0.85"/>
+    <g fill="#0A0B0E" stroke="#5A6170" stroke-width="3">
+      <circle cx="-40" cy="112" r="21"/>
+      <circle cx="-40" cy="222" r="21"/>
+      <circle cx="40" cy="112" r="21"/>
+      <circle cx="40" cy="222" r="21"/>
+    </g>
+    <rect x="-74" y="248" width="68" height="38" rx="14" fill="#15181D"/>
+    <rect x="6" y="248" width="68" height="38" rx="14" fill="#15181D"/>
+  </g>
+
+  <!-- sombra en el piso -->
+  <ellipse cx="462" cy="952" rx="200" ry="28" fill="#020A0E" opacity="0.55"/>
+  <ellipse cx="762" cy="968" rx="104" ry="20" fill="#020A0E" opacity="0.45"/>
+
+  <!-- kiwi -->
+  <g>
+    <!-- patas -->
+    <g stroke="#C48334" stroke-width="17" stroke-linecap="round" fill="none">
+      <path d="M 428 808 L 420 908"/>
+      <path d="M 528 816 L 534 916"/>
+    </g>
+    <g stroke="#C48334" stroke-width="12" stroke-linecap="round" fill="none">
+      <path d="M 420 906 L 386 934"/>
+      <path d="M 420 906 L 422 950"/>
+      <path d="M 420 906 L 456 932"/>
+      <path d="M 534 914 L 500 942"/>
+      <path d="M 534 914 L 536 958"/>
+      <path d="M 534 914 L 570 940"/>
+    </g>
+    <!-- cola -->
+    <path d="M 356 662 Q 292 690 316 742 Q 352 730 378 704 Z" fill="#4A2E16"/>
+    <!-- cuerpo -->
+    <ellipse cx="472" cy="700" rx="172" ry="152" fill="url(#cuerpo)"/>
+    <ellipse cx="492" cy="742" rx="118" ry="92" fill="url(#panza)" opacity="0.55"/>
+    <!-- cabeza -->
+    <circle cx="560" cy="534" r="96" fill="url(#cuerpo)"/>
+    <path d="M 566 442 A 96 96 0 0 1 648 512" stroke="#C79B60" stroke-width="7" fill="none"
+          opacity="0.5" stroke-linecap="round"/>
+    <!-- pico -->
+    <path d="M 626 516 Q 728 542 806 598 Q 720 596 620 570 Z" fill="url(#pico)"/>
+    <path d="M 626 556 Q 714 576 790 596 Q 710 592 622 572 Z" fill="#8E6F45" opacity="0.55"/>
+    <!-- ojo -->
+    <circle cx="592" cy="500" r="15" fill="#120E0A"/>
+    <circle cx="597" cy="495" r="5" fill="#FFFFFF" opacity="0.85"/>
+    <!-- plumas -->
+    <g stroke="#42280F" stroke-width="5" fill="none" opacity="0.45" stroke-linecap="round">
+      <path d="M 392 640 Q 430 626 466 630"/>
+      <path d="M 380 686 Q 418 672 456 676"/>
+      <path d="M 386 732 Q 424 718 462 722"/>
+    </g>
+    <!-- gorra de cazador -->
+    <g transform="rotate(-7 560 436)">
+      <path d="M 486 452 Q 500 396 566 392 Q 632 396 640 452 Z" fill="#55663A"/>
+      <ellipse cx="562" cy="456" rx="102" ry="22" fill="#46552F"/>
+      <rect x="494" y="428" width="122" height="14" rx="7" fill="#2C351E"/>
+      <path d="M 520 402 Q 560 390 606 404" stroke="#6C7E4C" stroke-width="6" fill="none" opacity="0.6"/>
+    </g>
+  </g>
+
+  <!-- título -->
+  <g font-family="Fira Sans Compressed Heavy" font-weight="900">
+    <text x="512" y="150" text-anchor="middle" font-size="136" letter-spacing="6"
+          stroke="#06121A" stroke-width="22" stroke-linejoin="round" fill="#06121A">KIWI CAZADOR</text>
+    <text x="512" y="150" text-anchor="middle" font-size="136" letter-spacing="6"
+          fill="#F2FBF3">KIWI CAZADOR</text>
+  </g>
+  <text x="512" y="208" text-anchor="middle" font-family="Fira Sans" font-weight="600" font-size="38"
+        letter-spacing="7" fill="#9FE0B6" stroke="#04101A" stroke-width="8" stroke-linejoin="round"
+        paint-order="stroke">CAZÁ · ESCÓNDETE · SOBREVIVÍ</text>
+
+  <!-- viñeta -->
+  <rect width="1024" height="1024" fill="url(#vineta)"/>
+</svg>

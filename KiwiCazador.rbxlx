@@ -43,7 +43,7 @@
 
 local Config = {}
 
-Config.Version = "1.9.5"
+Config.Version = "1.9.6"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -896,6 +896,8 @@ Config.Text = {
 	AsedioZoneIn = "¡El kiwi llegó a la zona! Aguanten %d segundos para sacarlo del mapa",
 	AsedioHoldWarn = "¡Quedan %d segundos de extracción!",
 	AsedioDropped = "¡Cayó el portador! El kiwi quedó en el piso: vuelvan a levantarlo",
+	AsedioDroppedZone = "¡Cayó el portador! El kiwi quedó en la zona: la extracción sigue corriendo",
+	AsedioPlanted = "¡%s dejó al kiwi en la zona de extracción! Aguanten los 2 minutos",
 	AsedioPickup = "%s volvió a levantar al kiwi",
 	AsedioRecovered = "¡Los %s rescataron al kiwi! Vuelve a su castillo y la extracción se corta",
 	AsedioWipe = "¡No quedó nadie en pie del equipo %s! La ronda es para %s",
@@ -3566,8 +3568,31 @@ local function buildArena(index, zone, cfg, parent, rng)
 	-- ("Alpes del Sur", etc.) plantado en la arena. Se saco de todos los
 	-- mapas: una vez que arranca el juego no tiene que verse mas.
 
-	-- Zona segura (meta del modo Colosal): el refugio circular del centro
-	local zoneRadius = (cfg.SafeZone and cfg.SafeZone.radius) or 15
+	-- La zona segura del modo Colosal ya no se arma aca: se construye solo
+	-- cuando arranca una partida Colosal (WorldBuilder.buildSafeZone) y se
+	-- borra al terminar, para que no quede marcada en los demas mapas.
+
+	return self
+end
+
+-- ===============================================================
+-- Zona segura del Colosal
+-- El refugio circular (la meta del modo donde el kiwi gigante te
+-- persigue). Se arma al arrancar cada partida Colosal y se destruye
+-- al terminar: en los demas mapas y modos no se ve nunca.
+-- ===============================================================
+function WorldBuilder.buildSafeZone(arena)
+	if not arena then
+		return nil
+	end
+
+	local center = arena.center
+	local radius = (Config.SafeZone and Config.SafeZone.radius) or 15
+
+	local folder = Instance.new("Folder")
+	folder.Name = "ZonaSeguraColosal"
+	folder.Parent = arena.folder
+
 	local function zonePart(name, shape, size, cf, color, transparency)
 		local piecePart = Instance.new("Part")
 		piecePart.Name = name
@@ -3586,7 +3611,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 	end
 
 	local zoneRing = zonePart("ZonaSegura", Enum.PartType.Cylinder,
-		Vector3.new(0.3, zoneRadius * 2, zoneRadius * 2),
+		Vector3.new(0.3, radius * 2, radius * 2),
 		CFrame.new(center + Vector3.new(0, 0.15, 0)) * CFrame.Angles(0, 0, math.rad(90)),
 		Color3.fromRGB(90, 110, 130), 0.4)
 
@@ -3629,17 +3654,18 @@ local function buildArena(index, zone, cfg, parent, rng)
 	zoneLabel.Text = "ZONA SEGURA (se activa mas tarde)"
 	zoneLabel.Parent = zoneGui
 
-	self.safeZone = {
+	arena.safeZone = {
 		center = center,
-		radius = zoneRadius,
+		radius = radius,
 		active = false,
 		ring = zoneRing,
 		beam = zoneBeam,
 		light = zoneLight,
 		label = zoneLabel,
+		folder = folder,
 	}
 
-	return self
+	return folder
 end
 
 -- ===============================================================
@@ -5003,10 +5029,15 @@ function KiwiController:holdAt(cf)
 	})
 end
 
--- Lo sueltan (cayo el portador): queda en el piso donde estaba
+-- Lo sueltan (cayo el portador): queda apoyado en el piso donde estaba
 function KiwiController:dropHold()
 	self.held = false
 	if self.pos then
+		-- Al soltarlo baja al piso (no queda flotando a la altura de brazos)
+		local groundY = self.lastGroundY or (self.arena and self.arena.floorY)
+		if groundY and self.rideHeight then
+			self.pos = Vector3.new(self.pos.X, groundY + self.rideHeight, self.pos.Z)
+		end
 		local cf = CFrame.lookAt(self.pos, self.pos + self.facing)
 		self.rig:update(cf, {
 			phase = 0,
@@ -6180,53 +6211,126 @@ local function buildKnifeTool(parent)
 	tool:SetAttribute("ToolId", "cuchillo")
 	tool.Grip = CFrame.new(0, -0.4, 0.15) * CFrame.Angles(math.rad(-90), 0, 0)
 	local acero = Color3.fromRGB(198, 204, 214)
-	local aceroOscuro = Color3.fromRGB(132, 138, 150)
+	local aceroClaro = Color3.fromRGB(228, 234, 244)
+	local filo = Color3.fromRGB(240, 245, 251)
+	local mango = Color3.fromRGB(52, 56, 64)
+	local placa = Color3.fromRGB(38, 41, 48)
+	local agujero = Color3.fromRGB(10, 11, 13)
+	local pin = Color3.fromRGB(214, 220, 230)
 
 	-- Mango en la mano (el Handle) y el gemelo pegado al lado
 	local handle = newHandle({
-		Size = Vector3.new(0.18, 0.85, 0.36),
-		Color = aceroOscuro,
+		Size = Vector3.new(0.20, 0.95, 0.10),
+		Color = mango,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "PlacaMano",
+		Size = Vector3.new(0.16, 0.86, 0.02),
+		CFrame = handle.CFrame * CFrame.new(0, 0, 0.05),
+		Color = placa,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
 		Name = "MangoB",
-		Size = Vector3.new(0.18, 0.85, 0.36),
+		Size = Vector3.new(0.20, 0.95, 0.10),
 		CFrame = handle.CFrame * CFrame.new(0.24, 0, 0),
-		Color = aceroOscuro,
+		Color = mango,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
+		Name = "PlacaB",
+		Size = Vector3.new(0.16, 0.86, 0.02),
+		CFrame = handle.CFrame * CFrame.new(0.24, 0, 0.05),
+		Color = placa,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	-- Agujeros de los mangos: cilindros oscuros que los cruzan de lado a lado
+	for lado = 0, 1 do
+		for i = 1, 3 do
+			weldPiece(handle, {
+				Name = "Agujero",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.12, 0.105, 0.105),
+				CFrame = handle.CFrame * CFrame.new(lado * 0.24, -0.30 + (i - 1) * 0.30, 0)
+					* CFrame.Angles(0, math.rad(90), 0),
+				Color = agujero,
+				Material = Enum.Material.SmoothPlastic,
+				Parent = tool,
+			})
+		end
+	end
+	-- Pasador que cruza los dos mangos + tornillo a la vista
+	weldPiece(handle, {
 		Name = "Pivote",
-		Size = Vector3.new(0.46, 0.12, 0.4),
-		CFrame = handle.CFrame * CFrame.new(0.12, 0.5, 0),
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.42, 0.10, 0.10),
+		CFrame = handle.CFrame * CFrame.new(0.12, 0.55, 0) * CFrame.Angles(0, math.rad(90), 0),
+		Color = pin,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Tornillo",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.06, 0.05, 0.05),
+		CFrame = handle.CFrame * CFrame.new(0.12, 0.55, 0.07) * CFrame.Angles(0, math.rad(90), 0),
+		Color = aceroClaro,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	-- Hoja: cuerpo, punta en rombo, contrafilo y filo
+	weldPiece(handle, {
+		Name = "Hoja",
+		Size = Vector3.new(0.22, 1.20, 0.06),
+		CFrame = handle.CFrame * CFrame.new(0.12, 1.18, 0),
 		Color = acero,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
-		Name = "Hoja",
-		Size = Vector3.new(0.12, 1.7, 0.3),
-		CFrame = handle.CFrame * CFrame.new(0.12, 1.42, 0),
-		Color = Color3.fromRGB(228, 234, 244),
+		Name = "Punta",
+		Size = Vector3.new(0.15, 0.15, 0.06),
+		CFrame = handle.CFrame * CFrame.new(0.12, 1.83, 0) * CFrame.Angles(0, 0, math.rad(45)),
+		Color = aceroClaro,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
-		Name = "Punta",
-		Size = Vector3.new(0.44, 0.44, 0.3),
-		CFrame = handle.CFrame * CFrame.new(0.12, 2.42, 0) * CFrame.Angles(0, 0, math.rad(45)),
-		Color = Color3.fromRGB(228, 234, 244),
+		Name = "Contrafilo",
+		Size = Vector3.new(0.05, 0.46, 0.065),
+		CFrame = handle.CFrame * CFrame.new(0.175, 1.55, 0) * CFrame.Angles(0, 0, math.rad(6)),
+		Color = aceroClaro,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
 		Name = "Filo",
-		Size = Vector3.new(0.1, 1.5, 0.1),
-		CFrame = handle.CFrame * CFrame.new(0.2, 1.35, 0),
-		Color = Color3.fromRGB(255, 255, 255),
-		Material = Enum.Material.Neon,
+		Size = Vector3.new(0.03, 0.95, 0.065),
+		CFrame = handle.CFrame * CFrame.new(0.025, 1.05, 0),
+		Color = filo,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	-- Pestillo colgando del mango de afuera
+	weldPiece(handle, {
+		Name = "Pestillo",
+		Size = Vector3.new(0.05, 0.20, 0.04),
+		CFrame = handle.CFrame * CFrame.new(0.24, -0.60, 0) * CFrame.Angles(0, 0, math.rad(4)),
+		Color = aceroClaro,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "PestilloPie",
+		Size = Vector3.new(0.07, 0.045, 0.05),
+		CFrame = handle.CFrame * CFrame.new(0.24, -0.71, 0),
+		Color = acero,
+		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	-- El cuchillo tambien entra a la carpeta de plantillas: era el unico
@@ -7936,6 +8040,8 @@ local function fireZone(session, thrower, pos)
 	capa(14, cfg.radius * 0.78, 1.2, 2.5, Color3.fromRGB(168, 44, 16), 0.2)
 	capa(18, cfg.radius * 0.66, 2.0, 1.9, Color3.fromRGB(255, 116, 30), 0.12)
 	capa(10, cfg.radius * 0.44, 2.8, 1.2, Color3.fromRGB(255, 214, 96), 0.08)
+	-- Punta blanca del fuego: chispas brillantes bien arriba
+	capa(6, cfg.radius * 0.24, 3.6, 0.8, Color3.fromRGB(255, 246, 214), 0.04)
 
 	-- Luz calida: de noche la fogata se ve desde lejos
 	local glow = Instance.new("PointLight")
@@ -7943,6 +8049,63 @@ local function fireZone(session, thrower, pos)
 	glow.Brightness = 3.2
 	glow.Range = math.max(24, cfg.radius * 2)
 	glow.Parent = flames[1].part
+
+	-- Brasas que saltan y humo que se abre por encima: es lo que hace que
+	-- el fuego se vea vivo de verdad, no una calcomania
+	local brasas = {}
+	for i = 1, 10 do
+		local part = Util.makePart({
+			Name = "Brasa",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.24, 0.24, 0.24),
+			Color = Color3.fromRGB(255, 198, 96),
+			Material = Enum.Material.Neon,
+			Transparency = 0.1,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.new(pos + Vector3.new(0, 0.6, 0)),
+			Parent = workspace,
+		})
+		table.insert(brasas, { part = part, t = 99, vida = 1, vel = Vector3.new(0, 8, 0), origen = pos })
+	end
+	local humos = {}
+	for i = 1, 6 do
+		local part = Util.makePart({
+			Name = "Humo",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(2, 2, 2),
+			Color = Color3.fromRGB(58, 54, 52),
+			Material = Enum.Material.SmoothPlastic,
+			Transparency = 0.62,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.new(pos + Vector3.new(0, 1.4, 0)),
+			Parent = workspace,
+		})
+		table.insert(humos, {
+			part = part, t = math.random() * 2.4, vida = 2.4,
+			origen = pos, deriva = Vector3.new(0, 2.2, 0),
+		})
+	end
+	-- Mancha quemada en el piso bajo el fuego
+	local mancha = Util.makePart({
+		Name = "Quemado",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.08, cfg.radius * 2.1, cfg.radius * 2.1),
+		Color = Color3.fromRGB(28, 22, 20),
+		Material = Enum.Material.Slate,
+		Transparency = 0.3,
+		Anchored = true,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CFrame = CFrame.new(pos + Vector3.new(0, 0.06, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Parent = workspace,
+	})
 
 	local endsAt = os.clock() + cfg.time
 	local nextBurn = 0
@@ -7963,6 +8126,46 @@ local function fireZone(session, thrower, pos)
 					p.Transparency = math.clamp(f.trans + math.abs(onda) * 0.08 + math.random() * 0.06, 0, 0.7)
 				end
 			end
+			-- Brasas: salen del fuego, suben en parabola y se apagan
+			for _, b in ipairs(brasas) do
+				local p = b.part
+				if p and p.Parent then
+					b.t = b.t + 0.09
+					if b.t &gt;= b.vida then
+						b.t = 0
+						b.vida = 0.7 + math.random() * 0.6
+						local ang = math.random() * math.pi * 2
+						local d = math.sqrt(math.random()) * cfg.radius * 0.55
+						b.origen = pos + Vector3.new(math.cos(ang) * d, 0.5 + math.random() * 1.3, math.sin(ang) * d)
+						b.vel = Vector3.new((math.random() - 0.5) * 5.5, 7 + math.random() * 4.5, (math.random() - 0.5) * 5.5)
+					end
+					local esc = 1 - (b.t / b.vida) * 0.55
+					p.CFrame = CFrame.new(b.origen + b.vel * b.t + Vector3.new(0, -4.6 * b.t * b.t, 0))
+					p.Size = Vector3.new(0.24 * esc, 0.24 * esc, 0.24 * esc)
+					p.Transparency = math.clamp(0.08 + (b.t / b.vida) * 0.85, 0, 0.92)
+				end
+			end
+			-- Humo: sube abriendose y se va desvaneciendo
+			for _, h in ipairs(humos) do
+				local p = h.part
+				if p and p.Parent then
+					h.t = h.t + 0.09
+					if h.t &gt;= h.vida then
+						h.t = 0
+						h.vida = 2.1 + math.random() * 1.3
+						local ang = math.random() * math.pi * 2
+						local d = math.sqrt(math.random()) * cfg.radius * 0.45
+						h.origen = pos + Vector3.new(math.cos(ang) * d, 1.2 + math.random() * 1.6, math.sin(ang) * d)
+						h.deriva = Vector3.new((math.random() - 0.5) * 1.8, 2.2 + math.random() * 1.2, (math.random() - 0.5) * 1.8)
+					end
+					local crecer = 1.9 + h.t * 2.3
+					p.Size = Vector3.new(crecer, crecer, crecer)
+					p.CFrame = CFrame.new(h.origen + h.deriva * h.t)
+					p.Transparency = math.clamp(0.58 + (h.t / h.vida) * 0.4, 0, 0.96)
+				end
+			end
+			-- La luz tambien titila, como una fogata de verdad
+			glow.Brightness = 2.8 + math.random() * 1.6
 			if os.clock() &gt;= nextBurn then
 				nextBurn = os.clock() + cfg.burnEvery
 				for _, other in ipairs(session.players) do
@@ -7983,6 +8186,19 @@ local function fireZone(session, thrower, pos)
 			if f.part and f.part.Parent then
 				f.part:Destroy()
 			end
+		end
+		for _, b in ipairs(brasas) do
+			if b.part and b.part.Parent then
+				b.part:Destroy()
+			end
+		end
+		for _, h in ipairs(humos) do
+			if h.part and h.part.Parent then
+				h.part:Destroy()
+			end
+		end
+		if mancha and mancha.Parent then
+			mancha:Destroy()
 		end
 	end)
 end
@@ -9116,6 +9332,7 @@ function Session.new(modeId, rng, opts)
 	self.looted = {}       -- quien ya saco su arma del baul de equipo (asedio)
 	self.fort = nil        -- castillo del asedio (se destruye al terminar)
 	self.fortChests = nil
+	self.safeZoneFolder = nil -- zona segura del colosal (solo en su partida)
 
 	if modeId == "asedio" then
 		self.isMulti = false
@@ -9657,7 +9874,15 @@ function Session:asedioCarryDrop()
 	if self.kiwi then
 		self.kiwi:dropHold()
 	end
-	self:notifyAll(Config.Text.AsedioDropped, COLOR.warn, 5)
+	-- Si cayo dentro de la zona, la extraccion sigue corriendo ahi mismo
+	local zona = self.fort and self.fort.zone
+	local kpos = self.kiwi and self.kiwi:getPosition()
+	if zona and kpos and (kpos - zona.pos).Magnitude &lt;= (zona.radius or 9) then
+		carry.inZona = true
+		self:notifyAll(Config.Text.AsedioDroppedZone, COLOR.warn, 5)
+	else
+		self:notifyAll(Config.Text.AsedioDropped, COLOR.warn, 5)
+	end
 	self:sendUpdates(true)
 end
 
@@ -9701,10 +9926,29 @@ function Session:stepCarry(dt, now)
 		end
 	end
 
-	-- 2) Recogida: un Cazador que llega hasta el kiwi en el piso lo levanta
+	-- 2) Plantado: al entrar a la zona el portador deja al kiwi en el piso y
+	-- de ahi en mas la extraccion corre sola. Adentro de la zona queda
+	-- asegurado: ningun Cazador se lo puede volver a llevar.
+	if carry.by then
+		local kpos = kiwi:getPosition()
+		local zona = self.fort and self.fort.zone
+		if kpos and zona and (kpos - zona.pos).Magnitude &lt;= (zona.radius or 9) then
+			local nombre = carry.by.DisplayName ~= "" and carry.by.DisplayName or carry.by.Name
+			carry.by = nil
+			carry.inZona = true
+			kiwi:dropHold()
+			self:notifyAll(string.format(Config.Text.AsedioPlanted, nombre), Config.Asedio.colorAttack, 6)
+			self:sendUpdates(true)
+		end
+	end
+
+	-- 3) Recogida: un Cazador que llega hasta el kiwi en el piso lo levanta
+	-- (solo afuera de la zona: adentro queda asegurado)
 	if not carry.by then
 		local kpos = kiwi:getPosition()
-		if kpos then
+		local zona = self.fort and self.fort.zone
+		local enZona = kpos and zona and (kpos - zona.pos).Magnitude &lt;= (zona.radius or 9)
+		if kpos and not enZona then
 			for _, player in ipairs(self.players) do
 				if not self.knocked[player] and self:asedioSide(player) == "attack" then
 					local root = getRoot(player)
@@ -9725,7 +9969,7 @@ function Session:stepCarry(dt, now)
 		return
 	end
 
-	-- 3) Rescate: un Defensor que se acerca al kiwi lo libera
+	-- 4) Rescate: un Defensor que se acerca al kiwi lo libera
 	local rango = Config.Asedio.recoveryRange or 7
 	for _, player in ipairs(self.players) do
 		if not self.knocked[player] and self:asedioSide(player) == "defend" then
@@ -9737,7 +9981,7 @@ function Session:stepCarry(dt, now)
 		end
 	end
 
-	-- 4) Extraccion: los 2 minutos cuentan adentro de la zona marcada
+	-- 5) Extraccion: los 2 minutos cuentan adentro de la zona marcada
 	local zona = self.fort and self.fort.zone
 	if zona and (kpos - zona.pos).Magnitude &lt;= (zona.radius or 9) then
 		if not carry.inZona then
@@ -10179,6 +10423,20 @@ function Session:buildFort()
 	end
 end
 
+-- Zona segura del Colosal: se arma recien cuando arranca la partida (no
+-- queda marcada en los mapas de los demas modos) y se borra al terminar.
+function Session:buildSafeZone()
+	if not self.arena or self.arena.safeZone then
+		return
+	end
+	local ok, folder = pcall(WorldBuilder.buildSafeZone, self.arena)
+	if not ok or not folder then
+		warn("[Kiwi Cazador] no se pudo armar la zona segura del colosal: " .. tostring(folder))
+		return
+	end
+	self.safeZoneFolder = folder
+end
+
 function Session:spawnsFor(player)
 	-- Asedio: cada equipo aparece alrededor de la casa del kiwi
 	if self.isAsedio and self.arena and self.arena.nest then
@@ -10277,6 +10535,11 @@ function Session:startCountdown()
 	end
 	if self.isAsedio then
 		self:buildFort()
+	end
+	-- La zona segura del Colosal se arma recien aca: no tiene que quedar
+	-- marcada en los mapas de los demas modos
+	if self.isColosal then
+		self:buildSafeZone()
 	end
 	self.phase = "countdown"
 	self.phaseEnds = os.clock() + Config.Round.Countdown
@@ -10535,6 +10798,15 @@ function Session:finish()
 		end
 		self.fort = nil
 		self.fortChests = nil
+	end
+
+	-- La zona segura del Colosal se borra con la partida (solo vive ahi)
+	if self.safeZoneFolder then
+		self.safeZoneFolder:Destroy()
+		self.safeZoneFolder = nil
+	end
+	if self.arena and self.arena.safeZone then
+		self.arena.safeZone = nil
 	end
 
 	if Config.Round.HubReturn then
@@ -12084,39 +12356,126 @@ local function getFlameRig(key)
 	emitter.Name = "Llama"
 	emitter.Texture = "rbxasset://textures/particles/fire_main.dds"
 	emitter.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 240, 180)),
-		ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255, 150, 60)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(170, 40, 12)),
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 236, 170)),
+		ColorSequenceKeypoint.new(0.35, Color3.fromRGB(255, 156, 58)),
+		ColorSequenceKeypoint.new(0.75, Color3.fromRGB(232, 84, 22)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 26, 8)),
 	})
 	emitter.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.1),
-		NumberSequenceKeypoint.new(0.75, 0.5),
+		NumberSequenceKeypoint.new(0, 0.12),
+		NumberSequenceKeypoint.new(0.7, 0.55),
 		NumberSequenceKeypoint.new(1, 1),
 	})
 	emitter.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1.4),
-		NumberSequenceKeypoint.new(1, 4.6),
+		NumberSequenceKeypoint.new(0, 1.3),
+		NumberSequenceKeypoint.new(0.55, 3.2),
+		NumberSequenceKeypoint.new(1, 4.8),
 	})
-	emitter.Lifetime = NumberRange.new(0.4, 0.65)
-	emitter.Speed = NumberRange.new(20, 30)
-	emitter.SpreadAngle = Vector2.new(6, 6)
-	emitter.Acceleration = Vector3.new(0, 4.5, 0)
+	emitter.Lifetime = NumberRange.new(0.42, 0.68)
+	emitter.Speed = NumberRange.new(19, 30)
+	emitter.SpreadAngle = Vector2.new(5, 5)
+	emitter.Acceleration = Vector3.new(0, 5, 0)
+	emitter.Rotation = NumberRange.new(-180, 180)
+	emitter.RotSpeed = NumberRange.new(-70, 70)
 	emitter.LightEmission = 1
 	emitter.LightInfluence = 0
-	emitter.Rate = 70
+	emitter.Rate = 65
 	emitter.Enabled = false
 	emitter.Parent = part
+
+	-- Corazon blanco del chorro: nace pegado al pico y le da temperatura
+	local nucleo = Instance.new("ParticleEmitter")
+	nucleo.Name = "Nucleo"
+	nucleo.Texture = "rbxasset://textures/particles/fire_main.dds"
+	nucleo.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 252, 236)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 226, 150)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 172, 74)),
+	})
+	nucleo.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.2),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	nucleo.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.7),
+		NumberSequenceKeypoint.new(1, 1.9),
+	})
+	nucleo.Lifetime = NumberRange.new(0.16, 0.28)
+	nucleo.Speed = NumberRange.new(30, 42)
+	nucleo.SpreadAngle = Vector2.new(2, 2)
+	nucleo.LightEmission = 1
+	nucleo.LightInfluence = 0
+	nucleo.Rate = 70
+	nucleo.Enabled = false
+	nucleo.Parent = part
+
+	-- Chispas que se desprenden del chorro y caen al piso
+	local chispas = Instance.new("ParticleEmitter")
+	chispas.Name = "Chispas"
+	chispas.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	chispas.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 226, 150)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 138, 40)),
+	})
+	chispas.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.1),
+		NumberSequenceKeypoint.new(0.7, 0.4),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	chispas.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.34),
+		NumberSequenceKeypoint.new(1, 0.06),
+	})
+	chispas.Lifetime = NumberRange.new(0.5, 1.0)
+	chispas.Speed = NumberRange.new(12, 26)
+	chispas.SpreadAngle = Vector2.new(14, 14)
+	chispas.Acceleration = Vector3.new(0, -34, 0)
+	chispas.LightEmission = 1
+	chispas.LightInfluence = 0
+	chispas.Rate = 22
+	chispas.Enabled = false
+	chispas.Parent = part
+
+	-- Humo agrisado que se desprende del chorro (misma textura del fuego,
+	-- apagada: no hace falta ningun asset nuevo)
+	local humo = Instance.new("ParticleEmitter")
+	humo.Name = "Humo"
+	humo.Texture = "rbxasset://textures/particles/fire_main.dds"
+	humo.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(96, 90, 86)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(52, 48, 46)),
+	})
+	humo.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.82),
+		NumberSequenceKeypoint.new(0.6, 0.9),
+		NumberSequenceKeypoint.new(1, 0.98),
+	})
+	humo.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 2.2),
+		NumberSequenceKeypoint.new(1, 5.4),
+	})
+	humo.Lifetime = NumberRange.new(1.0, 1.7)
+	humo.Speed = NumberRange.new(5, 9)
+	humo.SpreadAngle = Vector2.new(9, 9)
+	humo.Acceleration = Vector3.new(0, 3.4, 0)
+	humo.Rotation = NumberRange.new(-180, 180)
+	humo.RotSpeed = NumberRange.new(-40, 40)
+	humo.LightEmission = 0
+	humo.LightInfluence = 1
+	humo.Rate = 13
+	humo.Enabled = false
+	humo.Parent = part
 
 	local light = Instance.new("PointLight")
 	light.Name = "LuzLlama"
 	light.Color = Color3.fromRGB(255, 150, 70)
-	light.Range = 18
-	light.Brightness = 1.8
+	light.Range = 20
+	light.Brightness = 2.1
 	light.Shadows = false
 	light.Enabled = false
 	light.Parent = part
 
-	rig = { part = part, emitter = emitter, light = light, until_ = 0 }
+	rig = { part = part, emitters = { emitter, nucleo, chispas, humo }, light = light, until_ = 0 }
 	flameRigs[key] = rig
 	return rig
 end
@@ -12125,9 +12484,14 @@ end
 local function flameAt(key, position, direction)
 	local rig = getFlameRig(key)
 	local look = direction.Magnitude &gt; 0.01 and direction.Unit or Vector3.new(0, 0, -1)
+	-- El chorro tiembla apenas al salir: nada de un cono rigido
+	look = CFrame.Angles(math.rad(math.random(-14, 14) / 8), math.rad(math.random(-12, 12) / 8), 0) * look
 	rig.part.CFrame = CFrame.lookAt(position, position + look)
-	rig.emitter.Enabled = true
+	for _, em in ipairs(rig.emitters) do
+		em.Enabled = true
+	end
 	rig.light.Enabled = true
+	rig.light.Brightness = 2.1 + math.random() * 1.3
 	rig.until_ = os.clock() + 0.4
 end
 
@@ -12155,8 +12519,8 @@ local function getFireSpot(key)
 	emitter.Name = "Llamas"
 	emitter.Texture = "rbxasset://textures/particles/fire_main.dds"
 	emitter.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 220, 150)),
-		ColorSequenceKeypoint.new(0.45, Color3.fromRGB(255, 120, 45)),
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 236, 170)),
+		ColorSequenceKeypoint.new(0.35, Color3.fromRGB(255, 140, 52)),
 		ColorSequenceKeypoint.new(1, Color3.fromRGB(130, 26, 8)),
 	})
 	emitter.Transparency = NumberSequence.new({
@@ -12165,28 +12529,85 @@ local function getFireSpot(key)
 	})
 	emitter.Size = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 0.9),
-		NumberSequenceKeypoint.new(1, 2.4),
+		NumberSequenceKeypoint.new(0.6, 1.7),
+		NumberSequenceKeypoint.new(1, 2.6),
 	})
-	emitter.Lifetime = NumberRange.new(0.45, 0.85)
+	emitter.Lifetime = NumberRange.new(0.45, 0.9)
 	emitter.Speed = NumberRange.new(3, 8)
-	emitter.SpreadAngle = Vector2.new(32, 32)
+	emitter.SpreadAngle = Vector2.new(30, 30)
 	emitter.Acceleration = Vector3.new(0, 9, 0)
+	emitter.Rotation = NumberRange.new(-180, 180)
+	emitter.RotSpeed = NumberRange.new(-90, 90)
 	emitter.Rate = 28
 	emitter.LightEmission = 1
 	emitter.LightInfluence = 0
 	emitter.Enabled = false
 	emitter.Parent = part
 
+	-- Brasitas que saltan de la llama prendida
+	local chispas = Instance.new("ParticleEmitter")
+	chispas.Name = "Chispas"
+	chispas.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	chispas.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 214, 130)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 120, 36)),
+	})
+	chispas.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.2),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	chispas.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.22),
+		NumberSequenceKeypoint.new(1, 0.05),
+	})
+	chispas.Lifetime = NumberRange.new(0.4, 0.9)
+	chispas.Speed = NumberRange.new(6, 14)
+	chispas.SpreadAngle = Vector2.new(26, 26)
+	chispas.Acceleration = Vector3.new(0, -26, 0)
+	chispas.LightEmission = 1
+	chispas.LightInfluence = 0
+	chispas.Rate = 14
+	chispas.Enabled = false
+	chispas.Parent = part
+
+	-- Humo corto subiendo de la llama
+	local humo = Instance.new("ParticleEmitter")
+	humo.Name = "Humo"
+	humo.Texture = "rbxasset://textures/particles/fire_main.dds"
+	humo.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(92, 86, 82)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 46, 44)),
+	})
+	humo.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.84),
+		NumberSequenceKeypoint.new(1, 0.98),
+	})
+	humo.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1.0),
+		NumberSequenceKeypoint.new(1, 2.6),
+	})
+	humo.Lifetime = NumberRange.new(0.7, 1.3)
+	humo.Speed = NumberRange.new(3, 6)
+	humo.SpreadAngle = Vector2.new(14, 14)
+	humo.Acceleration = Vector3.new(0, 2.6, 0)
+	humo.Rotation = NumberRange.new(-180, 180)
+	humo.RotSpeed = NumberRange.new(-40, 40)
+	humo.LightEmission = 0
+	humo.LightInfluence = 1
+	humo.Rate = 10
+	humo.Enabled = false
+	humo.Parent = part
+
 	local light = Instance.new("PointLight")
 	light.Name = "LuzFuego"
 	light.Color = Color3.fromRGB(255, 140, 60)
-	light.Range = 11
-	light.Brightness = 1.1
+	light.Range = 12
+	light.Brightness = 1.3
 	light.Shadows = false
 	light.Enabled = false
 	light.Parent = part
 
-	spot = { part = part, emitter = emitter, light = light, until_ = 0 }
+	spot = { part = part, emitters = { emitter, chispas, humo }, light = light, until_ = 0 }
 	fireSpots[key] = spot
 	return spot
 end
@@ -12197,7 +12618,9 @@ local function fireSpotAt(key, position, normal)
 	local up = normal and normal.Magnitude &gt; 0.01 and normal.Unit or Vector3.new(0, 1, 0)
 	local base = position + up * 0.25
 	spot.part.CFrame = CFrame.lookAt(base, base + up)
-	spot.emitter.Enabled = true
+	for _, em in ipairs(spot.emitters) do
+		em.Enabled = true
+	end
 	spot.light.Enabled = true
 	spot.until_ = os.clock() + 1.1
 end
@@ -12211,15 +12634,24 @@ flameSpotParams.IgnoreWater = true
 local function flameCleanup()
 	local now = os.clock()
 	for _, rig in pairs(flameRigs) do
-		if rig.emitter.Enabled and now &gt; rig.until_ then
-			rig.emitter.Enabled = false
+		if rig.emitters[1].Enabled and now &gt; rig.until_ then
+			for _, em in ipairs(rig.emitters) do
+				em.Enabled = false
+			end
 			rig.light.Enabled = false
+		elseif rig.light.Enabled then
+			-- Mientras el chorro sale, la luz titila como fuego de verdad
+			rig.light.Brightness = 1.7 + math.random() * 1.5
 		end
 	end
 	for _, spot in pairs(fireSpots) do
-		if spot.emitter.Enabled and now &gt; spot.until_ then
-			spot.emitter.Enabled = false
+		if spot.emitters[1].Enabled and now &gt; spot.until_ then
+			for _, em in ipairs(spot.emitters) do
+				em.Enabled = false
+			end
 			spot.light.Enabled = false
+		elseif spot.light.Enabled then
+			spot.light.Brightness = 0.9 + math.random() * 0.9
 		end
 	end
 end
@@ -15641,23 +16073,65 @@ local function buildArco()
 	return model
 end
 
--- Cuchillo mariposa estilo CS2: dos mangos de acero y la hoja que gira
--- sobre el pivote. El modelo se guarda ABIERTO; "closed" es el giro que
--- devuelve cada pieza a la pose plegada para las animaciones (apertura).
+-- Cuchillo mariposa realista (estilo CS2): hoja de acero con filo, contrafilo
+-- y punta, dos mangos esqueletizados con agujeros, pasador con tornillo a la
+-- vista y pestillo colgando. El modelo se guarda ABIERTO; "closed" es el giro
+-- que devuelve la hoja a la pose plegada para las animaciones de apertura.
+-- La hoja va plana contra la camara (plano X-Y, espesor en Z): se ve la
+-- silueta entera del arma, como la inspeccion de Counter.
 local function buildCuchillo()
 	local model = { pieces = {} }
-	local acero = Color3.fromRGB(206, 212, 222)
-	local aceroOscuro = Color3.fromRGB(150, 156, 168)
+	local acero = Color3.fromRGB(196, 204, 216)
+	local aceroClaro = Color3.fromRGB(230, 236, 246)
+	local filo = Color3.fromRGB(242, 246, 252)
+	local mango = Color3.fromRGB(52, 56, 64)
+	local placa = Color3.fromRGB(40, 43, 50)
+	local riel = Color3.fromRGB(29, 31, 37)
+	local agujero = Color3.fromRGB(10, 11, 13)
+	local pin = Color3.fromRGB(212, 218, 228)
 	local pivote = { pivot = Vector3.new(0, -0.28, -0.40), closed = CFrame.Angles(math.rad(-180), 0, 0) }
-	-- Mangos alineados (el de abajo esta en la mano)
-	piece(model, Vector3.new(0.16, 0.95, 0.30), CFrame.new(-0.09, -0.765, -0.40), aceroOscuro)
-	piece(model, Vector3.new(0.16, 0.95, 0.30), CFrame.new(0.09, -0.765, -0.40), aceroOscuro)
-	piece(model, Vector3.new(0.30, 0.10, 0.32), CFrame.new(0, -0.28, -0.40), acero)
-	-- Hoja (abre y cierra girando sobre el pivote)
-	piece(model, Vector3.new(0.10, 1.15, 0.28), CFrame.new(0, 0.295, -0.40), acero, nil, nil, pivote)
-	piece(model, Vector3.new(0.30, 0.30, 0.28), CFrame.new(0, 0.94, -0.40) * CFrame.Angles(0, 0, math.rad(45)), acero, nil, nil, pivote)
-	piece(model, Vector3.new(0.10, 1.05, 0.10), CFrame.new(0.068, 0.275, -0.40), Color3.fromRGB(255, 255, 255), Enum.Material.Neon, nil, pivote)
-	model.muzzle = Vector3.new(0, 1.12, -0.40)
+	local P = pivote
+
+	-- Hoja: tres tramos que se afinan hacia la punta + rombo del final
+	piece(model, Vector3.new(0.22, 0.46, 0.055), CFrame.new(0, 0.01, -0.40), acero, nil, nil, P)
+	piece(model, Vector3.new(0.20, 0.30, 0.055), CFrame.new(0, 0.37, -0.40), acero, nil, nil, P)
+	piece(model, Vector3.new(0.16, 0.22, 0.055), CFrame.new(0, 0.61, -0.40), acero, nil, nil, P)
+	piece(model, Vector3.new(0.13, 0.13, 0.055), CFrame.new(0, 0.77, -0.40) * CFrame.Angles(0, 0, math.rad(45)),
+		aceroClaro, nil, nil, P)
+	-- Contrafilo (bisel del lomo cerca de la punta) y filo: dos luces del acero
+	piece(model, Vector3.new(0.045, 0.34, 0.058), CFrame.new(0.055, 0.60, -0.40) * CFrame.Angles(0, 0, math.rad(7)),
+		aceroClaro, nil, nil, P)
+	piece(model, Vector3.new(0.028, 0.62, 0.058), CFrame.new(-0.093, 0.20, -0.40) * CFrame.Angles(0, 0, math.rad(2)),
+		filo, nil, nil, P)
+	-- Tranca de la base y muescas del lomo (agarre del pulgar)
+	piece(model, Vector3.new(0.14, 0.10, 0.058), CFrame.new(0, -0.245, -0.40), aceroClaro, nil, nil, P)
+	for i = 1, 3 do
+		piece(model, Vector3.new(0.05, 0.016, 0.06), CFrame.new(0.062, -0.02 - i * 0.045, -0.40), mango, nil, nil, P)
+	end
+	-- Pasador: el eje que cruza los mangos con su tornillo a la vista
+	piece(model, Vector3.new(0.16, 0.085, 0.085), CFrame.new(0, -0.28, -0.40) * CFrame.Angles(0, math.rad(90), 0),
+		pin, nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.025, 0.052, 0.052), CFrame.new(0, -0.28, -0.365) * CFrame.Angles(0, math.rad(90), 0),
+		aceroClaro, nil, Enum.PartType.Cylinder)
+
+	-- Mangos esqueletizados: placa oscura, riel externo, tope y los agujeros
+	for _, s in ipairs({ -1, 1 }) do
+		local x = s * 0.115
+		piece(model, Vector3.new(0.19, 1.02, 0.075), CFrame.new(x, -0.79, -0.40), mango)
+		piece(model, Vector3.new(0.15, 0.90, 0.02), CFrame.new(x, -0.79, -0.376), placa)
+		piece(model, Vector3.new(0.04, 1.02, 0.09), CFrame.new(x + s * 0.095, -0.79, -0.40), riel)
+		piece(model, Vector3.new(0.20, 0.055, 0.095), CFrame.new(x, -1.32, -0.40), riel)
+		for i = 1, 3 do
+			piece(model, Vector3.new(0.022, 0.105, 0.105),
+				CFrame.new(x, -0.50 - (i - 1) * 0.29, -0.368) * CFrame.Angles(0, math.rad(90), 0),
+				agujero, Enum.Material.SmoothPlastic, Enum.PartType.Cylinder)
+		end
+	end
+	-- Pestillo que cuelga del mango de la izquierda
+	piece(model, Vector3.new(0.05, 0.20, 0.038), CFrame.new(-0.16, -1.40, -0.40) * CFrame.Angles(0, 0, math.rad(4)),
+		aceroClaro)
+	piece(model, Vector3.new(0.065, 0.045, 0.045), CFrame.new(-0.162, -1.51, -0.40), acero)
+	model.muzzle = Vector3.new(0, 0.92, -0.40)
 	return model
 end
 

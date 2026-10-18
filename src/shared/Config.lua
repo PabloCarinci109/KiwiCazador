@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.9.5"
+Config.Version = "1.9.6"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -863,6 +863,8 @@ Config.Text = {
 	AsedioZoneIn = "¡El kiwi llegó a la zona! Aguanten %d segundos para sacarlo del mapa",
 	AsedioHoldWarn = "¡Quedan %d segundos de extracción!",
 	AsedioDropped = "¡Cayó el portador! El kiwi quedó en el piso: vuelvan a levantarlo",
+	AsedioDroppedZone = "¡Cayó el portador! El kiwi quedó en la zona: la extracción sigue corriendo",
+	AsedioPlanted = "¡%s dejó al kiwi en la zona de extracción! Aguanten los 2 minutos",
 	AsedioPickup = "%s volvió a levantar al kiwi",
 	AsedioRecovered = "¡Los %s rescataron al kiwi! Vuelve a su castillo y la extracción se corta",
 	AsedioWipe = "¡No quedó nadie en pie del equipo %s! La ronda es para %s",

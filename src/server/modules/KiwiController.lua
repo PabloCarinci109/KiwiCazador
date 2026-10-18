@@ -736,10 +736,15 @@ function KiwiController:holdAt(cf)
 	})
 end
 
--- Lo sueltan (cayo el portador): queda en el piso donde estaba
+-- Lo sueltan (cayo el portador): queda apoyado en el piso donde estaba
 function KiwiController:dropHold()
 	self.held = false
 	if self.pos then
+		-- Al soltarlo baja al piso (no queda flotando a la altura de brazos)
+		local groundY = self.lastGroundY or (self.arena and self.arena.floorY)
+		if groundY and self.rideHeight then
+			self.pos = Vector3.new(self.pos.X, groundY + self.rideHeight, self.pos.Z)
+		end
 		local cf = CFrame.lookAt(self.pos, self.pos + self.facing)
 		self.rig:update(cf, {
 			phase = 0,

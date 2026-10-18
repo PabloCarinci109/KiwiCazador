@@ -303,39 +303,126 @@ local function getFlameRig(key)
 	emitter.Name = "Llama"
 	emitter.Texture = "rbxasset://textures/particles/fire_main.dds"
 	emitter.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 240, 180)),
-		ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255, 150, 60)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(170, 40, 12)),
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 236, 170)),
+		ColorSequenceKeypoint.new(0.35, Color3.fromRGB(255, 156, 58)),
+		ColorSequenceKeypoint.new(0.75, Color3.fromRGB(232, 84, 22)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 26, 8)),
 	})
 	emitter.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.1),
-		NumberSequenceKeypoint.new(0.75, 0.5),
+		NumberSequenceKeypoint.new(0, 0.12),
+		NumberSequenceKeypoint.new(0.7, 0.55),
 		NumberSequenceKeypoint.new(1, 1),
 	})
 	emitter.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1.4),
-		NumberSequenceKeypoint.new(1, 4.6),
+		NumberSequenceKeypoint.new(0, 1.3),
+		NumberSequenceKeypoint.new(0.55, 3.2),
+		NumberSequenceKeypoint.new(1, 4.8),
 	})
-	emitter.Lifetime = NumberRange.new(0.4, 0.65)
-	emitter.Speed = NumberRange.new(20, 30)
-	emitter.SpreadAngle = Vector2.new(6, 6)
-	emitter.Acceleration = Vector3.new(0, 4.5, 0)
+	emitter.Lifetime = NumberRange.new(0.42, 0.68)
+	emitter.Speed = NumberRange.new(19, 30)
+	emitter.SpreadAngle = Vector2.new(5, 5)
+	emitter.Acceleration = Vector3.new(0, 5, 0)
+	emitter.Rotation = NumberRange.new(-180, 180)
+	emitter.RotSpeed = NumberRange.new(-70, 70)
 	emitter.LightEmission = 1
 	emitter.LightInfluence = 0
-	emitter.Rate = 70
+	emitter.Rate = 65
 	emitter.Enabled = false
 	emitter.Parent = part
+
+	-- Corazon blanco del chorro: nace pegado al pico y le da temperatura
+	local nucleo = Instance.new("ParticleEmitter")
+	nucleo.Name = "Nucleo"
+	nucleo.Texture = "rbxasset://textures/particles/fire_main.dds"
+	nucleo.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 252, 236)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 226, 150)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 172, 74)),
+	})
+	nucleo.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.2),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	nucleo.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.7),
+		NumberSequenceKeypoint.new(1, 1.9),
+	})
+	nucleo.Lifetime = NumberRange.new(0.16, 0.28)
+	nucleo.Speed = NumberRange.new(30, 42)
+	nucleo.SpreadAngle = Vector2.new(2, 2)
+	nucleo.LightEmission = 1
+	nucleo.LightInfluence = 0
+	nucleo.Rate = 70
+	nucleo.Enabled = false
+	nucleo.Parent = part
+
+	-- Chispas que se desprenden del chorro y caen al piso
+	local chispas = Instance.new("ParticleEmitter")
+	chispas.Name = "Chispas"
+	chispas.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	chispas.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 226, 150)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 138, 40)),
+	})
+	chispas.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.1),
+		NumberSequenceKeypoint.new(0.7, 0.4),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	chispas.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.34),
+		NumberSequenceKeypoint.new(1, 0.06),
+	})
+	chispas.Lifetime = NumberRange.new(0.5, 1.0)
+	chispas.Speed = NumberRange.new(12, 26)
+	chispas.SpreadAngle = Vector2.new(14, 14)
+	chispas.Acceleration = Vector3.new(0, -34, 0)
+	chispas.LightEmission = 1
+	chispas.LightInfluence = 0
+	chispas.Rate = 22
+	chispas.Enabled = false
+	chispas.Parent = part
+
+	-- Humo agrisado que se desprende del chorro (misma textura del fuego,
+	-- apagada: no hace falta ningun asset nuevo)
+	local humo = Instance.new("ParticleEmitter")
+	humo.Name = "Humo"
+	humo.Texture = "rbxasset://textures/particles/fire_main.dds"
+	humo.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(96, 90, 86)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(52, 48, 46)),
+	})
+	humo.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.82),
+		NumberSequenceKeypoint.new(0.6, 0.9),
+		NumberSequenceKeypoint.new(1, 0.98),
+	})
+	humo.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 2.2),
+		NumberSequenceKeypoint.new(1, 5.4),
+	})
+	humo.Lifetime = NumberRange.new(1.0, 1.7)
+	humo.Speed = NumberRange.new(5, 9)
+	humo.SpreadAngle = Vector2.new(9, 9)
+	humo.Acceleration = Vector3.new(0, 3.4, 0)
+	humo.Rotation = NumberRange.new(-180, 180)
+	humo.RotSpeed = NumberRange.new(-40, 40)
+	humo.LightEmission = 0
+	humo.LightInfluence = 1
+	humo.Rate = 13
+	humo.Enabled = false
+	humo.Parent = part
 
 	local light = Instance.new("PointLight")
 	light.Name = "LuzLlama"
 	light.Color = Color3.fromRGB(255, 150, 70)
-	light.Range = 18
-	light.Brightness = 1.8
+	light.Range = 20
+	light.Brightness = 2.1
 	light.Shadows = false
 	light.Enabled = false
 	light.Parent = part
 
-	rig = { part = part, emitter = emitter, light = light, until_ = 0 }
+	rig = { part = part, emitters = { emitter, nucleo, chispas, humo }, light = light, until_ = 0 }
 	flameRigs[key] = rig
 	return rig
 end
@@ -344,9 +431,14 @@ end
 local function flameAt(key, position, direction)
 	local rig = getFlameRig(key)
 	local look = direction.Magnitude > 0.01 and direction.Unit or Vector3.new(0, 0, -1)
+	-- El chorro tiembla apenas al salir: nada de un cono rigido
+	look = CFrame.Angles(math.rad(math.random(-14, 14) / 8), math.rad(math.random(-12, 12) / 8), 0) * look
 	rig.part.CFrame = CFrame.lookAt(position, position + look)
-	rig.emitter.Enabled = true
+	for _, em in ipairs(rig.emitters) do
+		em.Enabled = true
+	end
 	rig.light.Enabled = true
+	rig.light.Brightness = 2.1 + math.random() * 1.3
 	rig.until_ = os.clock() + 0.4
 end
 
@@ -374,8 +466,8 @@ local function getFireSpot(key)
 	emitter.Name = "Llamas"
 	emitter.Texture = "rbxasset://textures/particles/fire_main.dds"
 	emitter.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 220, 150)),
-		ColorSequenceKeypoint.new(0.45, Color3.fromRGB(255, 120, 45)),
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 236, 170)),
+		ColorSequenceKeypoint.new(0.35, Color3.fromRGB(255, 140, 52)),
 		ColorSequenceKeypoint.new(1, Color3.fromRGB(130, 26, 8)),
 	})
 	emitter.Transparency = NumberSequence.new({
@@ -384,28 +476,85 @@ local function getFireSpot(key)
 	})
 	emitter.Size = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 0.9),
-		NumberSequenceKeypoint.new(1, 2.4),
+		NumberSequenceKeypoint.new(0.6, 1.7),
+		NumberSequenceKeypoint.new(1, 2.6),
 	})
-	emitter.Lifetime = NumberRange.new(0.45, 0.85)
+	emitter.Lifetime = NumberRange.new(0.45, 0.9)
 	emitter.Speed = NumberRange.new(3, 8)
-	emitter.SpreadAngle = Vector2.new(32, 32)
+	emitter.SpreadAngle = Vector2.new(30, 30)
 	emitter.Acceleration = Vector3.new(0, 9, 0)
+	emitter.Rotation = NumberRange.new(-180, 180)
+	emitter.RotSpeed = NumberRange.new(-90, 90)
 	emitter.Rate = 28
 	emitter.LightEmission = 1
 	emitter.LightInfluence = 0
 	emitter.Enabled = false
 	emitter.Parent = part
 
+	-- Brasitas que saltan de la llama prendida
+	local chispas = Instance.new("ParticleEmitter")
+	chispas.Name = "Chispas"
+	chispas.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	chispas.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 214, 130)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 120, 36)),
+	})
+	chispas.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.2),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	chispas.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.22),
+		NumberSequenceKeypoint.new(1, 0.05),
+	})
+	chispas.Lifetime = NumberRange.new(0.4, 0.9)
+	chispas.Speed = NumberRange.new(6, 14)
+	chispas.SpreadAngle = Vector2.new(26, 26)
+	chispas.Acceleration = Vector3.new(0, -26, 0)
+	chispas.LightEmission = 1
+	chispas.LightInfluence = 0
+	chispas.Rate = 14
+	chispas.Enabled = false
+	chispas.Parent = part
+
+	-- Humo corto subiendo de la llama
+	local humo = Instance.new("ParticleEmitter")
+	humo.Name = "Humo"
+	humo.Texture = "rbxasset://textures/particles/fire_main.dds"
+	humo.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(92, 86, 82)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 46, 44)),
+	})
+	humo.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.84),
+		NumberSequenceKeypoint.new(1, 0.98),
+	})
+	humo.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1.0),
+		NumberSequenceKeypoint.new(1, 2.6),
+	})
+	humo.Lifetime = NumberRange.new(0.7, 1.3)
+	humo.Speed = NumberRange.new(3, 6)
+	humo.SpreadAngle = Vector2.new(14, 14)
+	humo.Acceleration = Vector3.new(0, 2.6, 0)
+	humo.Rotation = NumberRange.new(-180, 180)
+	humo.RotSpeed = NumberRange.new(-40, 40)
+	humo.LightEmission = 0
+	humo.LightInfluence = 1
+	humo.Rate = 10
+	humo.Enabled = false
+	humo.Parent = part
+
 	local light = Instance.new("PointLight")
 	light.Name = "LuzFuego"
 	light.Color = Color3.fromRGB(255, 140, 60)
-	light.Range = 11
-	light.Brightness = 1.1
+	light.Range = 12
+	light.Brightness = 1.3
 	light.Shadows = false
 	light.Enabled = false
 	light.Parent = part
 
-	spot = { part = part, emitter = emitter, light = light, until_ = 0 }
+	spot = { part = part, emitters = { emitter, chispas, humo }, light = light, until_ = 0 }
 	fireSpots[key] = spot
 	return spot
 end
@@ -416,7 +565,9 @@ local function fireSpotAt(key, position, normal)
 	local up = normal and normal.Magnitude > 0.01 and normal.Unit or Vector3.new(0, 1, 0)
 	local base = position + up * 0.25
 	spot.part.CFrame = CFrame.lookAt(base, base + up)
-	spot.emitter.Enabled = true
+	for _, em in ipairs(spot.emitters) do
+		em.Enabled = true
+	end
 	spot.light.Enabled = true
 	spot.until_ = os.clock() + 1.1
 end
@@ -430,15 +581,24 @@ flameSpotParams.IgnoreWater = true
 local function flameCleanup()
 	local now = os.clock()
 	for _, rig in pairs(flameRigs) do
-		if rig.emitter.Enabled and now > rig.until_ then
-			rig.emitter.Enabled = false
+		if rig.emitters[1].Enabled and now > rig.until_ then
+			for _, em in ipairs(rig.emitters) do
+				em.Enabled = false
+			end
 			rig.light.Enabled = false
+		elseif rig.light.Enabled then
+			-- Mientras el chorro sale, la luz titila como fuego de verdad
+			rig.light.Brightness = 1.7 + math.random() * 1.5
 		end
 	end
 	for _, spot in pairs(fireSpots) do
-		if spot.emitter.Enabled and now > spot.until_ then
-			spot.emitter.Enabled = false
+		if spot.emitters[1].Enabled and now > spot.until_ then
+			for _, em in ipairs(spot.emitters) do
+				em.Enabled = false
+			end
 			spot.light.Enabled = false
+		elseif spot.light.Enabled then
+			spot.light.Brightness = 0.9 + math.random() * 0.9
 		end
 	end
 end

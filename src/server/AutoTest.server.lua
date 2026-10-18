@@ -244,26 +244,50 @@ local function extrasSolo(sesion)
 				end
 			end
 			check(not quedo, "solo: la granada detono sola con la mecha")
+
+			-- Molotov: al romperse arma el fuego de verdad (llamas, brasas,
+			-- humo y mancha quemada) que despues se limpia solo
+			local okFuego = pcall(function()
+				Actions.throwNade(sesion, player, "molotov", Config.Grenades.molotov,
+					rootGranada.Position + Vector3.new(0, 2, 0), Vector3.new(0, 0.9, -1).Unit)
+			end)
+			check(okFuego, "solo: el molotov se lanza sin errores")
+			task.wait(2.5)
+			local cuenta = { Llama = 0, Brasa = 0, Humo = 0, Quemado = 0 }
+			for _, parte in ipairs(workspace:GetChildren()) do
+				if cuenta[parte.Name] then
+					cuenta[parte.Name] = cuenta[parte.Name] + 1
+				end
+			end
+			check(cuenta.Llama > 0 and cuenta.Brasa > 0,
+				"solo: el molotov prende fuego real",
+				string.format("llamas=%d brasas=%d humo=%d", cuenta.Llama, cuenta.Brasa, cuenta.Humo))
+			check(cuenta.Quemado > 0, "solo: el fuego deja mancha quemada")
 		end
 	end
 	local antes = sesion.stats[player].hp
 	sesion:damagePlayer(player, nil, "prueba", 15, nil, "prueba")
 	check(sesion.stats[player].hp < antes, "solo: el dano baja la vida")
+	check(sesion.arena and sesion.arena.safeZone == nil, "solo: sin zona segura de colosal en este mapa")
 end
 
 local function extrasColosal(sesion)
 	check(sesion.isColosal, "colosal: modo marcado")
 	check(sesion.arena and sesion.arena.safeZone ~= nil, "colosal: zona segura existe")
+	check(sesion.safeZoneFolder ~= nil and sesion.safeZoneFolder.Name == "ZonaSeguraColosal",
+		"colosal: la zona se arma solo para su partida")
 	check(sesion.kiwi ~= nil and sesion.kiwi.giant == true, "colosal: kiwi gigante")
 end
 
 local function extrasMulti(sesion)
 	check(sesion.isMulti, "multi: modo marcado")
 	check(#sesion.players >= 1, "multi: jugador dentro")
+	check(sesion.arena and sesion.arena.safeZone == nil, "multi: sin zona segura de colosal en el mapa")
 end
 
 local function extrasAsedio(sesion)
 	check(sesion.fort ~= nil, "asedio: castillo construido")
+	check(sesion.arena and sesion.arena.safeZone == nil, "asedio: sin zona segura de colosal en el castillo")
 	check(sesion.fort and sesion.fort.folder:FindFirstChild("Escalon") ~= nil, "asedio: escalera al techo")
 	check(sesion.fort and sesion.fort.folder:FindFirstChild("CulvertPiso") ~= nil, "asedio: subterraneo secreto")
 	check(Config.Asedio.roundTime == 300 and Config.Asedio.recoveryTime == 120, "asedio: reglas 5 min / 2 min de extraccion")
@@ -290,15 +314,28 @@ local function extrasAsedio(sesion)
 	check(sesion.fort ~= nil and sesion.fort.zone ~= nil and sesion.fort.zone.pos ~= nil, "asedio: zona de extraccion marcada")
 	local character = player.Character
 	if side == "attack" then
-		-- Llevarlo a la zona: ahi la cuenta de extraccion avanza
+		-- Llevarlo a la zona: al entrar el portador lo deja plantado ahi
+		-- y la cuenta de extraccion arranca sola
 		local okLleva = false
 		if character and sesion.fort.zone then
 			okLleva = pcall(function()
 				character:PivotTo(CFrame.new(sesion.fort.zone.pos + Vector3.new(0, 4, 0)))
 			end)
 		end
-		task.wait(1.5)
-		check(okLleva and sesion.carry ~= nil and (sesion.carry.hold or 0) > 0.5, "asedio: la extraccion avanza en la zona")
+		local plantado = okLleva and esperar(function()
+			return sesion.carry ~= nil and sesion.carry.by == nil
+		end, 6) ~= nil
+		check(plantado, "asedio: al entrar a la zona el kiwi queda plantado en el piso")
+		task.wait(1.2)
+		check(sesion.carry ~= nil and (sesion.carry.hold or 0) > 0.5, "asedio: la extraccion avanza en la zona")
+		-- Plantado en la zona, un Cazador ya no se lo puede volver a llevar
+		if character and sesion.kiwi then
+			pcall(function()
+				character:PivotTo(CFrame.new(sesion.kiwi:getPosition() + Vector3.new(0, 4, 0)))
+			end)
+		end
+		task.wait(0.6)
+		check(sesion.carry ~= nil and sesion.carry.by == nil, "asedio: en la zona no se levanta de nuevo")
 		local okRescate = pcall(function()
 			sesion:asedioRecover()
 		end)

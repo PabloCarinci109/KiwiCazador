@@ -171,23 +171,65 @@ local function buildArco()
 	return model
 end
 
--- Cuchillo mariposa estilo CS2: dos mangos de acero y la hoja que gira
--- sobre el pivote. El modelo se guarda ABIERTO; "closed" es el giro que
--- devuelve cada pieza a la pose plegada para las animaciones (apertura).
+-- Cuchillo mariposa realista (estilo CS2): hoja de acero con filo, contrafilo
+-- y punta, dos mangos esqueletizados con agujeros, pasador con tornillo a la
+-- vista y pestillo colgando. El modelo se guarda ABIERTO; "closed" es el giro
+-- que devuelve la hoja a la pose plegada para las animaciones de apertura.
+-- La hoja va plana contra la camara (plano X-Y, espesor en Z): se ve la
+-- silueta entera del arma, como la inspeccion de Counter.
 local function buildCuchillo()
 	local model = { pieces = {} }
-	local acero = Color3.fromRGB(206, 212, 222)
-	local aceroOscuro = Color3.fromRGB(150, 156, 168)
+	local acero = Color3.fromRGB(196, 204, 216)
+	local aceroClaro = Color3.fromRGB(230, 236, 246)
+	local filo = Color3.fromRGB(242, 246, 252)
+	local mango = Color3.fromRGB(52, 56, 64)
+	local placa = Color3.fromRGB(40, 43, 50)
+	local riel = Color3.fromRGB(29, 31, 37)
+	local agujero = Color3.fromRGB(10, 11, 13)
+	local pin = Color3.fromRGB(212, 218, 228)
 	local pivote = { pivot = Vector3.new(0, -0.28, -0.40), closed = CFrame.Angles(math.rad(-180), 0, 0) }
-	-- Mangos alineados (el de abajo esta en la mano)
-	piece(model, Vector3.new(0.16, 0.95, 0.30), CFrame.new(-0.09, -0.765, -0.40), aceroOscuro)
-	piece(model, Vector3.new(0.16, 0.95, 0.30), CFrame.new(0.09, -0.765, -0.40), aceroOscuro)
-	piece(model, Vector3.new(0.30, 0.10, 0.32), CFrame.new(0, -0.28, -0.40), acero)
-	-- Hoja (abre y cierra girando sobre el pivote)
-	piece(model, Vector3.new(0.10, 1.15, 0.28), CFrame.new(0, 0.295, -0.40), acero, nil, nil, pivote)
-	piece(model, Vector3.new(0.30, 0.30, 0.28), CFrame.new(0, 0.94, -0.40) * CFrame.Angles(0, 0, math.rad(45)), acero, nil, nil, pivote)
-	piece(model, Vector3.new(0.10, 1.05, 0.10), CFrame.new(0.068, 0.275, -0.40), Color3.fromRGB(255, 255, 255), Enum.Material.Neon, nil, pivote)
-	model.muzzle = Vector3.new(0, 1.12, -0.40)
+	local P = pivote
+
+	-- Hoja: tres tramos que se afinan hacia la punta + rombo del final
+	piece(model, Vector3.new(0.22, 0.46, 0.055), CFrame.new(0, 0.01, -0.40), acero, nil, nil, P)
+	piece(model, Vector3.new(0.20, 0.30, 0.055), CFrame.new(0, 0.37, -0.40), acero, nil, nil, P)
+	piece(model, Vector3.new(0.16, 0.22, 0.055), CFrame.new(0, 0.61, -0.40), acero, nil, nil, P)
+	piece(model, Vector3.new(0.13, 0.13, 0.055), CFrame.new(0, 0.77, -0.40) * CFrame.Angles(0, 0, math.rad(45)),
+		aceroClaro, nil, nil, P)
+	-- Contrafilo (bisel del lomo cerca de la punta) y filo: dos luces del acero
+	piece(model, Vector3.new(0.045, 0.34, 0.058), CFrame.new(0.055, 0.60, -0.40) * CFrame.Angles(0, 0, math.rad(7)),
+		aceroClaro, nil, nil, P)
+	piece(model, Vector3.new(0.028, 0.62, 0.058), CFrame.new(-0.093, 0.20, -0.40) * CFrame.Angles(0, 0, math.rad(2)),
+		filo, nil, nil, P)
+	-- Tranca de la base y muescas del lomo (agarre del pulgar)
+	piece(model, Vector3.new(0.14, 0.10, 0.058), CFrame.new(0, -0.245, -0.40), aceroClaro, nil, nil, P)
+	for i = 1, 3 do
+		piece(model, Vector3.new(0.05, 0.016, 0.06), CFrame.new(0.062, -0.02 - i * 0.045, -0.40), mango, nil, nil, P)
+	end
+	-- Pasador: el eje que cruza los mangos con su tornillo a la vista
+	piece(model, Vector3.new(0.16, 0.085, 0.085), CFrame.new(0, -0.28, -0.40) * CFrame.Angles(0, math.rad(90), 0),
+		pin, nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.025, 0.052, 0.052), CFrame.new(0, -0.28, -0.365) * CFrame.Angles(0, math.rad(90), 0),
+		aceroClaro, nil, Enum.PartType.Cylinder)
+
+	-- Mangos esqueletizados: placa oscura, riel externo, tope y los agujeros
+	for _, s in ipairs({ -1, 1 }) do
+		local x = s * 0.115
+		piece(model, Vector3.new(0.19, 1.02, 0.075), CFrame.new(x, -0.79, -0.40), mango)
+		piece(model, Vector3.new(0.15, 0.90, 0.02), CFrame.new(x, -0.79, -0.376), placa)
+		piece(model, Vector3.new(0.04, 1.02, 0.09), CFrame.new(x + s * 0.095, -0.79, -0.40), riel)
+		piece(model, Vector3.new(0.20, 0.055, 0.095), CFrame.new(x, -1.32, -0.40), riel)
+		for i = 1, 3 do
+			piece(model, Vector3.new(0.022, 0.105, 0.105),
+				CFrame.new(x, -0.50 - (i - 1) * 0.29, -0.368) * CFrame.Angles(0, math.rad(90), 0),
+				agujero, Enum.Material.SmoothPlastic, Enum.PartType.Cylinder)
+		end
+	end
+	-- Pestillo que cuelga del mango de la izquierda
+	piece(model, Vector3.new(0.05, 0.20, 0.038), CFrame.new(-0.16, -1.40, -0.40) * CFrame.Angles(0, 0, math.rad(4)),
+		aceroClaro)
+	piece(model, Vector3.new(0.065, 0.045, 0.045), CFrame.new(-0.162, -1.51, -0.40), acero)
+	model.muzzle = Vector3.new(0, 0.92, -0.40)
 	return model
 end
 

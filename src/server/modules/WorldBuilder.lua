@@ -2298,8 +2298,31 @@ local function buildArena(index, zone, cfg, parent, rng)
 	-- ("Alpes del Sur", etc.) plantado en la arena. Se saco de todos los
 	-- mapas: una vez que arranca el juego no tiene que verse mas.
 
-	-- Zona segura (meta del modo Colosal): el refugio circular del centro
-	local zoneRadius = (cfg.SafeZone and cfg.SafeZone.radius) or 15
+	-- La zona segura del modo Colosal ya no se arma aca: se construye solo
+	-- cuando arranca una partida Colosal (WorldBuilder.buildSafeZone) y se
+	-- borra al terminar, para que no quede marcada en los demas mapas.
+
+	return self
+end
+
+-- ===============================================================
+-- Zona segura del Colosal
+-- El refugio circular (la meta del modo donde el kiwi gigante te
+-- persigue). Se arma al arrancar cada partida Colosal y se destruye
+-- al terminar: en los demas mapas y modos no se ve nunca.
+-- ===============================================================
+function WorldBuilder.buildSafeZone(arena)
+	if not arena then
+		return nil
+	end
+
+	local center = arena.center
+	local radius = (Config.SafeZone and Config.SafeZone.radius) or 15
+
+	local folder = Instance.new("Folder")
+	folder.Name = "ZonaSeguraColosal"
+	folder.Parent = arena.folder
+
 	local function zonePart(name, shape, size, cf, color, transparency)
 		local piecePart = Instance.new("Part")
 		piecePart.Name = name
@@ -2318,7 +2341,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 	end
 
 	local zoneRing = zonePart("ZonaSegura", Enum.PartType.Cylinder,
-		Vector3.new(0.3, zoneRadius * 2, zoneRadius * 2),
+		Vector3.new(0.3, radius * 2, radius * 2),
 		CFrame.new(center + Vector3.new(0, 0.15, 0)) * CFrame.Angles(0, 0, math.rad(90)),
 		Color3.fromRGB(90, 110, 130), 0.4)
 
@@ -2361,17 +2384,18 @@ local function buildArena(index, zone, cfg, parent, rng)
 	zoneLabel.Text = "ZONA SEGURA (se activa mas tarde)"
 	zoneLabel.Parent = zoneGui
 
-	self.safeZone = {
+	arena.safeZone = {
 		center = center,
-		radius = zoneRadius,
+		radius = radius,
 		active = false,
 		ring = zoneRing,
 		beam = zoneBeam,
 		light = zoneLight,
 		label = zoneLabel,
+		folder = folder,
 	}
 
-	return self
+	return folder
 end
 
 -- ===============================================================

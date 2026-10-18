@@ -179,6 +179,7 @@ function Session.new(modeId, rng, opts)
 	self.looted = {}       -- quien ya saco su arma del baul de equipo (asedio)
 	self.fort = nil        -- castillo del asedio (se destruye al terminar)
 	self.fortChests = nil
+	self.safeZoneFolder = nil -- zona segura del colosal (solo en su partida)
 
 	if modeId == "asedio" then
 		self.isMulti = false
@@ -720,7 +721,15 @@ function Session:asedioCarryDrop()
 	if self.kiwi then
 		self.kiwi:dropHold()
 	end
-	self:notifyAll(Config.Text.AsedioDropped, COLOR.warn, 5)
+	-- Si cayo dentro de la zona, la extraccion sigue corriendo ahi mismo
+	local zona = self.fort and self.fort.zone
+	local kpos = self.kiwi and self.kiwi:getPosition()
+	if zona and kpos and (kpos - zona.pos).Magnitude <= (zona.radius or 9) then
+		carry.inZona = true
+		self:notifyAll(Config.Text.AsedioDroppedZone, COLOR.warn, 5)
+	else
+		self:notifyAll(Config.Text.AsedioDropped, COLOR.warn, 5)
+	end
 	self:sendUpdates(true)
 end
 
@@ -764,10 +773,29 @@ function Session:stepCarry(dt, now)
 		end
 	end
 
-	-- 2) Recogida: un Cazador que llega hasta el kiwi en el piso lo levanta
+	-- 2) Plantado: al entrar a la zona el portador deja al kiwi en el piso y
+	-- de ahi en mas la extraccion corre sola. Adentro de la zona queda
+	-- asegurado: ningun Cazador se lo puede volver a llevar.
+	if carry.by then
+		local kpos = kiwi:getPosition()
+		local zona = self.fort and self.fort.zone
+		if kpos and zona and (kpos - zona.pos).Magnitude <= (zona.radius or 9) then
+			local nombre = carry.by.DisplayName ~= "" and carry.by.DisplayName or carry.by.Name
+			carry.by = nil
+			carry.inZona = true
+			kiwi:dropHold()
+			self:notifyAll(string.format(Config.Text.AsedioPlanted, nombre), Config.Asedio.colorAttack, 6)
+			self:sendUpdates(true)
+		end
+	end
+
+	-- 3) Recogida: un Cazador que llega hasta el kiwi en el piso lo levanta
+	-- (solo afuera de la zona: adentro queda asegurado)
 	if not carry.by then
 		local kpos = kiwi:getPosition()
-		if kpos then
+		local zona = self.fort and self.fort.zone
+		local enZona = kpos and zona and (kpos - zona.pos).Magnitude <= (zona.radius or 9)
+		if kpos and not enZona then
 			for _, player in ipairs(self.players) do
 				if not self.knocked[player] and self:asedioSide(player) == "attack" then
 					local root = getRoot(player)
@@ -788,7 +816,7 @@ function Session:stepCarry(dt, now)
 		return
 	end
 
-	-- 3) Rescate: un Defensor que se acerca al kiwi lo libera
+	-- 4) Rescate: un Defensor que se acerca al kiwi lo libera
 	local rango = Config.Asedio.recoveryRange or 7
 	for _, player in ipairs(self.players) do
 		if not self.knocked[player] and self:asedioSide(player) == "defend" then
@@ -800,7 +828,7 @@ function Session:stepCarry(dt, now)
 		end
 	end
 
-	-- 4) Extraccion: los 2 minutos cuentan adentro de la zona marcada
+	-- 5) Extraccion: los 2 minutos cuentan adentro de la zona marcada
 	local zona = self.fort and self.fort.zone
 	if zona and (kpos - zona.pos).Magnitude <= (zona.radius or 9) then
 		if not carry.inZona then
@@ -1242,6 +1270,20 @@ function Session:buildFort()
 	end
 end
 
+-- Zona segura del Colosal: se arma recien cuando arranca la partida (no
+-- queda marcada en los mapas de los demas modos) y se borra al terminar.
+function Session:buildSafeZone()
+	if not self.arena or self.arena.safeZone then
+		return
+	end
+	local ok, folder = pcall(WorldBuilder.buildSafeZone, self.arena)
+	if not ok or not folder then
+		warn("[Kiwi Cazador] no se pudo armar la zona segura del colosal: " .. tostring(folder))
+		return
+	end
+	self.safeZoneFolder = folder
+end
+
 function Session:spawnsFor(player)
 	-- Asedio: cada equipo aparece alrededor de la casa del kiwi
 	if self.isAsedio and self.arena and self.arena.nest then
@@ -1340,6 +1382,11 @@ function Session:startCountdown()
 	end
 	if self.isAsedio then
 		self:buildFort()
+	end
+	-- La zona segura del Colosal se arma recien aca: no tiene que quedar
+	-- marcada en los mapas de los demas modos
+	if self.isColosal then
+		self:buildSafeZone()
 	end
 	self.phase = "countdown"
 	self.phaseEnds = os.clock() + Config.Round.Countdown
@@ -1598,6 +1645,15 @@ function Session:finish()
 		end
 		self.fort = nil
 		self.fortChests = nil
+	end
+
+	-- La zona segura del Colosal se borra con la partida (solo vive ahi)
+	if self.safeZoneFolder then
+		self.safeZoneFolder:Destroy()
+		self.safeZoneFolder = nil
+	end
+	if self.arena and self.arena.safeZone then
+		self.arena.safeZone = nil
 	end
 
 	if Config.Round.HubReturn then
