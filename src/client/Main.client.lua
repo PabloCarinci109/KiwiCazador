@@ -603,7 +603,7 @@ end
 -- Armas que apuntan (y que por lo tanto muestran la vista de arma)
 local SCOPE_WEAPONS = {
 	rifle = true, pintura = true, relente = true, revolver = true,
-	arco = true, sniper = true, cuchillo = true, lanzallamas = true, cohete = true,
+	arco = true, sniper = true, lanzallamas = true, cohete = true,
 	ak = true, m4 = true, mp5 = true, glock = true, escopeta = true,
 }
 
@@ -774,9 +774,9 @@ local function fireTool(toolId)
 
 	-- Patada del arma (estilo Counter)
 	local RECOIL = {
-		rifle = 0.45, pintura = 0.45, relente = 0.45, sniper = 1.1,
-		revolver = 0.7, cohete = 1.0, arco = 0.5, cuchillo = 0.35, lanzallamas = 0.15,
-		ak = 0.8, m4 = 0.7, mp5 = 0.5, glock = 0.5, escopeta = 0.95,
+		rifle = 0.25, pintura = 0.25, relente = 0.25, sniper = 0.6,
+		revolver = 0.38, cohete = 0.55, arco = 0.28, cuchillo = 0.35, lanzallamas = 0.08,
+		ak = 0.44, m4 = 0.38, mp5 = 0.28, glock = 0.28, escopeta = 0.52,
 	}
 	if toolId == "cuchillo" then
 		-- Cuchillo mariposa: pega un zarpazo (sin fogonazo ni patada de arma)
@@ -786,11 +786,12 @@ local function fireTool(toolId)
 		ViewModel.flash()
 	end
 
-	-- Patada de camara estilo Counter Blox: 2 * (1 - control) grados
+	-- Patada de camara estilo Counter Blox: 0.9 * (1 - control) grados
+	-- (mas suave que la de Counter original: sube y vuelve sola)
 	local shootCfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[toolId]
 	local control = shootCfg and shootCfg.recoil or 72
-	local kick = math.rad(2 * (1 - control / 100))
-	ViewModel.kickCamera(kick * (1 + math.random() * 0.5), kick * (math.random() * 4 - 2))
+	local kick = math.rad(0.9 * (1 - control / 100))
+	ViewModel.kickCamera(kick * (1 + math.random() * 0.4), kick * (math.random() * 2 - 1))
 
 	-- El chorro de fuego no abre la cruz como un balazo
 	shotBloom = math.min(20, shotBloom + (toolId == "lanzallamas" and 2 or 8))
@@ -1143,6 +1144,78 @@ remotes.TrackerPing.OnClientEvent:Connect(function(data)
 	sound2D(Config.Sounds.ui, 0.5, 1.4)
 end)
 
+-- Ceguera de pintura: manchones que tapan toda la pantalla (golpe en la
+-- cabeza con el rifle de pintura). Se arma 100% por codigo y se desvanece.
+local paintBlindGui
+local function paintBlind(duration, color)
+	local plrGui = player:FindFirstChildOfClass("PlayerGui") or player:WaitForChild("PlayerGui")
+	if not paintBlindGui or not paintBlindGui.Parent then
+		paintBlindGui = Instance.new("ScreenGui")
+		paintBlindGui.Name = "KiwiPinturaCeguera"
+		paintBlindGui.IgnoreGuiInset = true
+		paintBlindGui.DisplayOrder = 60
+		paintBlindGui.ResetOnSpawn = false
+		paintBlindGui.Parent = plrGui
+	end
+	for _, child in ipairs(paintBlindGui:GetChildren()) do
+		child:Destroy()
+	end
+	duration = math.max(duration or 4, 0.5)
+	local base = color or Color3.fromRGB(230, 120, 190)
+	local blobs = {}
+
+	-- Fondo oscuro + dos manchones enormes al centro (no se ve la mira)
+	local fondo = Instance.new("Frame")
+	fondo.Size = UDim2.fromScale(1, 1)
+	fondo.BackgroundColor3 = Color3.fromRGB(20, 10, 24)
+	fondo.BackgroundTransparency = 0.3
+	fondo.BorderSizePixel = 0
+	fondo.ZIndex = 1
+	fondo.Parent = paintBlindGui
+	table.insert(blobs, fondo)
+
+	for i = 1, 30 do
+		local blob = Instance.new("Frame")
+		blob.AnchorPoint = Vector2.new(0.5, 0.5)
+		blob.Position = UDim2.fromScale(math.random(-8, 88) / 100, math.random(-8, 88) / 100)
+		local size = math.random(170, 520)
+		if i <= 2 then
+			size = math.random(620, 900)
+			blob.Position = UDim2.fromScale(0.5, 0.5)
+		end
+		blob.Size = UDim2.fromOffset(size, size * (0.72 + math.random() * 0.6))
+		blob.Rotation = math.random(0, 359)
+		blob.BackgroundColor3 = base:Lerp(
+			math.random() < 0.5 and Color3.fromRGB(18, 8, 20) or Color3.fromRGB(255, 250, 255),
+			math.random() * 0.45)
+		blob.BackgroundTransparency = 0.05 + math.random() * 0.2
+		blob.BorderSizePixel = 0
+		blob.ZIndex = 2 + i
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0.5, 0)
+		corner.Parent = blob
+		blob.Parent = paintBlindGui
+		table.insert(blobs, blob)
+	end
+
+	-- Al final se escurre: se desvanece y se limpia
+	task.delay(math.max(duration - 1.4, 0.1), function()
+		for _, b in ipairs(blobs) do
+			if b.Parent then
+				TweenService:Create(b, TweenInfo.new(1.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+					{ BackgroundTransparency = 1 }):Play()
+			end
+		end
+	end)
+	task.delay(duration + 0.4, function()
+		for _, b in ipairs(blobs) do
+			if b.Parent then
+				b:Destroy()
+			end
+		end
+	end)
+end
+
 remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 	data = data or {}
 	local position = data.pos
@@ -1238,6 +1311,9 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 			soundAt(Config.Sounds.paintHit, position, 0.8)
 			burst(position, Util.colorFromTable(data.color) or Color3.fromRGB(230, 120, 190), 26)
 		end
+	elseif kind == "paintblind" then
+		-- Manchazo en la cara: no se ve nada unos segundos
+		paintBlind(data.dur or 4, Util.colorFromTable(data.color))
 	elseif kind == "slowhit" then
 		if position then
 			soundAt(Config.Sounds.dartHit, position, 0.9, 1.15)

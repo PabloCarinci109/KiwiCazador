@@ -13,6 +13,7 @@
 local Shared = require(script.Parent.Shared)
 local Config = require(Shared.Config)
 local Util = require(Shared.Util)
+local Destruction = require(script.Parent.Destruction)
 
 local WorldBuilder = {}
 
@@ -940,10 +941,11 @@ local function buildArena(index, zone, cfg, parent, rng)
 		return addSpot("torre", "Bajo la torre", platform, pos, 8, 0.45)
 	end
 
-	-- Arbol decorativo (no es escondite, es obstaculo)
+	-- Arbol decorativo (no es escondite, es obstaculo).
+	-- El lanzamisiles lo tira abajo (Destruction registra tronco y copas).
 	local function makeTree(pos)
 		local height = rng:NextNumber(22, 36)
-		part({
+		local partes = { part({
 			Name = "Tronco",
 			Size = Vector3.new(2.8, height, 2.8),
 			Position = pos + Vector3.new(0, height * 0.5, 0),
@@ -951,10 +953,10 @@ local function buildArena(index, zone, cfg, parent, rng)
 			Material = Enum.Material.Wood,
 			CanCollide = true,
 			Parent = props,
-		})
+		}) }
 		for leaf = 1, 2 do
 			local leafSize = rng:NextNumber(14, 20) - leaf * 2
-			part({
+			table.insert(partes, part({
 				Name = "Copa",
 				Shape = Enum.PartType.Ball,
 				Size = Vector3.new(leafSize, leafSize * 0.72, leafSize),
@@ -962,8 +964,9 @@ local function buildArena(index, zone, cfg, parent, rng)
 				Color = Color3.fromRGB(58 + leaf * 6, 104 + leaf * 6, 60),
 				Material = Enum.Material.LeafyGrass,
 				Parent = props,
-			})
+			}))
 		end
+		Destruction.registrarLista("arbol", partes)
 	end
 
 	-- Medano de arena (Dunas): limita la vista y da volumen
@@ -1495,6 +1498,21 @@ local function buildArena(index, zone, cfg, parent, rng)
 		makeChestProp(base * CFrame.new(W * 0.5 - 2.2, upY, D * 0.5 - 2.2), "Baúl del piso")
 
 		addIndoor(base, Vector3.new(W - 2, totalH, D - 2))
+
+		-- Rompible: un cohete puede volar la casa (se recompone sola).
+		-- No se marcan los baules (tienen cartel para abrirlos y deben quedar fijos).
+		for _, p in ipairs(props:GetChildren()) do
+			if p:IsA("BasePart") and not p:FindFirstChildOfClass("ProximityPrompt") then
+				local n = p.Name
+				if n ~= "Baul" and n ~= "AdornoBaul" and n ~= "TapaBaul" and n ~= "BrilloBaul" then
+					local lp = base:PointToObjectSpace(p.Position)
+					if math.abs(lp.X) <= W * 0.5 + 4 and math.abs(lp.Z) <= D * 0.5 + 4
+						and lp.Y >= -3 and lp.Y <= totalH + 9 then
+						Destruction.marcar(p, "casa")
+					end
+				end
+			end
+		end
 	end
 
 	local function makeBarn(pos, angle)
@@ -1571,6 +1589,20 @@ local function buildArena(index, zone, cfg, parent, rng)
 		addSpot("granero", "Granero", floorPart, (base * CFrame.new(-W * 0.3, 0, -D * 0.32)).Position, 3.0, 0.9)
 		addSpot("granero", "Granero", floorPart, (base * CFrame.new(W * 0.3, 0, 0)).Position, 3.0, 0.9)
 		addIndoor(base, Vector3.new(W - 2, wallH, D - 2))
+
+		-- Rompible: el granero tambien se vuela con el lanzamisiles
+		for _, p in ipairs(props:GetChildren()) do
+			if p:IsA("BasePart") and not p:FindFirstChildOfClass("ProximityPrompt") then
+				local n = p.Name
+				if n ~= "Baul" and n ~= "AdornoBaul" and n ~= "TapaBaul" and n ~= "BrilloBaul" then
+					local lp = base:PointToObjectSpace(p.Position)
+					if math.abs(lp.X) <= W * 0.5 + 4 and math.abs(lp.Z) <= D * 0.5 + 4
+						and lp.Y >= -3 and lp.Y <= wallH + 10 then
+						Destruction.marcar(p, "casa")
+					end
+				end
+			end
+		end
 	end
 
 	-- ===============================================================
@@ -1911,6 +1943,8 @@ local function buildArena(index, zone, cfg, parent, rng)
 		local function addVehicle(veh)
 			table.insert(self.traffic, veh)
 			parkVehicle(veh)
+			-- El lanzamisiles puede destrozarlo (y el trafico lo saltea)
+			Destruction.registrarModelo(veh.model, "vehiculo")
 		end
 
 		for i, color in ipairs({ CAR_COLORS[1], CAR_COLORS[2], CAR_COLORS[3] }) do

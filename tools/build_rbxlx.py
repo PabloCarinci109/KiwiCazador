@@ -95,7 +95,8 @@ def construir():
         agregar_fuente(servidor, "Script", "AutoTest", SRC / "server" / "AutoTest.server.lua")
     modulos_srv, _ = item(servidor, "Folder", "modules")
     for nombre in ("Shared", "WorldBuilder", "KiwiModel", "KiwiController",
-                   "ToolService", "Actions", "Weather", "GameManager"):
+                   "ToolService", "Actions", "Weather", "GameManager",
+                   "Destruction"):
         agregar_fuente(modulos_srv, "ModuleScript", nombre, SRC / "server" / "modules" / (nombre + ".lua"))
 
     # StarterPlayer.StarterPlayerScripts.KiwiClient

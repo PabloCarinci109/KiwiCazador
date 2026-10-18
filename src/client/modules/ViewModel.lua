@@ -42,6 +42,15 @@ local HIP = CFrame.new(0.5, -1.25, -2.7) * CFrame.Angles(math.rad(1.5), math.rad
 -- Apuntando: el arma se corre al centro pero bien abajo, para que el
 -- puntito de mira quede despejado (estilo Counter Blox)
 local ADS = CFrame.new(0.05, -1.0, -2.35)
+-- Poses de mira por arma: al apuntar ninguna tapa el puntito central.
+-- El arco y el lanzamisiles son grandotes: se corren bien a la derecha.
+local ADS_POSES = {
+	arco = CFrame.new(0.58, -1.0, -2.05) * CFrame.Angles(0, math.rad(-10), math.rad(2)),
+	cohete = CFrame.new(1.0, -1.4, -2.8) * CFrame.Angles(0, math.rad(-8), math.rad(2)),
+	escopeta = CFrame.new(0.16, -1.02, -2.3),
+	revolver = CFrame.new(0.12, -0.95, -2.2),
+	lanzallamas = CFrame.new(0.4, -1.1, -2.45) * CFrame.Angles(0, math.rad(-6), 0),
+}
 
 -- ===============================================================
 -- Construccion de las armas (cajas simples, estilo Counter)
@@ -123,9 +132,14 @@ local function buildArco()
 	piece(model, Vector3.new(0.22, 2.0, 0.22), CFrame.new(0, -0.9, -0.6) * CFrame.Angles(0, 0, math.rad(24)), Color3.fromRGB(112, 84, 54), Enum.Material.Wood)
 	piece(model, Vector3.new(0.16, 0.16, 0.16), CFrame.new(-0.42, 0, -0.6), Color3.fromRGB(150, 196, 118), Enum.Material.Neon)
 	piece(model, Vector3.new(0.08, 3.4, 0.08), CFrame.new(-0.42, 0, -0.6), Color3.fromRGB(232, 236, 240), Enum.Material.SmoothPlastic)
+-- Flecha lista en la cuerda: se ve al apuntar y "sale" al disparar
+	piece(model, Vector3.new(0.07, 0.07, 2.7), CFrame.new(-0.16, 0.02, -1.32), Color3.fromRGB(206, 178, 126), Enum.Material.Wood)
+	piece(model, Vector3.new(0.12, 0.12, 0.26), CFrame.new(-0.16, 0.02, -2.72), Color3.fromRGB(206, 212, 222), Enum.Material.Metal)
+	piece(model, Vector3.new(0.3, 0.03, 0.36), CFrame.new(-0.16, 0.02, -0.36), Color3.fromRGB(196, 74, 68), Enum.Material.Fabric)
+	piece(model, Vector3.new(0.03, 0.3, 0.36), CFrame.new(-0.16, 0.02, -0.36), Color3.fromRGB(196, 74, 68), Enum.Material.Fabric)
 	-- Mano/puño
 	piece(model, Vector3.new(0.4, 0.5, 0.5), CFrame.new(0, 0, -0.6), Color3.fromRGB(120, 90, 58), Enum.Material.Fabric)
-	model.muzzle = Vector3.new(-0.42, 0, -0.9)
+	model.muzzle = Vector3.new(-0.16, 0.02, -2.9)
 	return model
 end
 
@@ -354,8 +368,8 @@ function ViewModel.setHidden(value)
 end
 
 function ViewModel.recoil(amount)
-	recoil = math.min(1.6, recoil + (amount or 0.5))
-	recoilRoll = (math.random() * 2 - 1) * 0.18 * (amount or 0.5)
+	recoil = math.min(1.2, recoil + (amount or 0.5))
+	recoilRoll = (math.random() * 2 - 1) * 0.13 * (amount or 0.5)
 end
 
 -- Patada de camara estilo Counter Blox: sube de golpe y vuelve sola
@@ -390,7 +404,7 @@ function ViewModel.getMuzzle()
 	if not camera or not current then
 		return nil
 	end
-	local base = camera.CFrame * HIP:Lerp(ADS, ads)
+	local base = camera.CFrame * HIP:Lerp(ADS_POSES[currentId] or ADS, ads)
 	local world = base * (current.muzzle or Vector3.new(0, 0, -2))
 	return world, camera.CFrame.LookVector
 end
@@ -405,7 +419,7 @@ local function stepUnbound(dt)
 	end
 
 	ads = ads + (adsGoal - ads) * math.min(dt * 11, 1)
-	recoil = recoil * math.max(0, 1 - dt * 9)
+	recoil = recoil * math.max(0, 1 - dt * 10)
 	flashTimer = math.max(0, flashTimer - dt)
 
 	local show = visible and current and not hiddenByScope
@@ -429,7 +443,7 @@ local function stepUnbound(dt)
 		local kicked = camCF * CFrame.Angles(camKick.X, camKick.Y, 0)
 		camera.CFrame = kicked
 		camCF = kicked
-		camKick = camKick * math.max(0, 1 - dt * 9)
+		camKick = camKick * math.max(0, 1 - dt * 10.5)
 	end
 
 	if not (current and show) then
@@ -469,9 +483,9 @@ local function stepUnbound(dt)
 	local bobX = math.cos(bobPhase) * 0.05 * bobAmt
 	local bobY = math.abs(math.sin(bobPhase)) * 0.045 * bobAmt
 
-	local base = camCF * HIP:Lerp(ADS, ads)
-		* CFrame.new(bobX + sway.X * 2.6, bobY + sway.Y * 2.2, recoil * 0.5)
-	local final = base * CFrame.Angles(-sway.Y * 2.4 - recoil * 0.2, -sway.X * 2.4, recoilRoll * recoil * 2)
+	local base = camCF * HIP:Lerp(ADS_POSES[currentId] or ADS, ads)
+		* CFrame.new(bobX + sway.X * 2.6, bobY + sway.Y * 2.2, recoil * 0.4)
+	local final = base * CFrame.Angles(-sway.Y * 2.4 - recoil * 0.14, -sway.X * 2.4, recoilRoll * recoil * 1.3)
 
 	-- Animacion del cuchillo mariposa: apertura al equipar, giro (F) y zarpazo
 	local animCF = nil

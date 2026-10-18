@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.9.1"
+Config.Version = "1.9.2"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -179,13 +179,13 @@ Config.Scope = {
 --   con la mira puesta el error se divide (el francotirador es perfecto)
 --   si el error queda por debajo del minimo, el disparo sale perfecto
 -- La patada de camara tambien es la de Counter:
---   grados = 2 * (1 - recoil/100), sube y vuelve sola.
+--   grados = 0.9 * (1 - recoil/100), sube y vuelve sola (mas suave).
 Config.Shoot = {
 	div = 6,            -- divisor del error (mas alto = mas preciso)
 	dead = 1.3,         -- por debajo de esto, disparo perfecto
 	adsDiv = 0.35,      -- con la mira el error se reduce a un tercio
 	crouchDiv = 1.6,    -- agachado (sigilo) el arma se afirma
-	recoilReturn = 9,   -- que tan rapido vuelve la camara de la patada
+	recoilReturn = 10,  -- que tan rapido vuelve la camara de la patada
 	sniperRange = 700,  -- alcance del rayo del francotirador
 	weapons = {
 		rifle = { vel = 0.40, spread = 0.3, dead = 1.2, recoil = 84 },
@@ -230,6 +230,7 @@ Config.PaintRifle = {
 	slowFactor = 0.45,
 	markTime = 15,     -- segundos que queda marcado un jugador (se ve entre paredes)
 	kiwiMarkTime = 12, -- segundos que queda marcado el kiwi si lo pintan
+	blindTime = 4,     -- tiro en la cabeza: le tapa la vista esos segundos
 }
 
 -- Rifle ralentizador (aparece solo en Kiwi Colosal): no lo duerme, lo frena
@@ -323,7 +324,7 @@ Config.Weapons = {
 		knockback = 24,
 		slowFactor = 0.35,
 		slowTime = 3.2,
-		size = Vector3.new(0.22, 0.22, 2.0),
+		size = Vector3.new(0.24, 0.24, 2.6), -- flecha larga: se ve bien al volar
 		stick = true,       -- la flecha queda clavada y se puede recoger (+1 uso)
 		pickupRange = 12,   -- distancia para recoger una flecha clavada
 		pickupLife = 60,    -- segundos que la flecha queda en el piso
@@ -755,6 +756,7 @@ Config.Text = {
 	TrapEaten = "El kiwi se comió la fruta y se fue...",
 	PaintHit = "¡Diste a %s! Queda marcado un rato (se ve entre las paredes).",
 	PaintVictim = "¡%s te manchó de pintura! Estás marcado y más lento.",
+	PaintBlind = "¡Pintura en los ojos! No ves nada por unos segundos.",
 	PaintKiwiMark = "¡Pintaste al kiwi! Queda marcado un rato.",
 	GiantFound = "%s fue descubierto por el kiwi gigante.",
 	GiantSafe = "El kiwi gigante se aburrió de buscar. ¡Sobreviviste!",

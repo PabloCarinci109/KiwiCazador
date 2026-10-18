@@ -655,6 +655,10 @@ local function vehiclePose(veh, s)
 end
 
 local function placeVehicle(veh)
+	-- Vehiculo destrozado por un cohete: no se mueve hasta repararse
+	if veh.model and veh.model:GetAttribute("KiwiRoto") then
+		return
+	end
 	local s = veh.dist
 	if veh.dir < 0 then
 		s = veh.total - s
@@ -707,7 +711,8 @@ function Session:stepTraffic(dt)
 	end
 
 	for _, veh in ipairs(arena.traffic) do
-		if not veh.waitUntil or now >= veh.waitUntil then
+		local roto = veh.model and veh.model:GetAttribute("KiwiRoto")
+		if not roto and (not veh.waitUntil or now >= veh.waitUntil) then
 			veh.dist = veh.dist + veh.speed * dt
 			if veh.dist >= veh.total then
 				if veh.shuttle then
@@ -727,7 +732,8 @@ function Session:stepTraffic(dt)
 		for _, player in ipairs(self.players) do
 			local data = self.stats[player]
 			local root = getRoot(player)
-			if data and root and not self.knocked[player] then
+			if data and root and not self.knocked[player]
+				and not (veh.model and veh.model:GetAttribute("KiwiRoto")) then
 				if now - (veh.lastHit[player] or 0) >= Config.City.hitCooldown then
 					local localPos = veh.pose:PointToObjectSpace(root.Position)
 					if math.abs(localPos.X) <= veh.halfW + 2.2

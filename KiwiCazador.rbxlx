@@ -43,7 +43,7 @@
 
 local Config = {}
 
-Config.Version = "1.9.1"
+Config.Version = "1.9.2"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -212,13 +212,13 @@ Config.Scope = {
 --   con la mira puesta el error se divide (el francotirador es perfecto)
 --   si el error queda por debajo del minimo, el disparo sale perfecto
 -- La patada de camara tambien es la de Counter:
---   grados = 2 * (1 - recoil/100), sube y vuelve sola.
+--   grados = 0.9 * (1 - recoil/100), sube y vuelve sola (mas suave).
 Config.Shoot = {
 	div = 6,            -- divisor del error (mas alto = mas preciso)
 	dead = 1.3,         -- por debajo de esto, disparo perfecto
 	adsDiv = 0.35,      -- con la mira el error se reduce a un tercio
 	crouchDiv = 1.6,    -- agachado (sigilo) el arma se afirma
-	recoilReturn = 9,   -- que tan rapido vuelve la camara de la patada
+	recoilReturn = 10,  -- que tan rapido vuelve la camara de la patada
 	sniperRange = 700,  -- alcance del rayo del francotirador
 	weapons = {
 		rifle = { vel = 0.40, spread = 0.3, dead = 1.2, recoil = 84 },
@@ -263,6 +263,7 @@ Config.PaintRifle = {
 	slowFactor = 0.45,
 	markTime = 15,     -- segundos que queda marcado un jugador (se ve entre paredes)
 	kiwiMarkTime = 12, -- segundos que queda marcado el kiwi si lo pintan
+	blindTime = 4,     -- tiro en la cabeza: le tapa la vista esos segundos
 }
 
 -- Rifle ralentizador (aparece solo en Kiwi Colosal): no lo duerme, lo frena
@@ -356,7 +357,7 @@ Config.Weapons = {
 		knockback = 24,
 		slowFactor = 0.35,
 		slowTime = 3.2,
-		size = Vector3.new(0.22, 0.22, 2.0),
+		size = Vector3.new(0.24, 0.24, 2.6), -- flecha larga: se ve bien al volar
 		stick = true,       -- la flecha queda clavada y se puede recoger (+1 uso)
 		pickupRange = 12,   -- distancia para recoger una flecha clavada
 		pickupLife = 60,    -- segundos que la flecha queda en el piso
@@ -788,6 +789,7 @@ Config.Text = {
 	TrapEaten = "El kiwi se comió la fruta y se fue...",
 	PaintHit = "¡Diste a %s! Queda marcado un rato (se ve entre las paredes).",
 	PaintVictim = "¡%s te manchó de pintura! Estás marcado y más lento.",
+	PaintBlind = "¡Pintura en los ojos! No ves nada por unos segundos.",
 	PaintKiwiMark = "¡Pintaste al kiwi! Queda marcado un rato.",
 	GiantFound = "%s fue descubierto por el kiwi gigante.",
 	GiantSafe = "El kiwi gigante se aburrió de buscar. ¡Sobreviviste!",
@@ -1189,6 +1191,7 @@ return folder
 local Shared = require(script.Parent.Shared)
 local Config = require(Shared.Config)
 local Util = require(Shared.Util)
+local Destruction = require(script.Parent.Destruction)
 
 local WorldBuilder = {}
 
@@ -2116,10 +2119,11 @@ local function buildArena(index, zone, cfg, parent, rng)
 		return addSpot("torre", "Bajo la torre", platform, pos, 8, 0.45)
 	end
 
-	-- Arbol decorativo (no es escondite, es obstaculo)
+	-- Arbol decorativo (no es escondite, es obstaculo).
+	-- El lanzamisiles lo tira abajo (Destruction registra tronco y copas).
 	local function makeTree(pos)
 		local height = rng:NextNumber(22, 36)
-		part({
+		local partes = { part({
 			Name = "Tronco",
 			Size = Vector3.new(2.8, height, 2.8),
 			Position = pos + Vector3.new(0, height * 0.5, 0),
@@ -2127,10 +2131,10 @@ local function buildArena(index, zone, cfg, parent, rng)
 			Material = Enum.Material.Wood,
 			CanCollide = true,
 			Parent = props,
-		})
+		}) }
 		for leaf = 1, 2 do
 			local leafSize = rng:NextNumber(14, 20) - leaf * 2
-			part({
+			table.insert(partes, part({
 				Name = "Copa",
 				Shape = Enum.PartType.Ball,
 				Size = Vector3.new(leafSize, leafSize * 0.72, leafSize),
@@ -2138,8 +2142,9 @@ local function buildArena(index, zone, cfg, parent, rng)
 				Color = Color3.fromRGB(58 + leaf * 6, 104 + leaf * 6, 60),
 				Material = Enum.Material.LeafyGrass,
 				Parent = props,
-			})
+			}))
 		end
+		Destruction.registrarLista("arbol", partes)
 	end
 
 	-- Medano de arena (Dunas): limita la vista y da volumen
@@ -2671,6 +2676,21 @@ local function buildArena(index, zone, cfg, parent, rng)
 		makeChestProp(base * CFrame.new(W * 0.5 - 2.2, upY, D * 0.5 - 2.2), "Baúl del piso")
 
 		addIndoor(base, Vector3.new(W - 2, totalH, D - 2))
+
+		-- Rompible: un cohete puede volar la casa (se recompone sola).
+		-- No se marcan los baules (tienen cartel para abrirlos y deben quedar fijos).
+		for _, p in ipairs(props:GetChildren()) do
+			if p:IsA("BasePart") and not p:FindFirstChildOfClass("ProximityPrompt") then
+				local n = p.Name
+				if n ~= "Baul" and n ~= "AdornoBaul" and n ~= "TapaBaul" and n ~= "BrilloBaul" then
+					local lp = base:PointToObjectSpace(p.Position)
+					if math.abs(lp.X) &lt;= W * 0.5 + 4 and math.abs(lp.Z) &lt;= D * 0.5 + 4
+						and lp.Y &gt;= -3 and lp.Y &lt;= totalH + 9 then
+						Destruction.marcar(p, "casa")
+					end
+				end
+			end
+		end
 	end
 
 	local function makeBarn(pos, angle)
@@ -2747,6 +2767,20 @@ local function buildArena(index, zone, cfg, parent, rng)
 		addSpot("granero", "Granero", floorPart, (base * CFrame.new(-W * 0.3, 0, -D * 0.32)).Position, 3.0, 0.9)
 		addSpot("granero", "Granero", floorPart, (base * CFrame.new(W * 0.3, 0, 0)).Position, 3.0, 0.9)
 		addIndoor(base, Vector3.new(W - 2, wallH, D - 2))
+
+		-- Rompible: el granero tambien se vuela con el lanzamisiles
+		for _, p in ipairs(props:GetChildren()) do
+			if p:IsA("BasePart") and not p:FindFirstChildOfClass("ProximityPrompt") then
+				local n = p.Name
+				if n ~= "Baul" and n ~= "AdornoBaul" and n ~= "TapaBaul" and n ~= "BrilloBaul" then
+					local lp = base:PointToObjectSpace(p.Position)
+					if math.abs(lp.X) &lt;= W * 0.5 + 4 and math.abs(lp.Z) &lt;= D * 0.5 + 4
+						and lp.Y &gt;= -3 and lp.Y &lt;= wallH + 10 then
+						Destruction.marcar(p, "casa")
+					end
+				end
+			end
+		end
 	end
 
 	-- ===============================================================
@@ -3087,6 +3121,8 @@ local function buildArena(index, zone, cfg, parent, rng)
 		local function addVehicle(veh)
 			table.insert(self.traffic, veh)
 			parkVehicle(veh)
+			-- El lanzamisiles puede destrozarlo (y el trafico lo saltea)
+			Destruction.registrarModelo(veh.model, "vehiculo")
 		end
 
 		for i, color in ipairs({ CAR_COLORS[1], CAR_COLORS[2], CAR_COLORS[3] }) do
@@ -6261,6 +6297,26 @@ function ToolService.give(player, only)
 		end
 	end
 
+	-- Blindaje: el cuchillo mariposa va de fabrica SIEMPRE (en todos los
+	-- modos y para todos los personajes), aunque la lista del modo lo olvide.
+	local tieneCuchillo = false
+	for _, item in ipairs(backpack:GetChildren()) do
+		if item:IsA("Tool") and item:GetAttribute("ToolId") == "cuchillo" then
+			tieneCuchillo = true
+			break
+		end
+	end
+	if not tieneCuchillo then
+		for _, template in ipairs(folder:GetChildren()) do
+			if template:GetAttribute("ToolId") == "cuchillo" then
+				local clone = template:Clone()
+				wireTool(clone)
+				clone.Parent = backpack
+				break
+			end
+		end
+	end
+
 	ToolService.cooldowns[player] = {}
 end
 
@@ -6474,6 +6530,7 @@ local Net = require(Shared.Net)
 local Util = require(Shared.Util)
 
 local ToolService = require(script.Parent.ToolService)
+local Destruction = require(script.Parent.Destruction)
 
 local Actions = {}
 
@@ -7303,6 +7360,11 @@ function Actions.weaponHit(session, dart, pos, victim, hitPart)
 		end
 	end
 
+	-- El lanzamisiles destroza el mapa: casas, autos, trenes y arboles
+	if dart.weaponId == "cohete" then
+		Destruction.explosivo(pos, (cfg.blast or 12) + 10, (cfg.knockback or 60) * 0.72)
+	end
+
 	session:event("boom", { pos = pos, weapon = dart.weaponId })
 	local shooterName = dart.player.DisplayName ~= "" and dart.player.DisplayName or dart.player.Name
 	if (cfg.blast or 0) &gt;= 10 then
@@ -7531,6 +7593,14 @@ function Actions.resolvePaint(session, shot, hit, victim)
 	if victim and victim ~= shot.player and session.stats[victim] then
 		Actions.paintPlayer(session, victim, shot.player, hit.Position, shot.color)
 		session:event("painthit", { pos = hit.Position, color = Util.colorToTable(shot.color) })
+		-- Manchazo en la cabeza: le tapa la vista unos segundos (ceguera)
+		if hit.Instance and hit.Instance.Name == "Head" then
+			Net.get("WorldEvent"):FireClient(victim, "paintblind", {
+				dur = Config.PaintRifle.blindTime or 4,
+				color = Util.colorToTable(shot.color),
+			})
+			session:notify(victim, Config.Text.PaintBlind, shot.color, 4)
+		end
 		-- En Asedio la pintura tambien lastima un poco (el fuego amigo sigue bloqueado)
 		if session.isAsedio then
 			session:damagePlayer(victim, shot.player, "pintura", Config.Asedio.paintDamage or 11, hit.Position)
@@ -8746,6 +8816,10 @@ local function vehiclePose(veh, s)
 end
 
 local function placeVehicle(veh)
+	-- Vehiculo destrozado por un cohete: no se mueve hasta repararse
+	if veh.model and veh.model:GetAttribute("KiwiRoto") then
+		return
+	end
 	local s = veh.dist
 	if veh.dir &lt; 0 then
 		s = veh.total - s
@@ -8798,7 +8872,8 @@ function Session:stepTraffic(dt)
 	end
 
 	for _, veh in ipairs(arena.traffic) do
-		if not veh.waitUntil or now &gt;= veh.waitUntil then
+		local roto = veh.model and veh.model:GetAttribute("KiwiRoto")
+		if not roto and (not veh.waitUntil or now &gt;= veh.waitUntil) then
 			veh.dist = veh.dist + veh.speed * dt
 			if veh.dist &gt;= veh.total then
 				if veh.shuttle then
@@ -8818,7 +8893,8 @@ function Session:stepTraffic(dt)
 		for _, player in ipairs(self.players) do
 			local data = self.stats[player]
 			local root = getRoot(player)
-			if data and root and not self.knocked[player] then
+			if data and root and not self.knocked[player]
+				and not (veh.model and veh.model:GetAttribute("KiwiRoto")) then
 				if now - (veh.lastHit[player] or 0) &gt;= Config.City.hitCooldown then
 					local localPos = veh.pose:PointToObjectSpace(root.Position)
 					if math.abs(localPos.X) &lt;= veh.halfW + 2.2
@@ -10418,24 +10494,175 @@ return GameManager
 </ProtectedString>
 					</Properties>
 				</Item>
+				<Item class="ModuleScript" referent="RBX020">
+					<Properties>
+						<string name="Name">Destruction</string>
+						<ProtectedString name="Source">--[[
+	Destruction.lua  (servidor)
+	Objetos rompibles del mapa: casas, graneros, autos, colectivo, tren
+	y arboles. El lanzamisiles es lo unico que los destroza: al impacto,
+	las partes marcadas dentro del radio se sueltan (Anchored = false) y
+	salen despedidas. A los ~32 segundos el mapa se recompone solo, asi
+	la partida sigue jugable ronda tras ronda.
+
+	WorldBuilder marca las partes al construir
+	(Destruction.marcar / registrarLista / registrarModelo) y Actions
+	dispara Destruction.explosivo cuando estalla un cohete.
+--]]
+
+local Destruction = {}
+
+local REPARACION = 32    -- segundos hasta que las partes vuelven a su lugar
+local MAX_PARTES = 260   -- tope de partes sueltas por explosion (fisica sana)
+
+local grupos = {}        -- { {tipo, partes = {{p, cf, anc}}, model, roto, suma, n} }
+
+local function grupoNuevo(tipo, model)
+	local g = {
+		tipo = tipo, model = model, partes = {}, roto = false,
+		suma = Vector3.new(0, 0, 0), n = 0,
+	}
+	table.insert(grupos, g)
+	return g
+end
+
+local function sumarParte(g, p)
+	if not p or not p:IsA("BasePart") then
+		return
+	end
+	g.n = g.n + 1
+	g.suma = g.suma + p.Position
+	table.insert(g.partes, { p = p, cf = p.CFrame, anc = p.Anchored })
+end
+
+-- Una parte suelta (casas: se marca cada pared, piso, mueble, etc.)
+function Destruction.marcar(p, tipo)
+	local g = grupoNuevo(tipo or "casa")
+	sumarParte(g, p)
+end
+
+-- Varias partes que vuelan juntas (arboles: tronco + copas)
+function Destruction.registrarLista(tipo, lista)
+	local g = grupoNuevo(tipo)
+	for _, p in ipairs(lista) do
+		sumarParte(g, p)
+	end
+end
+
+-- Un modelo entero (autos, colectivo, tren)
+function Destruction.registrarModelo(model, tipo)
+	local g = grupoNuevo(tipo, model)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			sumarParte(g, d)
+		end
+	end
+end
+
+-- Cuantas partes rompibles hay en el mapa (lo usa el AutoTest)
+function Destruction.count()
+	local total = 0
+	for _, g in ipairs(grupos) do
+		total = total + #g.partes
+	end
+	return total
+end
+
+function Destruction.limpiar()
+	grupos = {}
+end
+
+local function romper(g, pos, potencia, radio)
+	g.roto = true
+	local vehiculo = g.tipo == "vehiculo" and g.model
+	if vehiculo and vehiculo.Parent then
+		vehiculo:SetAttribute("KiwiRoto", true)
+	end
+	for _, e in ipairs(g.partes) do
+		local p = e.p
+		if p.Parent then
+			p.Anchored = false
+			local away = p.Position - pos
+			if away.Magnitude &lt; 0.8 then
+				away = Vector3.new(0, 1, 0)
+			end
+			local fuerza = math.clamp(1 - (away.Magnitude / (radio + 6)), 0.35, 1)
+			p.AssemblyLinearVelocity = away.Unit * potencia * fuerza
+				+ Vector3.new(0, potencia * 0.32 * fuerza, 0)
+			p.AssemblyAngularVelocity = Vector3.new(
+				(math.random() - 0.5) * 12,
+				(math.random() - 0.5) * 12,
+				(math.random() - 0.5) * 12)
+		end
+	end
+
+	-- Se recompone solo: el mapa no queda roto para siempre
+	task.delay(REPARACION, function()
+		for _, e in ipairs(g.partes) do
+			local p = e.p
+			if p.Parent then
+				p.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+				p.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+				p.CFrame = e.cf
+				p.Anchored = e.anc
+			end
+		end
+		if vehiculo and vehiculo.Parent then
+			vehiculo:SetAttribute("KiwiRoto", false)
+		end
+		g.roto = false
+	end)
+end
+
+-- Estallido del lanzamisiles: rompe lo marcado dentro del radio
+function Destruction.explosivo(pos, radio, potencia)
+	radio = radio or 24
+	potencia = math.clamp(potencia or 60, 20, 90)
+	local candidatos = {}
+	for _, g in ipairs(grupos) do
+		if not g.roto and g.n &gt; 0 then
+			local centro = g.suma / g.n
+			local d = (centro - pos).Magnitude
+			if d &lt;= radio then
+				table.insert(candidatos, { g = g, d = d })
+			end
+		end
+	end
+	table.sort(candidatos, function(a, b)
+		return a.d &lt; b.d
+	end)
+	local partes = 0
+	for _, c in ipairs(candidatos) do
+		if partes + #c.g.partes &gt; MAX_PARTES then
+			break
+		end
+		partes = partes + #c.g.partes
+		romper(c.g, pos, potencia, radio)
+	end
+end
+
+return Destruction
+</ProtectedString>
+					</Properties>
+				</Item>
 			</Item>
 		</Item>
 	</Item>
-	<Item class="StarterPlayer" referent="RBX020">
+	<Item class="StarterPlayer" referent="RBX021">
 		<Properties>
 			<string name="Name">StarterPlayer</string>
 			<float name="CharacterWalkSpeed">16</float>
 			<bool name="EnableMouseLockOption">true</bool>
 		</Properties>
-		<Item class="StarterPlayerScripts" referent="RBX021">
+		<Item class="StarterPlayerScripts" referent="RBX022">
 			<Properties>
 				<string name="Name">StarterPlayerScripts</string>
 			</Properties>
-			<Item class="Folder" referent="RBX022">
+			<Item class="Folder" referent="RBX023">
 				<Properties>
 					<string name="Name">KiwiClient</string>
 				</Properties>
-				<Item class="LocalScript" referent="RBX023">
+				<Item class="LocalScript" referent="RBX024">
 					<Properties>
 						<string name="Name">Main</string>
 						<ProtectedString name="Source">--[[
@@ -11043,7 +11270,7 @@ end
 -- Armas que apuntan (y que por lo tanto muestran la vista de arma)
 local SCOPE_WEAPONS = {
 	rifle = true, pintura = true, relente = true, revolver = true,
-	arco = true, sniper = true, cuchillo = true, lanzallamas = true, cohete = true,
+	arco = true, sniper = true, lanzallamas = true, cohete = true,
 	ak = true, m4 = true, mp5 = true, glock = true, escopeta = true,
 }
 
@@ -11214,9 +11441,9 @@ local function fireTool(toolId)
 
 	-- Patada del arma (estilo Counter)
 	local RECOIL = {
-		rifle = 0.45, pintura = 0.45, relente = 0.45, sniper = 1.1,
-		revolver = 0.7, cohete = 1.0, arco = 0.5, cuchillo = 0.35, lanzallamas = 0.15,
-		ak = 0.8, m4 = 0.7, mp5 = 0.5, glock = 0.5, escopeta = 0.95,
+		rifle = 0.25, pintura = 0.25, relente = 0.25, sniper = 0.6,
+		revolver = 0.38, cohete = 0.55, arco = 0.28, cuchillo = 0.35, lanzallamas = 0.08,
+		ak = 0.44, m4 = 0.38, mp5 = 0.28, glock = 0.28, escopeta = 0.52,
 	}
 	if toolId == "cuchillo" then
 		-- Cuchillo mariposa: pega un zarpazo (sin fogonazo ni patada de arma)
@@ -11226,11 +11453,12 @@ local function fireTool(toolId)
 		ViewModel.flash()
 	end
 
-	-- Patada de camara estilo Counter Blox: 2 * (1 - control) grados
+	-- Patada de camara estilo Counter Blox: 0.9 * (1 - control) grados
+	-- (mas suave que la de Counter original: sube y vuelve sola)
 	local shootCfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[toolId]
 	local control = shootCfg and shootCfg.recoil or 72
-	local kick = math.rad(2 * (1 - control / 100))
-	ViewModel.kickCamera(kick * (1 + math.random() * 0.5), kick * (math.random() * 4 - 2))
+	local kick = math.rad(0.9 * (1 - control / 100))
+	ViewModel.kickCamera(kick * (1 + math.random() * 0.4), kick * (math.random() * 2 - 1))
 
 	-- El chorro de fuego no abre la cruz como un balazo
 	shotBloom = math.min(20, shotBloom + (toolId == "lanzallamas" and 2 or 8))
@@ -11583,6 +11811,78 @@ remotes.TrackerPing.OnClientEvent:Connect(function(data)
 	sound2D(Config.Sounds.ui, 0.5, 1.4)
 end)
 
+-- Ceguera de pintura: manchones que tapan toda la pantalla (golpe en la
+-- cabeza con el rifle de pintura). Se arma 100% por codigo y se desvanece.
+local paintBlindGui
+local function paintBlind(duration, color)
+	local plrGui = player:FindFirstChildOfClass("PlayerGui") or player:WaitForChild("PlayerGui")
+	if not paintBlindGui or not paintBlindGui.Parent then
+		paintBlindGui = Instance.new("ScreenGui")
+		paintBlindGui.Name = "KiwiPinturaCeguera"
+		paintBlindGui.IgnoreGuiInset = true
+		paintBlindGui.DisplayOrder = 60
+		paintBlindGui.ResetOnSpawn = false
+		paintBlindGui.Parent = plrGui
+	end
+	for _, child in ipairs(paintBlindGui:GetChildren()) do
+		child:Destroy()
+	end
+	duration = math.max(duration or 4, 0.5)
+	local base = color or Color3.fromRGB(230, 120, 190)
+	local blobs = {}
+
+	-- Fondo oscuro + dos manchones enormes al centro (no se ve la mira)
+	local fondo = Instance.new("Frame")
+	fondo.Size = UDim2.fromScale(1, 1)
+	fondo.BackgroundColor3 = Color3.fromRGB(20, 10, 24)
+	fondo.BackgroundTransparency = 0.3
+	fondo.BorderSizePixel = 0
+	fondo.ZIndex = 1
+	fondo.Parent = paintBlindGui
+	table.insert(blobs, fondo)
+
+	for i = 1, 30 do
+		local blob = Instance.new("Frame")
+		blob.AnchorPoint = Vector2.new(0.5, 0.5)
+		blob.Position = UDim2.fromScale(math.random(-8, 88) / 100, math.random(-8, 88) / 100)
+		local size = math.random(170, 520)
+		if i &lt;= 2 then
+			size = math.random(620, 900)
+			blob.Position = UDim2.fromScale(0.5, 0.5)
+		end
+		blob.Size = UDim2.fromOffset(size, size * (0.72 + math.random() * 0.6))
+		blob.Rotation = math.random(0, 359)
+		blob.BackgroundColor3 = base:Lerp(
+			math.random() &lt; 0.5 and Color3.fromRGB(18, 8, 20) or Color3.fromRGB(255, 250, 255),
+			math.random() * 0.45)
+		blob.BackgroundTransparency = 0.05 + math.random() * 0.2
+		blob.BorderSizePixel = 0
+		blob.ZIndex = 2 + i
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0.5, 0)
+		corner.Parent = blob
+		blob.Parent = paintBlindGui
+		table.insert(blobs, blob)
+	end
+
+	-- Al final se escurre: se desvanece y se limpia
+	task.delay(math.max(duration - 1.4, 0.1), function()
+		for _, b in ipairs(blobs) do
+			if b.Parent then
+				TweenService:Create(b, TweenInfo.new(1.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+					{ BackgroundTransparency = 1 }):Play()
+			end
+		end
+	end)
+	task.delay(duration + 0.4, function()
+		for _, b in ipairs(blobs) do
+			if b.Parent then
+				b:Destroy()
+			end
+		end
+	end)
+end
+
 remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 	data = data or {}
 	local position = data.pos
@@ -11678,6 +11978,9 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 			soundAt(Config.Sounds.paintHit, position, 0.8)
 			burst(position, Util.colorFromTable(data.color) or Color3.fromRGB(230, 120, 190), 26)
 		end
+	elseif kind == "paintblind" then
+		-- Manchazo en la cara: no se ve nada unos segundos
+		paintBlind(data.dur or 4, Util.colorFromTable(data.color))
 	elseif kind == "slowhit" then
 		if position then
 			soundAt(Config.Sounds.dartHit, position, 0.9, 1.15)
@@ -11966,11 +12269,11 @@ remotes.RequestState:FireServer()
 </ProtectedString>
 					</Properties>
 				</Item>
-				<Item class="Folder" referent="RBX024">
+				<Item class="Folder" referent="RBX025">
 					<Properties>
 						<string name="Name">modules</string>
 					</Properties>
-					<Item class="ModuleScript" referent="RBX025">
+					<Item class="ModuleScript" referent="RBX026">
 						<Properties>
 							<string name="Name">HUD</string>
 							<ProtectedString name="Source">--[[
@@ -13937,7 +14240,7 @@ return HUD
 </ProtectedString>
 						</Properties>
 					</Item>
-					<Item class="ModuleScript" referent="RBX026">
+					<Item class="ModuleScript" referent="RBX027">
 						<Properties>
 							<string name="Name">ViewModel</string>
 							<ProtectedString name="Source">--[[
@@ -13984,6 +14287,15 @@ local HIP = CFrame.new(0.5, -1.25, -2.7) * CFrame.Angles(math.rad(1.5), math.rad
 -- Apuntando: el arma se corre al centro pero bien abajo, para que el
 -- puntito de mira quede despejado (estilo Counter Blox)
 local ADS = CFrame.new(0.05, -1.0, -2.35)
+-- Poses de mira por arma: al apuntar ninguna tapa el puntito central.
+-- El arco y el lanzamisiles son grandotes: se corren bien a la derecha.
+local ADS_POSES = {
+	arco = CFrame.new(0.58, -1.0, -2.05) * CFrame.Angles(0, math.rad(-10), math.rad(2)),
+	cohete = CFrame.new(1.0, -1.4, -2.8) * CFrame.Angles(0, math.rad(-8), math.rad(2)),
+	escopeta = CFrame.new(0.16, -1.02, -2.3),
+	revolver = CFrame.new(0.12, -0.95, -2.2),
+	lanzallamas = CFrame.new(0.4, -1.1, -2.45) * CFrame.Angles(0, math.rad(-6), 0),
+}
 
 -- ===============================================================
 -- Construccion de las armas (cajas simples, estilo Counter)
@@ -14065,9 +14377,14 @@ local function buildArco()
 	piece(model, Vector3.new(0.22, 2.0, 0.22), CFrame.new(0, -0.9, -0.6) * CFrame.Angles(0, 0, math.rad(24)), Color3.fromRGB(112, 84, 54), Enum.Material.Wood)
 	piece(model, Vector3.new(0.16, 0.16, 0.16), CFrame.new(-0.42, 0, -0.6), Color3.fromRGB(150, 196, 118), Enum.Material.Neon)
 	piece(model, Vector3.new(0.08, 3.4, 0.08), CFrame.new(-0.42, 0, -0.6), Color3.fromRGB(232, 236, 240), Enum.Material.SmoothPlastic)
+-- Flecha lista en la cuerda: se ve al apuntar y "sale" al disparar
+	piece(model, Vector3.new(0.07, 0.07, 2.7), CFrame.new(-0.16, 0.02, -1.32), Color3.fromRGB(206, 178, 126), Enum.Material.Wood)
+	piece(model, Vector3.new(0.12, 0.12, 0.26), CFrame.new(-0.16, 0.02, -2.72), Color3.fromRGB(206, 212, 222), Enum.Material.Metal)
+	piece(model, Vector3.new(0.3, 0.03, 0.36), CFrame.new(-0.16, 0.02, -0.36), Color3.fromRGB(196, 74, 68), Enum.Material.Fabric)
+	piece(model, Vector3.new(0.03, 0.3, 0.36), CFrame.new(-0.16, 0.02, -0.36), Color3.fromRGB(196, 74, 68), Enum.Material.Fabric)
 	-- Mano/puño
 	piece(model, Vector3.new(0.4, 0.5, 0.5), CFrame.new(0, 0, -0.6), Color3.fromRGB(120, 90, 58), Enum.Material.Fabric)
-	model.muzzle = Vector3.new(-0.42, 0, -0.9)
+	model.muzzle = Vector3.new(-0.16, 0.02, -2.9)
 	return model
 end
 
@@ -14296,8 +14613,8 @@ function ViewModel.setHidden(value)
 end
 
 function ViewModel.recoil(amount)
-	recoil = math.min(1.6, recoil + (amount or 0.5))
-	recoilRoll = (math.random() * 2 - 1) * 0.18 * (amount or 0.5)
+	recoil = math.min(1.2, recoil + (amount or 0.5))
+	recoilRoll = (math.random() * 2 - 1) * 0.13 * (amount or 0.5)
 end
 
 -- Patada de camara estilo Counter Blox: sube de golpe y vuelve sola
@@ -14332,7 +14649,7 @@ function ViewModel.getMuzzle()
 	if not camera or not current then
 		return nil
 	end
-	local base = camera.CFrame * HIP:Lerp(ADS, ads)
+	local base = camera.CFrame * HIP:Lerp(ADS_POSES[currentId] or ADS, ads)
 	local world = base * (current.muzzle or Vector3.new(0, 0, -2))
 	return world, camera.CFrame.LookVector
 end
@@ -14347,7 +14664,7 @@ local function stepUnbound(dt)
 	end
 
 	ads = ads + (adsGoal - ads) * math.min(dt * 11, 1)
-	recoil = recoil * math.max(0, 1 - dt * 9)
+	recoil = recoil * math.max(0, 1 - dt * 10)
 	flashTimer = math.max(0, flashTimer - dt)
 
 	local show = visible and current and not hiddenByScope
@@ -14371,7 +14688,7 @@ local function stepUnbound(dt)
 		local kicked = camCF * CFrame.Angles(camKick.X, camKick.Y, 0)
 		camera.CFrame = kicked
 		camCF = kicked
-		camKick = camKick * math.max(0, 1 - dt * 9)
+		camKick = camKick * math.max(0, 1 - dt * 10.5)
 	end
 
 	if not (current and show) then
@@ -14411,9 +14728,9 @@ local function stepUnbound(dt)
 	local bobX = math.cos(bobPhase) * 0.05 * bobAmt
 	local bobY = math.abs(math.sin(bobPhase)) * 0.045 * bobAmt
 
-	local base = camCF * HIP:Lerp(ADS, ads)
-		* CFrame.new(bobX + sway.X * 2.6, bobY + sway.Y * 2.2, recoil * 0.5)
-	local final = base * CFrame.Angles(-sway.Y * 2.4 - recoil * 0.2, -sway.X * 2.4, recoilRoll * recoil * 2)
+	local base = camCF * HIP:Lerp(ADS_POSES[currentId] or ADS, ads)
+		* CFrame.new(bobX + sway.X * 2.6, bobY + sway.Y * 2.2, recoil * 0.4)
+	local final = base * CFrame.Angles(-sway.Y * 2.4 - recoil * 0.14, -sway.X * 2.4, recoilRoll * recoil * 1.3)
 
 	-- Animacion del cuchillo mariposa: apertura al equipar, giro (F) y zarpazo
 	local animCF = nil
@@ -14474,7 +14791,7 @@ return ViewModel
 </ProtectedString>
 						</Properties>
 					</Item>
-					<Item class="ModuleScript" referent="RBX027">
+					<Item class="ModuleScript" referent="RBX028">
 						<Properties>
 							<string name="Name">WeatherFX</string>
 							<ProtectedString name="Source">--[[

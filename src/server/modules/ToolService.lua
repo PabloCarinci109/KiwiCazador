@@ -972,6 +972,26 @@ function ToolService.give(player, only)
 		end
 	end
 
+	-- Blindaje: el cuchillo mariposa va de fabrica SIEMPRE (en todos los
+	-- modos y para todos los personajes), aunque la lista del modo lo olvide.
+	local tieneCuchillo = false
+	for _, item in ipairs(backpack:GetChildren()) do
+		if item:IsA("Tool") and item:GetAttribute("ToolId") == "cuchillo" then
+			tieneCuchillo = true
+			break
+		end
+	end
+	if not tieneCuchillo then
+		for _, template in ipairs(folder:GetChildren()) do
+			if template:GetAttribute("ToolId") == "cuchillo" then
+				local clone = template:Clone()
+				wireTool(clone)
+				clone.Parent = backpack
+				break
+			end
+		end
+	end
+
 	ToolService.cooldowns[player] = {}
 end
 

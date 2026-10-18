@@ -15,6 +15,7 @@ if not modulos then
 end
 local GameManager = require(modulos.GameManager)
 local Weather = require(modulos.Weather)
+local Destruction = require(modulos.Destruction)
 
 local pruebas, fallos = 0, 0
 
@@ -213,6 +214,23 @@ pcall(function()
 end)
 task.wait(1)
 check(workspace:GetAttribute("Clima") == "sol", "clima: vuelve el sol")
+
+-- Mapa rompible: el lanzamisiles destroza casas, autos, trenes y arboles
+check(Destruction.count() > 20, "mapa: objetos rompibles registrados", "n=" .. Destruction.count())
+local pruebaRompe = Instance.new("Part")
+pruebaRompe.Name = "PruebaRompe"
+pruebaRompe.Anchored = true
+pruebaRompe.CanCollide = false
+pruebaRompe.Size = Vector3.new(2, 2, 2)
+pruebaRompe.Position = Vector3.new(0, 500, 0)
+pruebaRompe.Parent = workspace
+Destruction.marcar(pruebaRompe, "prueba")
+local okRompe = pcall(function()
+	Destruction.explosivo(pruebaRompe.Position + Vector3.new(6, 0, 0), 30, 40)
+end)
+task.wait(0.5)
+check(okRompe and pruebaRompe.Anchored == false, "mapa: el cohete suelta las partes golpeadas")
+pruebaRompe:Destroy()
 
 local casos = {
 	{ id = "facil", extra = extrasSolo },

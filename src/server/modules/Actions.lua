@@ -19,6 +19,7 @@ local Net = require(Shared.Net)
 local Util = require(Shared.Util)
 
 local ToolService = require(script.Parent.ToolService)
+local Destruction = require(script.Parent.Destruction)
 
 local Actions = {}
 
@@ -848,6 +849,11 @@ function Actions.weaponHit(session, dart, pos, victim, hitPart)
 		end
 	end
 
+	-- El lanzamisiles destroza el mapa: casas, autos, trenes y arboles
+	if dart.weaponId == "cohete" then
+		Destruction.explosivo(pos, (cfg.blast or 12) + 10, (cfg.knockback or 60) * 0.72)
+	end
+
 	session:event("boom", { pos = pos, weapon = dart.weaponId })
 	local shooterName = dart.player.DisplayName ~= "" and dart.player.DisplayName or dart.player.Name
 	if (cfg.blast or 0) >= 10 then
@@ -1076,6 +1082,14 @@ function Actions.resolvePaint(session, shot, hit, victim)
 	if victim and victim ~= shot.player and session.stats[victim] then
 		Actions.paintPlayer(session, victim, shot.player, hit.Position, shot.color)
 		session:event("painthit", { pos = hit.Position, color = Util.colorToTable(shot.color) })
+		-- Manchazo en la cabeza: le tapa la vista unos segundos (ceguera)
+		if hit.Instance and hit.Instance.Name == "Head" then
+			Net.get("WorldEvent"):FireClient(victim, "paintblind", {
+				dur = Config.PaintRifle.blindTime or 4,
+				color = Util.colorToTable(shot.color),
+			})
+			session:notify(victim, Config.Text.PaintBlind, shot.color, 4)
+		end
 		-- En Asedio la pintura tambien lastima un poco (el fuego amigo sigue bloqueado)
 		if session.isAsedio then
 			session:damagePlayer(victim, shot.player, "pintura", Config.Asedio.paintDamage or 11, hit.Position)
