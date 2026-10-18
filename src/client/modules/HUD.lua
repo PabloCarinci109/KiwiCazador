@@ -358,7 +358,7 @@ local function buildSessionHud(parent)
 		Name = "PuntoMira",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0, 2, 0, 2),
+		Size = UDim2.new(0, 3, 0, 3),
 		BackgroundColor3 = Color3.fromRGB(120, 255, 150),
 		BackgroundTransparency = 0.1,
 		BorderSizePixel = 0,
@@ -1337,12 +1337,16 @@ function HUD.setTeams(team, score, round, toWin, modeName)
 	end
 end
 
--- Punto de mira: visible al jugar, se abre segun la dispersion
-function HUD.setCrosshair(visible, gap, length)
+-- Punto de mira: visible al jugar, se abre segun la dispersion.
+-- Con dotOnly queda solo el puntito central (al apuntar, estilo Counter).
+function HUD.setCrosshair(visible, gap, length, dotOnly)
 	if not parts.crosshair then
 		return
 	end
 	parts.crosshair.Visible = visible and true or false
+	for _, item in ipairs(parts.crossLines or {}) do
+		item.line.Visible = (visible and not dotOnly) and true or false
+	end
 	if not visible then
 		return
 	end

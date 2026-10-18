@@ -35,7 +35,9 @@ local flashTimer = 0   -- fogonazo del canon
 -- Posicion del arma respecto de la camara (estilo Counter Blox: al costado,
 -- bien abajo a la derecha y con una leve inclinacion, para no tapar la vista)
 local HIP = CFrame.new(0.5, -1.25, -2.7) * CFrame.Angles(math.rad(1.5), math.rad(6), math.rad(-6))
-local ADS = CFrame.new(0, -0.62, -2.2)
+-- Apuntando: el arma se corre al centro pero bien abajo, para que el
+-- puntito de mira quede despejado (estilo Counter Blox)
+local ADS = CFrame.new(0.05, -1.0, -2.35)
 
 -- ===============================================================
 -- Construccion de las armas (cajas simples, estilo Counter)

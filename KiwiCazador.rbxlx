@@ -43,7 +43,7 @@
 
 local Config = {}
 
-Config.Version = "1.5.0"
+Config.Version = "1.5.1"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -9716,9 +9716,10 @@ local function setScope(enabled, level)
 	scoped = enabled
 	scopeLevel = lvl
 
-	-- Telescopica del francotirador: pantalla negra con circulo (Counter)
+	-- Telescopica del francotirador: pantalla negra con circulo (Counter).
+	-- Las demas armas apuntan con el puntito central, sin aro encima.
 	local sniperScope = scoped and equippedId == "sniper"
-	HUD.setScope(scoped, sniperScope)
+	HUD.setScope(sniperScope, sniperScope)
 	if sniperScope then
 		HUD.setScopeZoom(lvl &gt;= 2 and "10x" or "5x")
 	end
@@ -10032,16 +10033,20 @@ end
 local lastCross = nil
 RunService.RenderStepped:Connect(function(dt)
 	shotBloom = math.max(0, shotBloom - dt * 30)
-	local show = state.active and state.phase == "playing" and not scoped and not hiddenNow
+	-- La telescopica del francotirador tapa la pantalla: ahi no va la cruz
+	local sniperScope = scoped and equippedId == "sniper"
+	local show = state.active and state.phase == "playing" and not hiddenNow
 		and equippedId ~= nil and ViewModel.hasWeapon(equippedId)
+		and not sniperScope
 	if show ~= lastCross then
 		lastCross = show
-		HUD.setCrosshair(show, 4, 5)
+		HUD.setCrosshair(show, 4, 5, scoped)
 	end
 	if show then
 		local grados = spreadErrorLocal(equippedId)
+		-- Apuntando queda solo el puntito central (estilo Counter)
 		HUD.setCrosshair(true, 3 + math.min(grados * 2.2, 12) + shotBloom * 0.35,
-			4 + math.min(grados * 0.8, 4))
+			4 + math.min(grados * 0.8, 4), scoped)
 	end
 end)
 
@@ -10865,7 +10870,7 @@ local function buildSessionHud(parent)
 		Name = "PuntoMira",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0, 2, 0, 2),
+		Size = UDim2.new(0, 3, 0, 3),
 		BackgroundColor3 = Color3.fromRGB(120, 255, 150),
 		BackgroundTransparency = 0.1,
 		BorderSizePixel = 0,
@@ -11844,12 +11849,16 @@ function HUD.setTeams(team, score, round, toWin, modeName)
 	end
 end
 
--- Punto de mira: visible al jugar, se abre segun la dispersion
-function HUD.setCrosshair(visible, gap, length)
+-- Punto de mira: visible al jugar, se abre segun la dispersion.
+-- Con dotOnly queda solo el puntito central (al apuntar, estilo Counter).
+function HUD.setCrosshair(visible, gap, length, dotOnly)
 	if not parts.crosshair then
 		return
 	end
 	parts.crosshair.Visible = visible and true or false
+	for _, item in ipairs(parts.crossLines or {}) do
+		item.line.Visible = (visible and not dotOnly) and true or false
+	end
 	if not visible then
 		return
 	end
@@ -12387,7 +12396,9 @@ local flashTimer = 0   -- fogonazo del canon
 -- Posicion del arma respecto de la camara (estilo Counter Blox: al costado,
 -- bien abajo a la derecha y con una leve inclinacion, para no tapar la vista)
 local HIP = CFrame.new(0.5, -1.25, -2.7) * CFrame.Angles(math.rad(1.5), math.rad(6), math.rad(-6))
-local ADS = CFrame.new(0, -0.62, -2.2)
+-- Apuntando: el arma se corre al centro pero bien abajo, para que el
+-- puntito de mira quede despejado (estilo Counter Blox)
+local ADS = CFrame.new(0.05, -1.0, -2.35)
 
 -- ===============================================================
 -- Construccion de las armas (cajas simples, estilo Counter)

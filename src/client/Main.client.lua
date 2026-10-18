@@ -297,9 +297,10 @@ local function setScope(enabled, level)
 	scoped = enabled
 	scopeLevel = lvl
 
-	-- Telescopica del francotirador: pantalla negra con circulo (Counter)
+	-- Telescopica del francotirador: pantalla negra con circulo (Counter).
+	-- Las demas armas apuntan con el puntito central, sin aro encima.
 	local sniperScope = scoped and equippedId == "sniper"
-	HUD.setScope(scoped, sniperScope)
+	HUD.setScope(sniperScope, sniperScope)
 	if sniperScope then
 		HUD.setScopeZoom(lvl >= 2 and "10x" or "5x")
 	end
@@ -613,16 +614,20 @@ end
 local lastCross = nil
 RunService.RenderStepped:Connect(function(dt)
 	shotBloom = math.max(0, shotBloom - dt * 30)
-	local show = state.active and state.phase == "playing" and not scoped and not hiddenNow
+	-- La telescopica del francotirador tapa la pantalla: ahi no va la cruz
+	local sniperScope = scoped and equippedId == "sniper"
+	local show = state.active and state.phase == "playing" and not hiddenNow
 		and equippedId ~= nil and ViewModel.hasWeapon(equippedId)
+		and not sniperScope
 	if show ~= lastCross then
 		lastCross = show
-		HUD.setCrosshair(show, 4, 5)
+		HUD.setCrosshair(show, 4, 5, scoped)
 	end
 	if show then
 		local grados = spreadErrorLocal(equippedId)
+		-- Apuntando queda solo el puntito central (estilo Counter)
 		HUD.setCrosshair(true, 3 + math.min(grados * 2.2, 12) + shotBloom * 0.35,
-			4 + math.min(grados * 0.8, 4))
+			4 + math.min(grados * 0.8, 4), scoped)
 	end
 end)
 

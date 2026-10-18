@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.5.0"
+Config.Version = "1.5.1"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 

@@ -42,6 +42,11 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 ### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
 
+> **1.5.1:** al apuntar (clic derecho) el arma baja al costado y en el centro queda un
+> **puntito de mira** bien fino: ya no tapa la vista. El aro de mira grande con vidrio negro
+> ahora es **solo del francotirador** (5x, segundo clic 10x); el resto de las armas apunta
+> directo con el puntito.
+
 > **1.5.0:** primera persona **fija** durante la partida (estilo Counter Blox), el arma pasa
 > **al costado** de la pantalla para no tapar la vista, la **cruz es más chica** y los baúles
 > ahora sueltan el **arsenal Counter**: **AK-47, M4A1, MP5, Glock-18 y Escopeta** (además del
@@ -82,7 +87,7 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 | Tecla | Acción |
 | --- | --- |
 | **Click** | Usar la herramienta equipada (en las **automáticas** deja el clic **apretado** para rafaguear) |
-| **Click derecho** | Con las armas que apuntan (tranquilizante, pintura, ralentizador y todo el **arsenal Counter**): **mira** con zoom y cruz, el arma se corre al costado |
+| **Click derecho** | Apuntar con zoom leve y **puntito central** en cualquier arma (con el **francotirador** en cambio entra la telescópica 5x/10x) |
 | **1 / 2 / 3 / 4 / 5** | Cambiar de herramienta (red / rifle / rastreador / trampa / pintura; en Colosal: rastreador / ralentizador) |
 | **Shift** | Correr (haces mucho ruido: el kiwi te oye y huye) |
 | **Ctrl**, **Alt** o **C** | Agachado en sigilo (casi no te oye; la cámara baja y el arma se afirma: menos dispersión) |
@@ -91,7 +96,8 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 > **Vista estilo Counter Blox:** durante la partida la cámara es **siempre en primera persona**
 > (en el lobby y la votación queda libre), con el **arma al costado** para no tapar la pantalla
-> y una **cruz chica** que se abre solo cuando te movés o disparás.
+> y una **cruz chica** que se abre solo cuando te movés o disparás. Al apuntar el arma se
+> corre **bien abajo** y queda nada más que el **puntito central** para tirar preciso.
 
 ### Herramientas
 
@@ -100,7 +106,8 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
   correcto, el kiwi sale disparado.
 - **Rifle tranquilizante** 💉 — dispara un dardo. Si le das, el kiwi **se duerme unos segundos**:
   acércate y **tócalo** para recogerlo. Ojo, despierta y sale corriendo. Con **clic derecho**
-  entra la **mira**: vista en **primera persona** (ya no te tapa la cabeza), zoom y cruz en el centro.
+  entra la **mira**: vista en **primera persona** (ya no te tapa la cabeza), zoom leve y el
+  **puntito central** para apuntar.
 - **Rastreador** 🧭 — pulsa click y aparece la **brújula** en el centro del HUD: **aguja hacia el
   kiwi**, **rosa de los vientos** (N/E/S/O) que gira con tu cámara y la **distancia** abajo. La
   aguja cambia de color según el estado: verde si está a la vista, ámbar si está escondido. Tiene enfriamiento.
@@ -287,7 +294,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.5.0 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.5.1 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):
