@@ -42,6 +42,14 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 ### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
 
+> **1.8.0:** el personaje ahora **corre siempre** (con **Shift** camina despacio y hace menos
+> ruido) y en partida el **mouse queda oculto y centrado** (se fue la manito que tapaba el punto
+> de mira). La cámara **abre un poco el FOV al correr** para sentir la velocidad. El
+> **lanzallamas** deja **fuego prendido donde pega** (paredes, objetos, gente): si esa llama
+> arde 5 segundos o más, **quema a quien esté cerca, incluso a vos**. Y al equiparlo cargás una
+> **mochila de combustible** visible en tercera persona: si un enemigo **le dispara al tanque,
+> explota y te vuela el 80% de la vida**.
+
 > **1.7.0:** el **punto de mira central** ahora sí queda en el centro de la pantalla (antes
 > estaba pegado a la barra de arriba) y se ve **siempre en partida, incluso sin armas**. La
 > **mira del francotirador** es mucho más grande y se adapta a tu pantalla, con bastante menos
@@ -84,8 +92,9 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 - **HUD estilo Counter:** barra de **marcador de equipos y ronda** arriba, **vida grande** abajo a
   la izquierda (verde → ámbar → roja), **punto de mira dinámico** que se abre al moverse o
   disparar, **tabla de posiciones con Tab** y **fogonazo** del cañón en el arma en primera persona.
-- **Movilidad:** **Shift** correr, **Ctrl / Alt / C** agachado en sigilo (la cámara baja y el arma
-  se afirma: menos dispersión). **V** cambia a primera persona.
+- **Movilidad:** el personaje **corre siempre**; **Shift** lo hace **caminar despacio** y
+  **Ctrl / Alt / C** agacharse en sigilo (la cámara baja y el arma se afirma: menos dispersión).
+  **V** cambia a primera persona.
 - **Créditos:** las fórmulas de disparo, retroceso, cabeza y zoom están inspiradas en el código
   público de **Counter Blox: Sauce - Restored** (licencia MIT) — ver [`LICENSE-CB.md`](LICENSE-CB.md).
 
@@ -102,7 +111,7 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 | **Click** | Usar la herramienta equipada (en las **automáticas** deja el clic **apretado** para rafaguear) |
 | **Click derecho** | Apuntar con zoom leve y **puntito central** en cualquier arma (con el **francotirador** en cambio entra la telescópica 5x/10x) |
 | **1 / 2 / 3 / 4 / 5** | Cambiar de herramienta (red / rifle / rastreador / trampa / pintura; en Colosal: rastreador / ralentizador) |
-| **Shift** | Correr (haces mucho ruido: el kiwi te oye y huye) |
+| **Shift** | Caminar despacio (hacés menos ruido; por defecto corrés, y el kiwi te oye antes) |
 | **Ctrl**, **Alt** o **C** | Agachado en sigilo (casi no te oye; la cámara baja y el arma se afirma: menos dispersión) |
 | **E** | **Esconderte** en un armario, barril o pajar / **abrir un baúl**. Dentro del escondite, E otra vez te saca |
 | **Tab** | **Tabla estilo Counter** (equipos, marcador y capturas en Asedio) + tabla de jugadores de Roblox |
@@ -307,7 +316,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.7.0 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.8.0 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):

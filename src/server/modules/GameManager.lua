@@ -79,7 +79,7 @@ local function setFrozen(player, frozen)
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
-		humanoid.WalkSpeed = frozen and 0 or Config.Player.walkSpeed
+		humanoid.WalkSpeed = frozen and 0 or Config.Player.sprintSpeed
 		humanoid.JumpPower = frozen and 0 or 50
 		humanoid.UseJumpPower = true
 	end

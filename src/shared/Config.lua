@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.7.0"
+Config.Version = "1.8.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -364,6 +364,9 @@ Config.Weapons = {
 		damagePercent = 10,  -- 10% de la vida maxima por tick
 		tickTime = 1.0,      -- un tick de daño por segundo
 		overheat = 10,       -- segundos de chorro seguido antes de quemarte
+		fireHot = 5,         -- segundos que una llama prendida tarda en volverse peligrosa
+		fireRadius = 4.5,    -- radio de esa llama: quema a quien este cerca (tambien a vos)
+		tankDamagePercent = 80, -- si le disparan a la mochila de combustible: explota por 80% de vida
 		knockback = 8,
 		slowFactor = 0.60,
 		slowTime = 1.0,
@@ -479,8 +482,8 @@ Config.City = {
 }
 
 Config.Player = {
-	walkSpeed = 16,
-	sprintSpeed = 24,
+	walkSpeed = 16,    -- con Shift caminas (mas lento y mas silencioso)
+	sprintSpeed = 24,  -- velocidad por defecto: corres todo el tiempo
 	sneakSpeed = 7,
 	maxHealth = 100,   -- vida de los cazadores (las armas de baul hieren)
 	regen = 4,         -- vida por segundo fuera de combate
@@ -735,6 +738,7 @@ Config.Text = {
 	ChestLoot = "¡Encontraste: %s! (%d usos)",
 	WeaponOut = "Se te acabó: %s",
 	BoomShout = "¡%s disparó el %s!",
+	TankBoom = "¡%s le voló la mochila de combustible a %s!",
 	BoomHit = "¡Le diste con el %s!",
 	Headshot = "¡TIRO A LA CABEZA!",
 	AsedioRound = "¡Ronda %d! Los %s atacan y los %s defienden al kiwi (marcador %d - %d)",

@@ -611,6 +611,79 @@ local function buildKnifeTool(id)
 	return tool
 end
 
+-- Mochila de combustible: se ve en la espalda (tercera persona) mientras
+-- usas el lanzallamas y se puede disparar: si le pegan, explota.
+local function tankPiece(character, name, props)
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Size = props.size
+	part.Color = props.color
+	part.Shape = props.shape or Enum.PartType.Block
+	part.Material = props.material or Enum.Material.Metal
+	part.CanCollide = false
+	part.CanTouch = false
+	part.CanQuery = true
+	part.CastShadow = false
+	part.Massless = true
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	part:SetAttribute("Tanque", true)
+	part.CFrame = props.cframe
+	part.Parent = character
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = props.torso
+	weld.Part1 = part
+	weld.Parent = part
+	return part
+end
+
+local function attachFuelTank(character)
+	if character:FindFirstChild("TanqueCombustible") then
+		return
+	end
+	local torso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+	if not torso then
+		return
+	end
+	local cf = torso.CFrame
+	-- Local +Z mira para atras: la mochila va pegada a la espalda
+	tankPiece(character, "TanqueCombustible", {
+		torso = torso,
+		size = Vector3.new(0.92, 1.15, 0.34),
+		color = Color3.fromRGB(140, 60, 48),
+		cframe = cf * CFrame.new(0, 0.12, 0.62),
+	})
+	tankPiece(character, "TanqueCombustible_Tanque", {
+		torso = torso,
+		shape = Enum.PartType.Cylinder,
+		size = Vector3.new(0.95, 0.5, 0.5),
+		color = Color3.fromRGB(178, 76, 58),
+		cframe = cf * CFrame.new(0, 0.12, 0.85),
+	})
+	tankPiece(character, "TanqueCombustible_Valvula", {
+		torso = torso,
+		shape = Enum.PartType.Ball,
+		size = Vector3.new(0.2, 0.2, 0.2),
+		color = Color3.fromRGB(96, 220, 140),
+		material = Enum.Material.Neon,
+		cframe = cf * CFrame.new(0.3, 0.55, 0.8),
+	})
+end
+
+local function detachFuelTank(character)
+	if not character then
+		return
+	end
+	for _, part in ipairs(character:GetChildren()) do
+		if part:IsA("BasePart") and part:GetAttribute("Tanque") then
+			part:Destroy()
+		end
+	end
+end
+
+ToolService.attachTank = attachFuelTank
+ToolService.detachTank = detachFuelTank
+
 local function buildFlamethrowerTool(id)
 	local cfg = Config.Weapons[id]
 	local tool = prepareLootTool(id)
@@ -674,6 +747,28 @@ local function buildFlamethrowerTool(id)
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
+
+	-- Al sacarlo aparece la mochila de combustible en la espalda
+	local worn = nil
+	tool.Equipped:Connect(function()
+		local parent = tool.Parent
+		if parent and parent:IsA("Model") then
+			worn = parent
+			attachFuelTank(parent)
+		end
+	end)
+	tool.Unequipped:Connect(function()
+		if worn then
+			detachFuelTank(worn)
+			worn = nil
+		end
+	end)
+	tool.Destroying:Connect(function()
+		if worn then
+			detachFuelTank(worn)
+			worn = nil
+		end
+	end)
 	return tool
 end
 

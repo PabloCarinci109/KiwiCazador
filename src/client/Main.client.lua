@@ -2,7 +2,7 @@
 	Main.client.lua  (cliente)
 	Une todo del lado del jugador:
 		- menu del lobby y HUD
-		- teclas de correr (Shift) y sigilo (Ctrl)
+		- teclas de caminar (Shift) y sigilo (Ctrl)
 		- uso de las herramientas (red, rifle, rastreador, trampa, pintura)
 		- efectos, sonidos y brujula del rastreador
 --]]
@@ -33,6 +33,7 @@ local state = { active = false, phase = "none", diff = nil }
 local sprinting = false
 local sneaking = false
 local shotBloom = 0 -- el punto de mira se abre un toque al disparar
+local speedFov = nil -- al correr la camara abre un poco el FOV (se siente mas rapido)
 local cooldowns = {
 	red = { left = 0, total = 1 },
 	rifle = { left = 0, total = 1 },
@@ -271,13 +272,95 @@ local function flameAt(key, position, direction)
 	rig.until_ = os.clock() + 0.4
 end
 
--- Apaga los chorros que quedaron sin refrescar (lo llama el Heartbeat)
+-- Fuego que queda prendido donde pega el chorro (paredes, objetos, gente):
+-- se apaga solo si dejás de alimentarlo
+local fireSpots = {}
+
+local function getFireSpot(key)
+	local spot = fireSpots[key]
+	if spot then
+		return spot
+	end
+	local part = Instance.new("Part")
+	part.Name = "FuegoImpacto"
+	part.Size = Vector3.new(0.4, 0.4, 0.4)
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Transparency = 1
+	part.Parent = workspace
+
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "Llamas"
+	emitter.Texture = "rbxasset://textures/particles/fire_main.dds"
+	emitter.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 220, 150)),
+		ColorSequenceKeypoint.new(0.45, Color3.fromRGB(255, 120, 45)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(130, 26, 8)),
+	})
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.25),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.9),
+		NumberSequenceKeypoint.new(1, 2.4),
+	})
+	emitter.Lifetime = NumberRange.new(0.45, 0.85)
+	emitter.Speed = NumberRange.new(3, 8)
+	emitter.SpreadAngle = Vector2.new(32, 32)
+	emitter.Acceleration = Vector3.new(0, 9, 0)
+	emitter.Rate = 28
+	emitter.LightEmission = 1
+	emitter.LightInfluence = 0
+	emitter.Enabled = false
+	emitter.Parent = part
+
+	local light = Instance.new("PointLight")
+	light.Name = "LuzFuego"
+	light.Color = Color3.fromRGB(255, 140, 60)
+	light.Range = 11
+	light.Brightness = 1.1
+	light.Shadows = false
+	light.Enabled = false
+	light.Parent = part
+
+	spot = { part = part, emitter = emitter, light = light, until_ = 0 }
+	fireSpots[key] = spot
+	return spot
+end
+
+-- Prende (o refresca) una llama pegada a la superficie donde choco el chorro
+local function fireSpotAt(key, position, normal)
+	local spot = getFireSpot(key)
+	local up = normal and normal.Magnitude > 0.01 and normal.Unit or Vector3.new(0, 1, 0)
+	local base = position + up * 0.25
+	spot.part.CFrame = CFrame.lookAt(base, base + up)
+	spot.emitter.Enabled = true
+	spot.light.Enabled = true
+	spot.until_ = os.clock() + 1.1
+end
+
+-- Raycast del chorro (se reusa: nada de tablas nuevas por frame)
+local flameSpotParams = RaycastParams.new()
+flameSpotParams.FilterType = Enum.RaycastFilterType.Exclude
+flameSpotParams.IgnoreWater = true
+
+-- Apaga los chorros y el fuego prendido que quedo sin refrescar (lo llama el Heartbeat)
 local function flameCleanup()
 	local now = os.clock()
 	for _, rig in pairs(flameRigs) do
 		if rig.emitter.Enabled and now > rig.until_ then
 			rig.emitter.Enabled = false
 			rig.light.Enabled = false
+		end
+	end
+	for _, spot in pairs(fireSpots) do
+		if spot.emitter.Enabled and now > spot.until_ then
+			spot.emitter.Enabled = false
+			spot.light.Enabled = false
 		end
 	end
 end
@@ -364,8 +447,8 @@ local function applySpeed()
 	end
 
 	if not state.active then
-		if hum.WalkSpeed ~= Config.Player.walkSpeed then
-			hum.WalkSpeed = Config.Player.walkSpeed
+		if hum.WalkSpeed ~= Config.Player.sprintSpeed then
+			hum.WalkSpeed = Config.Player.sprintSpeed
 		end
 		return
 	end
@@ -390,9 +473,11 @@ local function applySpeed()
 	if sneaking then
 		hum.WalkSpeed = Config.Player.sneakSpeed
 	elseif sprinting then
-		hum.WalkSpeed = Config.Player.sprintSpeed
-	else
+		-- Shift apretado: caminar despacio
 		hum.WalkSpeed = Config.Player.walkSpeed
+	else
+		-- Por defecto el personaje corre
+		hum.WalkSpeed = Config.Player.sprintSpeed
 	end
 
 	-- Apuntando se camina mas lento (estilo Counter)
@@ -468,6 +553,11 @@ local function scopeFov(id, level)
 	return weapons[id] or Config.Scope.fov
 end
 
+-- En partida (primera persona) el mouse queda oculto y centrado
+local function inRoundNow()
+	return state.active and (state.phase == "playing" or state.phase == "countdown")
+end
+
 local function setScope(enabled, level)
 	enabled = enabled and true or false
 	local lvl = enabled and math.max(1, level or 1) or 0
@@ -486,7 +576,7 @@ local function setScope(enabled, level)
 	end
 
 	refreshViewmodel()
-	UserInputService.MouseIconEnabled = not scoped
+	UserInputService.MouseIconEnabled = not scoped and not inRoundNow()
 
 	local hum = humanoid()
 	if hum then
@@ -502,7 +592,8 @@ local function setScope(enabled, level)
 	end
 
 	-- Apuntando se pasa a primera persona: la mira ya no tapa la cabeza
-	UserInputService.MouseBehavior = scoped and Enum.MouseBehavior.LockCenter or Enum.MouseBehavior.Default
+	UserInputService.MouseBehavior = (scoped or inRoundNow())
+		and Enum.MouseBehavior.LockCenter or Enum.MouseBehavior.Default
 	applyCameraMode()
 	applySpeed()
 
@@ -728,7 +819,8 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		end
 		return
 	end
-	if input.KeyCode == Enum.KeyCode.LeftShift then
+	if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
+		-- Shift: caminar despacio (por defecto el personaje corre)
 		sprinting = true
 		applySpeed()
 	elseif input.KeyCode == Enum.KeyCode.Tab then
@@ -745,7 +837,7 @@ UserInputService.InputEnded:Connect(function(input)
 		holdingFire = false
 		return
 	end
-	if input.KeyCode == Enum.KeyCode.LeftShift then
+	if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
 		sprinting = false
 		applySpeed()
 	elseif input.KeyCode == Enum.KeyCode.Tab then
@@ -805,7 +897,7 @@ RunService.RenderStepped:Connect(function(dt)
 			4 + math.min(grados * 0.8, 4), scoped)
 	end
 	-- El punto central se ve SIEMPRE en partida, incluso sin armas
-	local inRound = state.active and (state.phase == "playing" or state.phase == "countdown")
+	local inRound = inRoundNow()
 	local dotShow = inRound and not hiddenNow and not sniperScope
 	if dotShow ~= lastDot then
 		lastDot = dotShow
@@ -819,6 +911,29 @@ RunService.RenderStepped:Connect(function(dt)
 		local muzzlePos, look = ViewModel.getMuzzle()
 		if muzzlePos and look then
 			flameAt("local", muzzlePos, look)
+			-- Donde pega el chorro queda fuego prendido
+			flameSpotParams.FilterDescendantsInstances = player.Character and { player.Character } or {}
+			local hit = workspace:Raycast(muzzlePos, look * 17, flameSpotParams)
+			if hit then
+				fireSpotAt("impact:local", hit.Position, hit.Normal)
+			end
+		end
+	end
+
+	-- En partida el mouse queda oculto y centrado: nada de manito sobre el punto
+	if inRound then
+		if UserInputService.MouseIconEnabled then
+			UserInputService.MouseIconEnabled = false
+		end
+		if not scoped and UserInputService.MouseBehavior ~= Enum.MouseBehavior.LockCenter then
+			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+		end
+	elseif not scoped then
+		if not UserInputService.MouseIconEnabled then
+			UserInputService.MouseIconEnabled = true
+		end
+		if UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 		end
 	end
 end)
@@ -1084,11 +1199,13 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 	elseif kind == "boom" then
 		if position then
 			local cfg = data.weapon and Config.Weapons[data.weapon]
-			soundAt(Config.Sounds.gunBoom, position, 1, 0.5)
+			-- El tanque de combustible hace una explosion mas grande
+			local tank = data.tank == true
+			soundAt(Config.Sounds.gunBoom, position, tank and 1.2 or 1, 0.5)
 			soundAt(Config.Sounds.dartHit, position, 0.85, 0.75)
-			burst(position, (cfg and cfg.color) or Color3.fromRGB(255, 186, 120), 46)
-			if distanceToLocal(position) < 70 then
-				sound2D(Config.Sounds.roar, 0.5, 0.7)
+			burst(position, (cfg and cfg.color) or Color3.fromRGB(255, 186, 120), tank and 90 or 46)
+			if distanceToLocal(position) < (tank and 110 or 70) then
+				sound2D(Config.Sounds.roar, tank and 0.75 or 0.5, 0.7)
 			end
 		end
 	elseif kind == "weaponfx" then
@@ -1106,7 +1223,18 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 		elseif position and weapon == "lanzallamas" then
 			-- Chorro continuo: cada aviso del servidor refresca el rig
 			if data.user ~= player.UserId then
-				flameAt("r" .. tostring(data.user or 0), position, dir)
+				local key = "r" .. tostring(data.user or 0)
+				flameAt(key, position, dir)
+				-- Y el fuego prendido donde pega su chorro
+				local shooter = data.user and Players:GetPlayerByUserId(data.user)
+				local rp = RaycastParams.new()
+				rp.FilterType = Enum.RaycastFilterType.Exclude
+				rp.FilterDescendantsInstances = shooter and shooter.Character and { shooter.Character } or {}
+				rp.IgnoreWater = true
+				local hit = workspace:Raycast(position, dir * 17, rp)
+				if hit then
+					fireSpotAt("impact:" .. key, hit.Position, hit.Normal)
+				end
 			end
 		elseif position and weapon == "arco" then
 			burst(position + dir * 1.2, Color3.fromRGB(180, 225, 150), 5)
@@ -1273,7 +1401,24 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 
-	-- Chorros de llama que quedaron viejos
+	-- Efecto de velocidad: corriendo la camara abre un poco el FOV (se siente mas rapido)
+	if state.active and state.phase == "playing" and not scoped then
+		local character = player.Character
+		local camera = workspace.CurrentCamera
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if root and camera then
+			local v = root.AssemblyLinearVelocity
+			local flatSpeed = math.sqrt(v.X * v.X + v.Z * v.Z)
+			local goal = 70 + math.clamp((flatSpeed - Config.Player.walkSpeed) * 0.5, 0, 7)
+			speedFov = speedFov or camera.FieldOfView
+			speedFov = speedFov + (goal - speedFov) * math.min(1, dt * 6)
+			camera.FieldOfView = speedFov
+		end
+	else
+		speedFov = nil
+	end
+
+	-- Chorros de llama y fuegos que quedaron viejos
 	flameCleanup()
 
 	local remaining = remainingCooldowns

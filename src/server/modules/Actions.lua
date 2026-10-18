@@ -31,6 +31,16 @@ local AIM_TOLERANCE = math.rad(75)    -- cuanto puede desviarse la mira del dard
 --   error = spread del arma + velocidad * vel
 --   con la mira puesta: error = spread * adsDiv (el sniper es perfecto)
 --   si el error queda por debajo del minimo, el disparo sale perfecto
+-- En asedio no se lastima (ni se prende fuego) al propio equipo
+local function friendlyShot(session, shooter, victim)
+	if not session.isAsedio or not session.teamOf or not shooter or not victim or shooter == victim then
+		return false
+	end
+	local mine = session.teamOf[shooter]
+	local theirs = session.teamOf[victim]
+	return mine ~= nil and mine == theirs
+end
+
 function Actions.spreadError(weaponId, root, data)
 	local shoot = Config.Shoot or {}
 	local cfg = (shoot.weapons or {})[weaponId] or {}
@@ -446,6 +456,16 @@ function Actions.sniperShot(session, player, cfg, muzzle, dir, data)
 		hitKiwi = kiwi ~= nil and not kiwi.defeated and hit.Instance:IsDescendantOf(kiwi.model)
 	end
 
+	-- Si le dio a la mochila de combustible: explota y se lleva el 80%
+	if victim and victim ~= player and hit and hit.Instance:GetAttribute("Tanque") then
+		if not friendlyShot(session, player, victim) then
+			Actions.blowTank(session, victim, player, pos)
+			session:event("dartshot", { pos = muzzle, dir = dir, weapon = "sniper" })
+			session:event("weaponfx", { weapon = "sniper", pos = muzzle, dir = dir, hit = true })
+			return
+		end
+	end
+
 	if victim and victim ~= player then
 		session:damagePlayer(victim, player, cfg.name, cfg.damage, pos)
 		local _, vroot = getRoot(victim)
@@ -496,7 +516,67 @@ function Actions.flame(session, player, weaponId, cfg, muzzle, dir)
 		session:event("weaponfx", { weapon = weaponId, pos = muzzle, dir = dir, user = player.UserId })
 	end
 
-	-- Un tick de daño por segundo
+	-- El chorro prende fuego donde pega: paredes, objetos y personajes.
+	-- Esa llama queda ardiendo y, si sigue viva a los 5 segundos, empieza a
+	-- quemar a quien este cerca: tambien a vos, que la encendiste.
+	local reach = cfg.reach or 17
+	local damage = Config.Player.maxHealth * (cfg.damagePercent or 10) / 100
+	local fireRadius = cfg.fireRadius or 4.5
+
+	session.firePatches = session.firePatches or {}
+	local mine = session.firePatches[player]
+	if not mine then
+		mine = {}
+		session.firePatches[player] = mine
+	end
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { player.Character }
+	params.IgnoreWater = true
+	local hit = workspace:Raycast(muzzle, dir * reach, params)
+	if hit then
+		local spot = nil
+		for _, p in ipairs(mine) do
+			if (p.pos - hit.Position).Magnitude <= fireRadius then
+				spot = p
+				break
+			end
+		end
+		if spot then
+			spot.pos = hit.Position
+			spot.lastHeat = now
+		else
+			if #mine >= 6 then
+				table.remove(mine, 1)
+			end
+			table.insert(mine, { pos = hit.Position, born = now, lastHeat = now, nextTick = now })
+		end
+	end
+
+	-- Llama vieja: sin alimentarla se apaga; con 5+ segundos encendida quema
+	for index = #mine, 1, -1 do
+		local spot = mine[index]
+		if now - spot.lastHeat > 4 then
+			table.remove(mine, index)
+		elseif now - spot.born >= (cfg.fireHot or 5) and now - spot.lastHeat <= 2
+			and now >= spot.nextTick then
+			spot.nextTick = now + (cfg.tickTime or 1)
+			for _, other in ipairs(session.players) do
+				local _, otherRoot = getRoot(other)
+				if otherRoot and (otherRoot.Position - spot.pos).Magnitude <= fireRadius then
+					if other == player then
+						session:damagePlayer(player, player, cfg.name, damage, spot.pos,
+							"El fuego que dejaste te esta quemando")
+					elseif not friendlyShot(session, player, other) then
+						session:damagePlayer(other, player, cfg.name, damage, spot.pos)
+					end
+				end
+			end
+		end
+	end
+
+	-- Un tick de daño por segundo (el chorro en cono)
 	local tickTime = cfg.tickTime or 1
 	state.dmg = state.dmg + dt
 	if state.dmg < tickTime then
@@ -509,10 +589,8 @@ function Actions.flame(session, player, weaponId, cfg, muzzle, dir)
 		return
 	end
 
-	local reach = cfg.reach or 17
 	local cosLimit = math.cos(math.rad(cfg.coneAngle or 32))
 	local aimFlat = flat(dir).Unit
-	local damage = Config.Player.maxHealth * (cfg.damagePercent or 10) / 100
 
 	for _, other in ipairs(session.players) do
 		local _, otherRoot = getRoot(other)
@@ -523,10 +601,7 @@ function Actions.flame(session, player, weaponId, cfg, muzzle, dir)
 				local toFlat = flat(to)
 				if toFlat.Magnitude > 0.1 and toFlat.Unit:Dot(aimFlat) >= cosLimit then
 					-- El chorro no atraviesa paredes: linea de vista real
-					local params = RaycastParams.new()
-					params.FilterType = Enum.RaycastFilterType.Exclude
-					params.FilterDescendantsInstances = { player.Character }
-					params.IgnoreWater = true
+					-- (el params del impacto se reusa: sin tablas nuevas por tick)
 					local los = workspace:Raycast(muzzle, to, params)
 					if los == nil or los.Instance:IsDescendantOf(other.Character) then
 						session:damagePlayer(other, player, cfg.name, damage, otherRoot.Position)
@@ -557,6 +632,29 @@ function Actions.flame(session, player, weaponId, cfg, muzzle, dir)
 		session:damagePlayer(player, player, cfg.name, damage,
 			myRoot and myRoot.Position or muzzle, "Te estas quemando con tu propio lanzallamas")
 	end
+end
+
+-- Le dispararon a la mochila de combustible del lanzallamas: explota, el
+-- arma se pierde y su dueño se come el 80% de su vida maxima.
+function Actions.blowTank(session, victim, attacker, pos)
+	local weaponCfg = Config.Weapons.lanzallamas
+	local character = victim.Character
+	if character then
+		ToolService.detachTank(character)
+	end
+	ToolService.takeTool(victim, "lanzallamas")
+
+	local damage = Config.Player.maxHealth * (weaponCfg.tankDamagePercent or 80) / 100
+	session:damagePlayer(victim, attacker, weaponCfg.name, damage, pos,
+		"Te volaron el tanque de combustible")
+	session:event("boom", { pos = pos, weapon = "lanzallamas", tank = true })
+
+	local aname = "El mapa"
+	if attacker and attacker ~= victim then
+		aname = attacker.DisplayName ~= "" and attacker.DisplayName or attacker.Name
+	end
+	local vname = victim.DisplayName ~= "" and victim.DisplayName or victim.Name
+	session:notifyAll(string.format(Config.Text.TankBoom, aname, vname), weaponCfg.color, 4)
 end
 
 -- Flecha clavada: queda en el mundo con un cartel para recuperarla (+1 uso).
@@ -670,6 +768,14 @@ function Actions.weaponHit(session, dart, pos, victim, hitPart)
 	local cfg = Config.Weapons[dart.weaponId]
 	if not cfg then
 		return
+	end
+
+	-- Le dispararon a la mochila de combustible del lanzallamas: explota
+	if hitPart and victim and victim ~= dart.player and hitPart:GetAttribute("Tanque") then
+		if not friendlyShot(session, dart.player, victim) then
+			Actions.blowTank(session, victim, dart.player, pos)
+			return
+		end
 	end
 
 	-- El kiwi NO recibe daño: solo queda relentizado si le da cerca
@@ -933,11 +1039,11 @@ function Actions.paintPlayer(session, victim, shooter, pos, color)
 
 	if humanoid then
 		humanoid:SetAttribute("Pintado", true)
-		humanoid.WalkSpeed = Config.Player.walkSpeed * Config.PaintRifle.slowFactor
+		humanoid.WalkSpeed = Config.Player.sprintSpeed * Config.PaintRifle.slowFactor
 		task.delay(Config.PaintRifle.slowTime, function()
 			if humanoid.Parent then
 				humanoid:SetAttribute("Pintado", false)
-				humanoid.WalkSpeed = Config.Player.walkSpeed
+				humanoid.WalkSpeed = Config.Player.sprintSpeed
 			end
 		end)
 	end
