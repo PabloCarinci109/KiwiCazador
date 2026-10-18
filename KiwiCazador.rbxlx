@@ -43,7 +43,7 @@
 
 local Config = {}
 
-Config.Version = "1.4.1"
+Config.Version = "1.5.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -231,6 +231,13 @@ Config.Shoot = {
 		cuchillo = { recoil = 92 },
 		lanzallamas = { vel = 0.5, recoil = 88 },
 		cohete = { recoil = 18 },
+		-- Arsenal estilo Counter Blox (baules): automaticas, MP5, pistola
+		-- y escopeta de perdigones.
+		ak = { vel = 0.55, spread = 1.1, dead = 1.6, recoil = 62 },
+		m4 = { vel = 0.45, spread = 0.8, dead = 1.4, recoil = 70 },
+		mp5 = { vel = 0.50, spread = 0.9, dead = 1.5, recoil = 78 },
+		glock = { vel = 0.42, spread = 0.5, dead = 1.5, recoil = 55 },
+		escopeta = { vel = 0.40, spread = 0.6, dead = 0, recoil = 40 },
 	},
 }
 
@@ -296,6 +303,12 @@ Config.Loot = {
 		{ id = "lanzallamas", weight = 14 },
 		{ id = "sniper", weight = 14 },
 		{ id = "cohete", weight = 8 },
+		-- Arsenal estilo Counter Blox: automaticas y escopeta (mas tiros)
+		{ id = "ak", weight = 10, uses = 60 },
+		{ id = "m4", weight = 10, uses = 70 },
+		{ id = "mp5", weight = 10, uses = 80 },
+		{ id = "glock", weight = 12, uses = 40 },
+		{ id = "escopeta", weight = 10, uses = 20 },
 	},
 }
 
@@ -385,6 +398,93 @@ Config.Weapons = {
 		slowFactor = 0.60,
 		slowTime = 1.0,
 		size = Vector3.new(0.3, 0.3, 1.6),
+	},
+
+	-- ===== Arsenal estilo Counter Blox (sale de los baules) =====
+	ak = {
+		name = "AK-47",
+		color = Color3.fromRGB(196, 140, 78),
+		cooldown = 0.10,   -- automatica: mantene el clic para rafaguear
+		auto = true,
+		speed = 280,
+		life = 1.6,
+		blast = 0,
+		damage = 34,       -- estilo Counter: 3 tiros al cuerpo
+		minDamage = 18,
+		falloff = 1,
+		headMult = 2.4,    -- a la cabeza: 82
+		knockback = 30,
+		slowFactor = 0.50,
+		slowTime = 1.5,
+		size = Vector3.new(0.32, 0.32, 1.7),
+	},
+	m4 = {
+		name = "M4A1",
+		color = Color3.fromRGB(120, 150, 190),
+		cooldown = 0.09,
+		auto = true,
+		speed = 290,
+		life = 1.6,
+		blast = 0,
+		damage = 30,
+		minDamage = 20,
+		falloff = 0.8,
+		headMult = 2.3,    -- a la cabeza: 69
+		knockback = 26,
+		slowFactor = 0.50,
+		slowTime = 1.4,
+		size = Vector3.new(0.30, 0.30, 1.8),
+	},
+	mp5 = {
+		name = "MP5",
+		color = Color3.fromRGB(96, 104, 118),
+		cooldown = 0.075,
+		auto = true,
+		speed = 250,
+		life = 1.4,
+		blast = 0,
+		damage = 22,       -- rafagas cortas, mucho control
+		minDamage = 13,
+		falloff = 1.2,
+		headMult = 2.0,    -- a la cabeza: 44
+		knockback = 20,
+		slowFactor = 0.55,
+		slowTime = 1.2,
+		size = Vector3.new(0.26, 0.26, 1.5),
+	},
+	glock = {
+		name = "Glock-18",
+		color = Color3.fromRGB(150, 152, 160),
+		cooldown = 0.32,
+		speed = 240,
+		life = 1.5,
+		blast = 0,
+		damage = 26,       -- pistola de arranque
+		minDamage = 14,
+		falloff = 1.1,
+		headMult = 2.4,    -- a la cabeza: 62
+		knockback = 24,
+		slowFactor = 0.55,
+		slowTime = 1.3,
+		size = Vector3.new(0.30, 0.30, 1.2),
+	},
+	escopeta = {
+		name = "Escopeta",
+		color = Color3.fromRGB(200, 170, 120),
+		cooldown = 1.05,
+		pellets = 8,       -- perdigones por disparo (estilo Counter)
+		spreadHalf = 3.6,  -- medio angulo del cono de perdigones
+		speed = 240,
+		life = 0.8,
+		blast = 0,
+		damage = 14,       -- por perdigon: de cerca es letal
+		minDamage = 4,
+		falloff = 2.4,     -- de lejos casi no llega
+		headMult = 1.6,
+		knockback = 34,
+		slowFactor = 0.45,
+		slowTime = 1.6,
+		size = Vector3.new(0.18, 0.18, 0.9),
 	},
 }
 
@@ -5573,6 +5673,76 @@ local function buildFlamethrowerTool(id)
 	return tool
 end
 
+-- Armas estilo Counter Blox (AK, M4, MP5, Glock, escopeta): cuerpo,
+-- cañon, culata y cargador simples, como el resto de las armas de baul.
+local COUNTER_TOOLS = {
+	ak = {
+		color = Color3.fromRGB(150, 104, 62), body = Vector3.new(0.24, 0.34, 1.5),
+		len = 1.5, bore = 0.17, wood = true, stock = Color3.fromRGB(126, 90, 58),
+	},
+	m4 = {
+		color = Color3.fromRGB(64, 70, 82), body = Vector3.new(0.24, 0.32, 1.6),
+		len = 1.7, bore = 0.15,
+	},
+	mp5 = {
+		color = Color3.fromRGB(58, 62, 72), body = Vector3.new(0.22, 0.30, 1.1),
+		len = 1.0, bore = 0.15, stockY = 0.35,
+	},
+	glock = {
+		color = Color3.fromRGB(70, 72, 80), body = Vector3.new(0.14, 0.24, 0.8),
+		len = 0.55, bore = 0.13, stockY = 0.22,
+	},
+	escopeta = {
+		color = Color3.fromRGB(96, 74, 54), body = Vector3.new(0.24, 0.32, 1.5),
+		len = 1.7, bore = 0.22, wood = true, stock = Color3.fromRGB(118, 80, 50),
+	},
+}
+
+local function buildCounterTool(id)
+	local spec = COUNTER_TOOLS[id]
+	local tool = prepareLootTool(id)
+	tool.Grip = CFrame.new(0, -0.2, 0.35) * CFrame.Angles(math.rad(-90), 0, 0)
+	local handle = newHandle({
+		Size = Vector3.new(0.26, 0.85, 0.4),
+		Color = Color3.fromRGB(52, 56, 64),
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Cuerpo",
+		Size = spec.body,
+		CFrame = handle.CFrame * CFrame.new(0, 0.55, -0.6),
+		Color = spec.color,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Canon",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(spec.len, spec.bore, spec.bore),
+		CFrame = handle.CFrame * CFrame.new(0, 0.62, -(spec.len * 0.5 + 0.35)) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(38, 40, 46),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Culata",
+		Size = Vector3.new(0.22, spec.stockY or 0.42, 0.85),
+		CFrame = handle.CFrame * CFrame.new(0, 0.42, 0.35),
+		Color = spec.stock or spec.color,
+		Material = spec.wood and Enum.Material.Wood or Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Cargador",
+		Size = Vector3.new(0.16, 0.5, 0.3),
+		CFrame = handle.CFrame * CFrame.new(0, 0.12, -0.5) * CFrame.Angles(math.rad(-14), 0, 0),
+		Color = spec.color,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	return tool
+end
+
 local function buildLootTool(parent, id)
 	if not Config.Weapons[id] then
 		return nil
@@ -5589,6 +5759,8 @@ local function buildLootTool(parent, id)
 		tool = buildKnifeTool(id)
 	elseif id == "lanzallamas" then
 		tool = buildFlamethrowerTool(id)
+	elseif COUNTER_TOOLS[id] then
+		tool = buildCounterTool(id)
 	else
 		tool = buildRocketTool(id)
 	end
@@ -5930,6 +6102,16 @@ function Actions.applySpread(dir, weaponId, root, data)
 	return (CFrame.lookAt(Vector3.new(), dir) * spread).LookVector, grados
 end
 
+-- Abre un cono al azar alrededor de una direccion (perdigones de escopeta)
+function Actions.coneDirection(dir, halfAngleDeg)
+	local up = math.abs(dir.Y) &lt; 0.99 and Vector3.new(0, 1, 0) or Vector3.new(1, 0, 0)
+	local right = dir:Cross(up).Unit
+	local realUp = right:Cross(dir).Unit
+	local ax = (math.random() * 2 - 1) * math.rad(halfAngleDeg)
+	local ay = (math.random() * 2 - 1) * math.rad(halfAngleDeg)
+	return (dir + right * math.tan(ax) + realUp * math.tan(ay)).Unit
+end
+
 -- ===============================================================
 -- Utilidades
 -- ===============================================================
@@ -6184,34 +6366,43 @@ function Actions.fireWeapon(session, player, weaponId, data)
 	-- Dispersion estilo Counter tambien en los tiros del baul
 	dir = Actions.applySpread(dir, weaponId, root, data)
 
-	local dartPart = Util.makePart({
-		Name = "Proyectil",
-		ClassName = "Part",
-		Size = cfg.size or Vector3.new(0.4, 0.4, 1.6),
-		Color = cfg.color,
-		Material = Enum.Material.Neon,
-		Anchored = true,
-		CanCollide = false,
-		CanQuery = false,
-		CanTouch = false,
-		CFrame = CFrame.lookAt(muzzle + dir * 1.2, muzzle + dir * 2.2),
-		Parent = workspace,
-	})
-	Util.destroyAfter(dartPart, 6)
+	-- Escopeta: varios perdigones abriendo el cono (mira y agachado lo cierran)
+	local pellets = math.max(1, cfg.pellets or 1)
+	local half = (cfg.spreadHalf or 0) * (data.scoped and 0.55 or 1) * (data.sneak and 0.8 or 1)
+	for _ = 1, pellets do
+		local shotDir = dir
+		if pellets &gt; 1 and half &gt; 0 then
+			shotDir = Actions.coneDirection(dir, half)
+		end
 
-	local dart = {
-		kind = "weapon",
-		weaponId = weaponId,
-		part = dartPart,
-		pos = muzzle + dir * 1.2,
-		dir = dir,
-		speed = cfg.speed,
-		life = cfg.life,
-		player = player,
-		params = Actions.makeDartParams(character, dartPart),
-	}
+		local dartPart = Util.makePart({
+			Name = "Proyectil",
+			ClassName = "Part",
+			Size = cfg.size or Vector3.new(0.4, 0.4, 1.6),
+			Color = cfg.color,
+			Material = Enum.Material.Neon,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.lookAt(muzzle + shotDir * 1.2, muzzle + shotDir * 2.2),
+			Parent = workspace,
+		})
+		Util.destroyAfter(dartPart, 6)
 
-	table.insert(session.projectiles, dart)
+		table.insert(session.projectiles, {
+			kind = "weapon",
+			weaponId = weaponId,
+			part = dartPart,
+			pos = muzzle + shotDir * 1.2,
+			dir = shotDir,
+			speed = cfg.speed,
+			life = cfg.life,
+			player = player,
+			params = Actions.makeDartParams(character, dartPart),
+		})
+	end
+
 	ToolService.startCooldown(player, weaponId, cfg.cooldown)
 	ToolService.consumeLoot(player, weaponId)
 	session:event("dartshot", { pos = muzzle, dir = dir })
@@ -8614,10 +8805,10 @@ function Session:openChest(player, index)
 	for _, entry in ipairs(weapons) do
 		ToolService.takeTool(player, entry.id)
 	end
-	ToolService.giveLoot(player, pick.id, Config.Loot.uses)
+	ToolService.giveLoot(player, pick.id, pick.uses or Config.Loot.uses)
 
 	local cfg = Config.Weapons[pick.id]
-	self:notify(player, string.format(Config.Text.ChestLoot, cfg.name, Config.Loot.uses), cfg.color, 5)
+	self:notify(player, string.format(Config.Text.ChestLoot, cfg.name, pick.uses or Config.Loot.uses), cfg.color, 5)
 	self:event("chestopen", { pos = chest.center })
 	self:sendUpdate(player)
 end
@@ -9391,7 +9582,6 @@ local hiddenNow = false -- escondido en un armario/barril/pajar: no te moves
 local scoped = false
 local scopeLevel = 0
 local equippedId = nil
-local firstPerson = false -- vista en primera persona (tecla V)
 
 local function applySpeed()
 	local hum = humanoid()
@@ -9460,7 +9650,10 @@ end
 -- Mira del rifle (clic derecho para apuntar)
 -- ===============================================================
 local function applyCameraMode()
-	local first = scoped or (firstPerson and state.active and state.phase == "playing")
+	-- Estilo Counter Blox: durante la partida se juega SIEMPRE en primera
+	-- persona; en el lobby y la votacion la vista queda libre.
+	local round = state.active and (state.phase == "playing" or state.phase == "countdown")
+	local first = scoped or round
 	local mode = first and Enum.CameraMode.LockFirstPerson or Enum.CameraMode.Classic
 	if player.CameraMode ~= mode then
 		player.CameraMode = mode
@@ -9488,19 +9681,22 @@ end
 local SCOPE_WEAPONS = {
 	rifle = true, pintura = true, relente = true, revolver = true,
 	arco = true, sniper = true, cuchillo = true, lanzallamas = true, cohete = true,
+	ak = true, m4 = true, mp5 = true, glock = true, escopeta = true,
 }
 
 -- Vista de arma estilo Counter: se ve en primera persona y al apuntar.
 -- Con la telescopica puesta el arma se esconde (solo queda la mira).
 local function refreshViewmodel()
-	local playing = state.active and state.phase == "playing"
-	local show = playing and (scoped or firstPerson)
+	local round = state.active and (state.phase == "playing" or state.phase == "countdown")
+	local armed = equippedId ~= nil and ViewModel.hasWeapon(equippedId)
+	local show = round and armed and not hiddenNow
 	ViewModel.setWeapon(equippedId)
 	ViewModel.setVisible(show)
 	ViewModel.setAds(scoped and equippedId ~= "sniper" and 1 or 0)
 	ViewModel.setHidden(scoped and equippedId == "sniper")
-	-- El arma "de verdad" del personaje se esconde cuando manda la vista
-	setWeaponHidden(scoped or (show and ViewModel.hasWeapon(equippedId)))
+	-- En primera persona el arma "de verdad" del personaje no se usa:
+	-- manda la vista estilo Counter (asi no se cruza con la cara)
+	setWeaponHidden(round or scoped)
 end
 
 local function scopeFov(id, level)
@@ -9601,6 +9797,11 @@ local function aimPoint()
 	return camera.CFrame.Position + camera.CFrame.LookVector * 220
 end
 
+-- Rafaga automatica estilo Counter: mantene apretado y sigue disparando
+local holdingFire = false
+local autoJob = nil
+local startAutoFire
+
 local function fireTool(toolId)
 	if not state.active or state.phase ~= "playing" then
 		sound2D(Config.Sounds.denied, 0.5)
@@ -9642,12 +9843,17 @@ local function fireTool(toolId)
 		sound2D(Config.Sounds.netSwing, 0.55, 1.3)
 	elseif toolId == "lanzallamas" then
 		sound2D(Config.Sounds.dartShot, 0.7, 0.55)
+	elseif toolId == "ak" or toolId == "m4" or toolId == "mp5" or toolId == "glock" then
+		sound2D(Config.Sounds.dartShot, 0.62, 1.45)
+	elseif toolId == "escopeta" then
+		sound2D(Config.Sounds.dartShot, 0.95, 0.5)
 	end
 
 	-- Patada del arma (estilo Counter)
 	local RECOIL = {
 		rifle = 0.45, pintura = 0.45, relente = 0.45, sniper = 1.1,
 		revolver = 0.7, cohete = 1.0, arco = 0.5, cuchillo = 0.35, lanzallamas = 0.3,
+		ak = 0.8, m4 = 0.7, mp5 = 0.5, glock = 0.5, escopeta = 0.95,
 	}
 	ViewModel.recoil(RECOIL[toolId] or 0)
 	ViewModel.flash()
@@ -9659,6 +9865,34 @@ local function fireTool(toolId)
 	ViewModel.kickCamera(kick * (1 + math.random() * 0.5), kick * (math.random() * 4 - 2))
 
 	shotBloom = math.min(20, shotBloom + 8)
+
+	-- Automaticas (AK, M4, MP5): si seguis apretando, la rafaga continua
+	local wcfg = Config.Weapons[toolId]
+	if wcfg and wcfg.auto and holdingFire then
+		startAutoFire(toolId)
+	end
+end
+
+startAutoFire = function(toolId)
+	if autoJob then
+		return
+	end
+	autoJob = toolId
+	task.spawn(function()
+		local wcfg = Config.Weapons[toolId]
+		local step = (wcfg and wcfg.cooldown or 0.12) * 1.08
+		while autoJob == toolId and holdingFire and equippedId == toolId
+			and state.active and state.phase == "playing" do
+			task.wait(step)
+			if autoJob ~= toolId or not holdingFire then
+				break
+			end
+			fireTool(toolId)
+		end
+		if autoJob == toolId then
+			autoJob = nil
+		end
+	end)
 end
 
 local hookedTools = {}
@@ -9712,6 +9946,14 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then
 		return
 	end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		holdingFire = true
+		local wcfg = equippedId and Config.Weapons[equippedId]
+		if wcfg and wcfg.auto then
+			startAutoFire(equippedId)
+		end
+		return
+	end
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		-- Clic derecho: mira estilo Counter. El francotirador va ciclando
 		-- la telescopica: 5x -&gt; 10x -&gt; sin mira.
@@ -9739,17 +9981,14 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		or input.KeyCode == Enum.KeyCode.C then
 		sneaking = true
 		applySpeed()
-	elseif input.KeyCode == Enum.KeyCode.V then
-		if state.active and state.phase == "playing" then
-			firstPerson = not firstPerson
-			applyCameraMode()
-			refreshViewmodel()
-			sound2D(Config.Sounds.ui, 0.35)
-		end
 	end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		holdingFire = false
+		return
+	end
 	if input.KeyCode == Enum.KeyCode.LeftShift then
 		sprinting = false
 		applySpeed()
@@ -9797,12 +10036,12 @@ RunService.RenderStepped:Connect(function(dt)
 		and equippedId ~= nil and ViewModel.hasWeapon(equippedId)
 	if show ~= lastCross then
 		lastCross = show
-		HUD.setCrosshair(show, 6, 9)
+		HUD.setCrosshair(show, 4, 5)
 	end
 	if show then
 		local grados = spreadErrorLocal(equippedId)
-		HUD.setCrosshair(true, 5 + math.min(grados * 5, 30) + shotBloom * 0.55,
-			7 + math.min(grados * 2, 10))
+		HUD.setCrosshair(true, 3 + math.min(grados * 2.2, 12) + shotBloom * 0.35,
+			4 + math.min(grados * 0.8, 4))
 	end
 end)
 
@@ -9845,7 +10084,6 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 	applyCameraMode()
 	if state.hidden ~= hiddenNow then
 		hiddenNow = state.hidden
-		firstPerson = state.hidden
 		if hiddenNow then
 			setScope(false)
 			sound2D(Config.Sounds.rustle, 0.5)
@@ -10136,7 +10374,6 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 			sound2D(Config.Sounds.lose, 0.8)
 			-- Camara en tercera persona para ver como te come
 			setScope(false)
-			firstPerson = false
 			local now = os.clock()
 			eatCam = {
 				start = now,
@@ -10164,7 +10401,6 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 		end
 		if data.userId == player.UserId then
 			setScope(false)
-			firstPerson = false
 			sound2D(Config.Sounds.lose, 0.8)
 			if state.modeId == "asedio" then
 				HUD.death("¡TE NOQUEARON!", "Volvés al combate en unos segundos...")
@@ -11617,22 +11853,22 @@ function HUD.setCrosshair(visible, gap, length)
 	if not visible then
 		return
 	end
-	gap = math.clamp(gap or 5, 0, 60)
-	length = math.clamp(length or 9, 4, 30)
+	gap = math.clamp(gap or 4, 0, 40)
+	length = math.clamp(length or 5, 3, 14)
 	for _, item in ipairs(parts.crossLines or {}) do
 		local line = item.line
 		if item.axis == "up" then
 			line.Position = UDim2.new(0.5, 0, 0.5, -gap)
-			line.Size = UDim2.new(0, 2, 0, length)
+			line.Size = UDim2.new(0, 1, 0, length)
 		elseif item.axis == "down" then
 			line.Position = UDim2.new(0.5, 0, 0.5, gap)
-			line.Size = UDim2.new(0, 2, 0, length)
+			line.Size = UDim2.new(0, 1, 0, length)
 		elseif item.axis == "left" then
 			line.Position = UDim2.new(0.5, -gap, 0.5, 0)
-			line.Size = UDim2.new(0, length, 0, 2)
+			line.Size = UDim2.new(0, length, 0, 1)
 		else
 			line.Position = UDim2.new(0.5, gap, 0.5, 0)
-			line.Size = UDim2.new(0, length, 0, 2)
+			line.Size = UDim2.new(0, length, 0, 1)
 		end
 	end
 end
@@ -12148,9 +12384,10 @@ local recoilRoll = 0   -- volcado al azar de la patada (estilo Counter)
 local camKick = Vector2.new(0, 0) -- patada de camara (radianes)
 local flashTimer = 0   -- fogonazo del canon
 
--- Posicion del arma respecto de la camara
-local HIP = CFrame.new(0.85, -0.95, -1.45)
-local ADS = CFrame.new(0.02, -0.55, -1.1)
+-- Posicion del arma respecto de la camara (estilo Counter Blox: al costado,
+-- bien abajo a la derecha y con una leve inclinacion, para no tapar la vista)
+local HIP = CFrame.new(0.5, -1.25, -2.7) * CFrame.Angles(math.rad(1.5), math.rad(6), math.rad(-6))
+local ADS = CFrame.new(0, -0.62, -2.2)
 
 -- ===============================================================
 -- Construccion de las armas (cajas simples, estilo Counter)
@@ -12276,6 +12513,50 @@ local function buildCohete()
 	return model
 end
 
+-- ===== Arsenal estilo Counter Blox =====
+local function buildAK()
+	return buildRifle(Color3.fromRGB(150, 96, 52), Color3.fromRGB(70, 74, 84))
+end
+
+local function buildM4()
+	return buildRifle(Color3.fromRGB(72, 80, 94), Color3.fromRGB(90, 130, 190))
+end
+
+local function buildMP5()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.5, 0.6, 1.5), CFrame.new(0, -0.06, -0.3), Color3.fromRGB(60, 66, 76))
+	piece(model, Vector3.new(0.22, 0.22, 1.3), CFrame.new(0, 0.2, -1.7), Color3.fromRGB(40, 44, 50))
+	piece(model, Vector3.new(0.18, 0.18, 0.4), CFrame.new(0, 0.2, -2.4), Color3.fromRGB(30, 33, 38))
+	piece(model, Vector3.new(0.34, 0.55, 0.5), CFrame.new(0, -0.55, 0.35) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(48, 52, 60))
+	piece(model, Vector3.new(0.2, 0.45, 0.3), CFrame.new(0, -0.42, -0.5) * CFrame.Angles(math.rad(-14), 0, 0), Color3.fromRGB(44, 48, 54))
+	piece(model, Vector3.new(0.26, 0.24, 0.7), CFrame.new(0, 0.36, -0.5), Color3.fromRGB(210, 160, 60))
+	model.muzzle = Vector3.new(0, 0.2, -2.55)
+	return model
+end
+
+local function buildGlock()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.3, 0.42, 1.15), CFrame.new(0, 0.08, -0.55), Color3.fromRGB(58, 60, 68))
+	piece(model, Vector3.new(0.26, 0.52, 0.44), CFrame.new(0, -0.34, -0.02) * CFrame.Angles(math.rad(-8), 0, 0), Color3.fromRGB(46, 48, 54))
+	piece(model, Vector3.new(0.5, 0.14, 0.14), CFrame.new(0, 0.08, -1.35) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(80, 84, 94), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.1, 0.1, 0.1), CFrame.new(0, 0.33, -0.95), Color3.fromRGB(236, 238, 244), Enum.Material.SmoothPlastic)
+	model.muzzle = Vector3.new(0, 0.08, -1.6)
+	return model
+end
+
+local function buildEscopeta()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.36, 0.5, 1.4), CFrame.new(0, -0.1, 1.1), Color3.fromRGB(118, 80, 50), Enum.Material.Wood)
+	piece(model, Vector3.new(0.34, 0.5, 1.3), CFrame.new(0, 0, -0.35), Color3.fromRGB(66, 70, 76))
+	piece(model, Vector3.new(2.4, 0.22, 0.22), CFrame.new(0, 0.16, -1.75) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(52, 54, 60), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.34, 0.28, 0.9), CFrame.new(0, -0.16, -1.55), Color3.fromRGB(96, 74, 52), Enum.Material.Wood)
+	piece(model, Vector3.new(0.22, 0.22, 0.6), CFrame.new(0, -0.05, -0.9), Color3.fromRGB(58, 62, 68))
+	model.muzzle = Vector3.new(0, 0.16, -3.0)
+	return model
+end
+
 local BUILDERS = {
 	rifle = function() return buildRifle(nil, nil) end,
 	pintura = function() return buildRifle(Color3.fromRGB(120, 84, 108), Color3.fromRGB(230, 120, 190)) end,
@@ -12286,6 +12567,12 @@ local BUILDERS = {
 	cuchillo = buildCuchillo,
 	lanzallamas = buildLanzallamas,
 	cohete = buildCohete,
+	-- Arsenal Counter Blox
+	ak = buildAK,
+	m4 = buildM4,
+	mp5 = buildMP5,
+	glock = buildGlock,
+	escopeta = buildEscopeta,
 }
 
 -- ===============================================================

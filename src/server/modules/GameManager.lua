@@ -1645,10 +1645,10 @@ function Session:openChest(player, index)
 	for _, entry in ipairs(weapons) do
 		ToolService.takeTool(player, entry.id)
 	end
-	ToolService.giveLoot(player, pick.id, Config.Loot.uses)
+	ToolService.giveLoot(player, pick.id, pick.uses or Config.Loot.uses)
 
 	local cfg = Config.Weapons[pick.id]
-	self:notify(player, string.format(Config.Text.ChestLoot, cfg.name, Config.Loot.uses), cfg.color, 5)
+	self:notify(player, string.format(Config.Text.ChestLoot, cfg.name, pick.uses or Config.Loot.uses), cfg.color, 5)
 	self:event("chestopen", { pos = chest.center })
 	self:sendUpdate(player)
 end

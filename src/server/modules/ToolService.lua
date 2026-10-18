@@ -652,6 +652,76 @@ local function buildFlamethrowerTool(id)
 	return tool
 end
 
+-- Armas estilo Counter Blox (AK, M4, MP5, Glock, escopeta): cuerpo,
+-- cañon, culata y cargador simples, como el resto de las armas de baul.
+local COUNTER_TOOLS = {
+	ak = {
+		color = Color3.fromRGB(150, 104, 62), body = Vector3.new(0.24, 0.34, 1.5),
+		len = 1.5, bore = 0.17, wood = true, stock = Color3.fromRGB(126, 90, 58),
+	},
+	m4 = {
+		color = Color3.fromRGB(64, 70, 82), body = Vector3.new(0.24, 0.32, 1.6),
+		len = 1.7, bore = 0.15,
+	},
+	mp5 = {
+		color = Color3.fromRGB(58, 62, 72), body = Vector3.new(0.22, 0.30, 1.1),
+		len = 1.0, bore = 0.15, stockY = 0.35,
+	},
+	glock = {
+		color = Color3.fromRGB(70, 72, 80), body = Vector3.new(0.14, 0.24, 0.8),
+		len = 0.55, bore = 0.13, stockY = 0.22,
+	},
+	escopeta = {
+		color = Color3.fromRGB(96, 74, 54), body = Vector3.new(0.24, 0.32, 1.5),
+		len = 1.7, bore = 0.22, wood = true, stock = Color3.fromRGB(118, 80, 50),
+	},
+}
+
+local function buildCounterTool(id)
+	local spec = COUNTER_TOOLS[id]
+	local tool = prepareLootTool(id)
+	tool.Grip = CFrame.new(0, -0.2, 0.35) * CFrame.Angles(math.rad(-90), 0, 0)
+	local handle = newHandle({
+		Size = Vector3.new(0.26, 0.85, 0.4),
+		Color = Color3.fromRGB(52, 56, 64),
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Cuerpo",
+		Size = spec.body,
+		CFrame = handle.CFrame * CFrame.new(0, 0.55, -0.6),
+		Color = spec.color,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Canon",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(spec.len, spec.bore, spec.bore),
+		CFrame = handle.CFrame * CFrame.new(0, 0.62, -(spec.len * 0.5 + 0.35)) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(38, 40, 46),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Culata",
+		Size = Vector3.new(0.22, spec.stockY or 0.42, 0.85),
+		CFrame = handle.CFrame * CFrame.new(0, 0.42, 0.35),
+		Color = spec.stock or spec.color,
+		Material = spec.wood and Enum.Material.Wood or Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Cargador",
+		Size = Vector3.new(0.16, 0.5, 0.3),
+		CFrame = handle.CFrame * CFrame.new(0, 0.12, -0.5) * CFrame.Angles(math.rad(-14), 0, 0),
+		Color = spec.color,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	return tool
+end
+
 local function buildLootTool(parent, id)
 	if not Config.Weapons[id] then
 		return nil
@@ -668,6 +738,8 @@ local function buildLootTool(parent, id)
 		tool = buildKnifeTool(id)
 	elseif id == "lanzallamas" then
 		tool = buildFlamethrowerTool(id)
+	elseif COUNTER_TOOLS[id] then
+		tool = buildCounterTool(id)
 	else
 		tool = buildRocketTool(id)
 	end

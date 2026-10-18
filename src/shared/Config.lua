@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.4.1"
+Config.Version = "1.5.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -198,6 +198,13 @@ Config.Shoot = {
 		cuchillo = { recoil = 92 },
 		lanzallamas = { vel = 0.5, recoil = 88 },
 		cohete = { recoil = 18 },
+		-- Arsenal estilo Counter Blox (baules): automaticas, MP5, pistola
+		-- y escopeta de perdigones.
+		ak = { vel = 0.55, spread = 1.1, dead = 1.6, recoil = 62 },
+		m4 = { vel = 0.45, spread = 0.8, dead = 1.4, recoil = 70 },
+		mp5 = { vel = 0.50, spread = 0.9, dead = 1.5, recoil = 78 },
+		glock = { vel = 0.42, spread = 0.5, dead = 1.5, recoil = 55 },
+		escopeta = { vel = 0.40, spread = 0.6, dead = 0, recoil = 40 },
 	},
 }
 
@@ -263,6 +270,12 @@ Config.Loot = {
 		{ id = "lanzallamas", weight = 14 },
 		{ id = "sniper", weight = 14 },
 		{ id = "cohete", weight = 8 },
+		-- Arsenal estilo Counter Blox: automaticas y escopeta (mas tiros)
+		{ id = "ak", weight = 10, uses = 60 },
+		{ id = "m4", weight = 10, uses = 70 },
+		{ id = "mp5", weight = 10, uses = 80 },
+		{ id = "glock", weight = 12, uses = 40 },
+		{ id = "escopeta", weight = 10, uses = 20 },
 	},
 }
 
@@ -352,6 +365,93 @@ Config.Weapons = {
 		slowFactor = 0.60,
 		slowTime = 1.0,
 		size = Vector3.new(0.3, 0.3, 1.6),
+	},
+
+	-- ===== Arsenal estilo Counter Blox (sale de los baules) =====
+	ak = {
+		name = "AK-47",
+		color = Color3.fromRGB(196, 140, 78),
+		cooldown = 0.10,   -- automatica: mantene el clic para rafaguear
+		auto = true,
+		speed = 280,
+		life = 1.6,
+		blast = 0,
+		damage = 34,       -- estilo Counter: 3 tiros al cuerpo
+		minDamage = 18,
+		falloff = 1,
+		headMult = 2.4,    -- a la cabeza: 82
+		knockback = 30,
+		slowFactor = 0.50,
+		slowTime = 1.5,
+		size = Vector3.new(0.32, 0.32, 1.7),
+	},
+	m4 = {
+		name = "M4A1",
+		color = Color3.fromRGB(120, 150, 190),
+		cooldown = 0.09,
+		auto = true,
+		speed = 290,
+		life = 1.6,
+		blast = 0,
+		damage = 30,
+		minDamage = 20,
+		falloff = 0.8,
+		headMult = 2.3,    -- a la cabeza: 69
+		knockback = 26,
+		slowFactor = 0.50,
+		slowTime = 1.4,
+		size = Vector3.new(0.30, 0.30, 1.8),
+	},
+	mp5 = {
+		name = "MP5",
+		color = Color3.fromRGB(96, 104, 118),
+		cooldown = 0.075,
+		auto = true,
+		speed = 250,
+		life = 1.4,
+		blast = 0,
+		damage = 22,       -- rafagas cortas, mucho control
+		minDamage = 13,
+		falloff = 1.2,
+		headMult = 2.0,    -- a la cabeza: 44
+		knockback = 20,
+		slowFactor = 0.55,
+		slowTime = 1.2,
+		size = Vector3.new(0.26, 0.26, 1.5),
+	},
+	glock = {
+		name = "Glock-18",
+		color = Color3.fromRGB(150, 152, 160),
+		cooldown = 0.32,
+		speed = 240,
+		life = 1.5,
+		blast = 0,
+		damage = 26,       -- pistola de arranque
+		minDamage = 14,
+		falloff = 1.1,
+		headMult = 2.4,    -- a la cabeza: 62
+		knockback = 24,
+		slowFactor = 0.55,
+		slowTime = 1.3,
+		size = Vector3.new(0.30, 0.30, 1.2),
+	},
+	escopeta = {
+		name = "Escopeta",
+		color = Color3.fromRGB(200, 170, 120),
+		cooldown = 1.05,
+		pellets = 8,       -- perdigones por disparo (estilo Counter)
+		spreadHalf = 3.6,  -- medio angulo del cono de perdigones
+		speed = 240,
+		life = 0.8,
+		blast = 0,
+		damage = 14,       -- por perdigon: de cerca es letal
+		minDamage = 4,
+		falloff = 2.4,     -- de lejos casi no llega
+		headMult = 1.6,
+		knockback = 34,
+		slowFactor = 0.45,
+		slowTime = 1.6,
+		size = Vector3.new(0.18, 0.18, 0.9),
 	},
 }
 

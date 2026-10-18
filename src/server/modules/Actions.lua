@@ -78,6 +78,16 @@ function Actions.applySpread(dir, weaponId, root, data)
 	return (CFrame.lookAt(Vector3.new(), dir) * spread).LookVector, grados
 end
 
+-- Abre un cono al azar alrededor de una direccion (perdigones de escopeta)
+function Actions.coneDirection(dir, halfAngleDeg)
+	local up = math.abs(dir.Y) < 0.99 and Vector3.new(0, 1, 0) or Vector3.new(1, 0, 0)
+	local right = dir:Cross(up).Unit
+	local realUp = right:Cross(dir).Unit
+	local ax = (math.random() * 2 - 1) * math.rad(halfAngleDeg)
+	local ay = (math.random() * 2 - 1) * math.rad(halfAngleDeg)
+	return (dir + right * math.tan(ax) + realUp * math.tan(ay)).Unit
+end
+
 -- ===============================================================
 -- Utilidades
 -- ===============================================================
@@ -332,34 +342,43 @@ function Actions.fireWeapon(session, player, weaponId, data)
 	-- Dispersion estilo Counter tambien en los tiros del baul
 	dir = Actions.applySpread(dir, weaponId, root, data)
 
-	local dartPart = Util.makePart({
-		Name = "Proyectil",
-		ClassName = "Part",
-		Size = cfg.size or Vector3.new(0.4, 0.4, 1.6),
-		Color = cfg.color,
-		Material = Enum.Material.Neon,
-		Anchored = true,
-		CanCollide = false,
-		CanQuery = false,
-		CanTouch = false,
-		CFrame = CFrame.lookAt(muzzle + dir * 1.2, muzzle + dir * 2.2),
-		Parent = workspace,
-	})
-	Util.destroyAfter(dartPart, 6)
+	-- Escopeta: varios perdigones abriendo el cono (mira y agachado lo cierran)
+	local pellets = math.max(1, cfg.pellets or 1)
+	local half = (cfg.spreadHalf or 0) * (data.scoped and 0.55 or 1) * (data.sneak and 0.8 or 1)
+	for _ = 1, pellets do
+		local shotDir = dir
+		if pellets > 1 and half > 0 then
+			shotDir = Actions.coneDirection(dir, half)
+		end
 
-	local dart = {
-		kind = "weapon",
-		weaponId = weaponId,
-		part = dartPart,
-		pos = muzzle + dir * 1.2,
-		dir = dir,
-		speed = cfg.speed,
-		life = cfg.life,
-		player = player,
-		params = Actions.makeDartParams(character, dartPart),
-	}
+		local dartPart = Util.makePart({
+			Name = "Proyectil",
+			ClassName = "Part",
+			Size = cfg.size or Vector3.new(0.4, 0.4, 1.6),
+			Color = cfg.color,
+			Material = Enum.Material.Neon,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.lookAt(muzzle + shotDir * 1.2, muzzle + shotDir * 2.2),
+			Parent = workspace,
+		})
+		Util.destroyAfter(dartPart, 6)
 
-	table.insert(session.projectiles, dart)
+		table.insert(session.projectiles, {
+			kind = "weapon",
+			weaponId = weaponId,
+			part = dartPart,
+			pos = muzzle + shotDir * 1.2,
+			dir = shotDir,
+			speed = cfg.speed,
+			life = cfg.life,
+			player = player,
+			params = Actions.makeDartParams(character, dartPart),
+		})
+	end
+
 	ToolService.startCooldown(player, weaponId, cfg.cooldown)
 	ToolService.consumeLoot(player, weaponId)
 	session:event("dartshot", { pos = muzzle, dir = dir })

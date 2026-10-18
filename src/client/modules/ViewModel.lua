@@ -32,9 +32,10 @@ local recoilRoll = 0   -- volcado al azar de la patada (estilo Counter)
 local camKick = Vector2.new(0, 0) -- patada de camara (radianes)
 local flashTimer = 0   -- fogonazo del canon
 
--- Posicion del arma respecto de la camara
-local HIP = CFrame.new(0.85, -0.95, -1.45)
-local ADS = CFrame.new(0.02, -0.55, -1.1)
+-- Posicion del arma respecto de la camara (estilo Counter Blox: al costado,
+-- bien abajo a la derecha y con una leve inclinacion, para no tapar la vista)
+local HIP = CFrame.new(0.5, -1.25, -2.7) * CFrame.Angles(math.rad(1.5), math.rad(6), math.rad(-6))
+local ADS = CFrame.new(0, -0.62, -2.2)
 
 -- ===============================================================
 -- Construccion de las armas (cajas simples, estilo Counter)
@@ -160,6 +161,50 @@ local function buildCohete()
 	return model
 end
 
+-- ===== Arsenal estilo Counter Blox =====
+local function buildAK()
+	return buildRifle(Color3.fromRGB(150, 96, 52), Color3.fromRGB(70, 74, 84))
+end
+
+local function buildM4()
+	return buildRifle(Color3.fromRGB(72, 80, 94), Color3.fromRGB(90, 130, 190))
+end
+
+local function buildMP5()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.5, 0.6, 1.5), CFrame.new(0, -0.06, -0.3), Color3.fromRGB(60, 66, 76))
+	piece(model, Vector3.new(0.22, 0.22, 1.3), CFrame.new(0, 0.2, -1.7), Color3.fromRGB(40, 44, 50))
+	piece(model, Vector3.new(0.18, 0.18, 0.4), CFrame.new(0, 0.2, -2.4), Color3.fromRGB(30, 33, 38))
+	piece(model, Vector3.new(0.34, 0.55, 0.5), CFrame.new(0, -0.55, 0.35) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(48, 52, 60))
+	piece(model, Vector3.new(0.2, 0.45, 0.3), CFrame.new(0, -0.42, -0.5) * CFrame.Angles(math.rad(-14), 0, 0), Color3.fromRGB(44, 48, 54))
+	piece(model, Vector3.new(0.26, 0.24, 0.7), CFrame.new(0, 0.36, -0.5), Color3.fromRGB(210, 160, 60))
+	model.muzzle = Vector3.new(0, 0.2, -2.55)
+	return model
+end
+
+local function buildGlock()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.3, 0.42, 1.15), CFrame.new(0, 0.08, -0.55), Color3.fromRGB(58, 60, 68))
+	piece(model, Vector3.new(0.26, 0.52, 0.44), CFrame.new(0, -0.34, -0.02) * CFrame.Angles(math.rad(-8), 0, 0), Color3.fromRGB(46, 48, 54))
+	piece(model, Vector3.new(0.5, 0.14, 0.14), CFrame.new(0, 0.08, -1.35) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(80, 84, 94), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.1, 0.1, 0.1), CFrame.new(0, 0.33, -0.95), Color3.fromRGB(236, 238, 244), Enum.Material.SmoothPlastic)
+	model.muzzle = Vector3.new(0, 0.08, -1.6)
+	return model
+end
+
+local function buildEscopeta()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.36, 0.5, 1.4), CFrame.new(0, -0.1, 1.1), Color3.fromRGB(118, 80, 50), Enum.Material.Wood)
+	piece(model, Vector3.new(0.34, 0.5, 1.3), CFrame.new(0, 0, -0.35), Color3.fromRGB(66, 70, 76))
+	piece(model, Vector3.new(2.4, 0.22, 0.22), CFrame.new(0, 0.16, -1.75) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(52, 54, 60), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.34, 0.28, 0.9), CFrame.new(0, -0.16, -1.55), Color3.fromRGB(96, 74, 52), Enum.Material.Wood)
+	piece(model, Vector3.new(0.22, 0.22, 0.6), CFrame.new(0, -0.05, -0.9), Color3.fromRGB(58, 62, 68))
+	model.muzzle = Vector3.new(0, 0.16, -3.0)
+	return model
+end
+
 local BUILDERS = {
 	rifle = function() return buildRifle(nil, nil) end,
 	pintura = function() return buildRifle(Color3.fromRGB(120, 84, 108), Color3.fromRGB(230, 120, 190)) end,
@@ -170,6 +215,12 @@ local BUILDERS = {
 	cuchillo = buildCuchillo,
 	lanzallamas = buildLanzallamas,
 	cohete = buildCohete,
+	-- Arsenal Counter Blox
+	ak = buildAK,
+	m4 = buildM4,
+	mp5 = buildMP5,
+	glock = buildGlock,
+	escopeta = buildEscopeta,
 }
 
 -- ===============================================================

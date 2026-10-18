@@ -163,7 +163,6 @@ local hiddenNow = false -- escondido en un armario/barril/pajar: no te moves
 local scoped = false
 local scopeLevel = 0
 local equippedId = nil
-local firstPerson = false -- vista en primera persona (tecla V)
 
 local function applySpeed()
 	local hum = humanoid()
@@ -232,7 +231,10 @@ end
 -- Mira del rifle (clic derecho para apuntar)
 -- ===============================================================
 local function applyCameraMode()
-	local first = scoped or (firstPerson and state.active and state.phase == "playing")
+	-- Estilo Counter Blox: durante la partida se juega SIEMPRE en primera
+	-- persona; en el lobby y la votacion la vista queda libre.
+	local round = state.active and (state.phase == "playing" or state.phase == "countdown")
+	local first = scoped or round
 	local mode = first and Enum.CameraMode.LockFirstPerson or Enum.CameraMode.Classic
 	if player.CameraMode ~= mode then
 		player.CameraMode = mode
@@ -260,19 +262,22 @@ end
 local SCOPE_WEAPONS = {
 	rifle = true, pintura = true, relente = true, revolver = true,
 	arco = true, sniper = true, cuchillo = true, lanzallamas = true, cohete = true,
+	ak = true, m4 = true, mp5 = true, glock = true, escopeta = true,
 }
 
 -- Vista de arma estilo Counter: se ve en primera persona y al apuntar.
 -- Con la telescopica puesta el arma se esconde (solo queda la mira).
 local function refreshViewmodel()
-	local playing = state.active and state.phase == "playing"
-	local show = playing and (scoped or firstPerson)
+	local round = state.active and (state.phase == "playing" or state.phase == "countdown")
+	local armed = equippedId ~= nil and ViewModel.hasWeapon(equippedId)
+	local show = round and armed and not hiddenNow
 	ViewModel.setWeapon(equippedId)
 	ViewModel.setVisible(show)
 	ViewModel.setAds(scoped and equippedId ~= "sniper" and 1 or 0)
 	ViewModel.setHidden(scoped and equippedId == "sniper")
-	-- El arma "de verdad" del personaje se esconde cuando manda la vista
-	setWeaponHidden(scoped or (show and ViewModel.hasWeapon(equippedId)))
+	-- En primera persona el arma "de verdad" del personaje no se usa:
+	-- manda la vista estilo Counter (asi no se cruza con la cara)
+	setWeaponHidden(round or scoped)
 end
 
 local function scopeFov(id, level)
@@ -373,6 +378,11 @@ local function aimPoint()
 	return camera.CFrame.Position + camera.CFrame.LookVector * 220
 end
 
+-- Rafaga automatica estilo Counter: mantene apretado y sigue disparando
+local holdingFire = false
+local autoJob = nil
+local startAutoFire
+
 local function fireTool(toolId)
 	if not state.active or state.phase ~= "playing" then
 		sound2D(Config.Sounds.denied, 0.5)
@@ -414,12 +424,17 @@ local function fireTool(toolId)
 		sound2D(Config.Sounds.netSwing, 0.55, 1.3)
 	elseif toolId == "lanzallamas" then
 		sound2D(Config.Sounds.dartShot, 0.7, 0.55)
+	elseif toolId == "ak" or toolId == "m4" or toolId == "mp5" or toolId == "glock" then
+		sound2D(Config.Sounds.dartShot, 0.62, 1.45)
+	elseif toolId == "escopeta" then
+		sound2D(Config.Sounds.dartShot, 0.95, 0.5)
 	end
 
 	-- Patada del arma (estilo Counter)
 	local RECOIL = {
 		rifle = 0.45, pintura = 0.45, relente = 0.45, sniper = 1.1,
 		revolver = 0.7, cohete = 1.0, arco = 0.5, cuchillo = 0.35, lanzallamas = 0.3,
+		ak = 0.8, m4 = 0.7, mp5 = 0.5, glock = 0.5, escopeta = 0.95,
 	}
 	ViewModel.recoil(RECOIL[toolId] or 0)
 	ViewModel.flash()
@@ -431,6 +446,34 @@ local function fireTool(toolId)
 	ViewModel.kickCamera(kick * (1 + math.random() * 0.5), kick * (math.random() * 4 - 2))
 
 	shotBloom = math.min(20, shotBloom + 8)
+
+	-- Automaticas (AK, M4, MP5): si seguis apretando, la rafaga continua
+	local wcfg = Config.Weapons[toolId]
+	if wcfg and wcfg.auto and holdingFire then
+		startAutoFire(toolId)
+	end
+end
+
+startAutoFire = function(toolId)
+	if autoJob then
+		return
+	end
+	autoJob = toolId
+	task.spawn(function()
+		local wcfg = Config.Weapons[toolId]
+		local step = (wcfg and wcfg.cooldown or 0.12) * 1.08
+		while autoJob == toolId and holdingFire and equippedId == toolId
+			and state.active and state.phase == "playing" do
+			task.wait(step)
+			if autoJob ~= toolId or not holdingFire then
+				break
+			end
+			fireTool(toolId)
+		end
+		if autoJob == toolId then
+			autoJob = nil
+		end
+	end)
 end
 
 local hookedTools = {}
@@ -484,6 +527,14 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then
 		return
 	end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		holdingFire = true
+		local wcfg = equippedId and Config.Weapons[equippedId]
+		if wcfg and wcfg.auto then
+			startAutoFire(equippedId)
+		end
+		return
+	end
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		-- Clic derecho: mira estilo Counter. El francotirador va ciclando
 		-- la telescopica: 5x -> 10x -> sin mira.
@@ -511,17 +562,14 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		or input.KeyCode == Enum.KeyCode.C then
 		sneaking = true
 		applySpeed()
-	elseif input.KeyCode == Enum.KeyCode.V then
-		if state.active and state.phase == "playing" then
-			firstPerson = not firstPerson
-			applyCameraMode()
-			refreshViewmodel()
-			sound2D(Config.Sounds.ui, 0.35)
-		end
 	end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		holdingFire = false
+		return
+	end
 	if input.KeyCode == Enum.KeyCode.LeftShift then
 		sprinting = false
 		applySpeed()
@@ -569,12 +617,12 @@ RunService.RenderStepped:Connect(function(dt)
 		and equippedId ~= nil and ViewModel.hasWeapon(equippedId)
 	if show ~= lastCross then
 		lastCross = show
-		HUD.setCrosshair(show, 6, 9)
+		HUD.setCrosshair(show, 4, 5)
 	end
 	if show then
 		local grados = spreadErrorLocal(equippedId)
-		HUD.setCrosshair(true, 5 + math.min(grados * 5, 30) + shotBloom * 0.55,
-			7 + math.min(grados * 2, 10))
+		HUD.setCrosshair(true, 3 + math.min(grados * 2.2, 12) + shotBloom * 0.35,
+			4 + math.min(grados * 0.8, 4))
 	end
 end)
 
@@ -617,7 +665,6 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 	applyCameraMode()
 	if state.hidden ~= hiddenNow then
 		hiddenNow = state.hidden
-		firstPerson = state.hidden
 		if hiddenNow then
 			setScope(false)
 			sound2D(Config.Sounds.rustle, 0.5)
@@ -908,7 +955,6 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 			sound2D(Config.Sounds.lose, 0.8)
 			-- Camara en tercera persona para ver como te come
 			setScope(false)
-			firstPerson = false
 			local now = os.clock()
 			eatCam = {
 				start = now,
@@ -936,7 +982,6 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 		end
 		if data.userId == player.UserId then
 			setScope(false)
-			firstPerson = false
 			sound2D(Config.Sounds.lose, 0.8)
 			if state.modeId == "asedio" then
 				HUD.death("¡TE NOQUEARON!", "Volvés al combate en unos segundos...")

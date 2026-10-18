@@ -42,6 +42,11 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 ### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
 
+> **1.5.0:** primera persona **fija** durante la partida (estilo Counter Blox), el arma pasa
+> **al costado** de la pantalla para no tapar la vista, la **cruz es más chica** y los baúles
+> ahora sueltan el **arsenal Counter**: **AK-47, M4A1, MP5, Glock-18 y Escopeta** (además del
+> revólver, francotirador, arco, cuchillo, lanzallamas y lanzacohetes de siempre).
+
 > **1.4.1:** el juego **no iniciaba en ningún modo** (WorldBuilder no importaba Config y el armado
 > del mundo fallaba al arrancar: "attempt to index nil with 'City'"). Ya está corregido: si el
 > Output muestra esa clase de error, actualizá a la build 1.4.1 o superior.
@@ -76,14 +81,17 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 | Tecla | Acción |
 | --- | --- |
-| **Click** | Usar la herramienta equipada |
-| **Click derecho** | Con el rifle tranquilizante, el de pintura o el ralentizador: **mira** en primera persona (zoom + cruz, el arma se oculta para ver limpio) |
+| **Click** | Usar la herramienta equipada (en las **automáticas** deja el clic **apretado** para rafaguear) |
+| **Click derecho** | Con las armas que apuntan (tranquilizante, pintura, ralentizador y todo el **arsenal Counter**): **mira** con zoom y cruz, el arma se corre al costado |
 | **1 / 2 / 3 / 4 / 5** | Cambiar de herramienta (red / rifle / rastreador / trampa / pintura; en Colosal: rastreador / ralentizador) |
 | **Shift** | Correr (haces mucho ruido: el kiwi te oye y huye) |
 | **Ctrl**, **Alt** o **C** | Agachado en sigilo (casi no te oye; la cámara baja y el arma se afirma: menos dispersión) |
-| **V** | Alternar vista en primera persona |
 | **E** | **Esconderte** en un armario, barril o pajar / **abrir un baúl**. Dentro del escondite, E otra vez te saca |
 | **Tab** | **Tabla estilo Counter** (equipos, marcador y capturas en Asedio) + tabla de jugadores de Roblox |
+
+> **Vista estilo Counter Blox:** durante la partida la cámara es **siempre en primera persona**
+> (en el lobby y la votación queda libre), con el **arma al costado** para no tapar la pantalla
+> y una **cruz chica** que se abre solo cuando te movés o disparás.
 
 ### Herramientas
 
@@ -108,6 +116,12 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 - **Rifle ralentizador** 🧊 — aparece **solo en Kiwi Colosal** (tecla junto al rastreador) y tiene
   **mira**. Sus agujas **no duermen** al gigante: lo dejan **lento 8 segundos** con un tinte frío,
   ojos celestes y un cartel **"¡RALENTIZADO!"** que se ve entre paredes. Tu ventana para escapar.
+- **Arsenal estilo Counter Blox** 🔫 — sale de los **baúles** y trae las clásicas de Counter:
+  **AK-47** (34 de daño, automática), **M4A1** (30, automática y precisa), **MP5** (22, muy
+  manejable), **Glock-18** (26, pistola) y **Escopeta** (8 perdigones: de cerca es letal).
+  Las automáticas **se disparan dejando el clic apretado**; con **clic derecho** apuntás y la
+  dispersión se cierra. Junto al **Revólver**, el **Francotirador**, el **Arco**, el **Cuchillo**,
+  el **Lanzallamas** y el **Lanzacohetes** (y el **tranquilizante** de siempre).
 
 ### Escondites y baúles (1.2.0, ampliados en 1.3.0)
 
@@ -273,7 +287,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.4.1 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.5.0 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):

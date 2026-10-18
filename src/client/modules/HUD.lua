@@ -1346,22 +1346,22 @@ function HUD.setCrosshair(visible, gap, length)
 	if not visible then
 		return
 	end
-	gap = math.clamp(gap or 5, 0, 60)
-	length = math.clamp(length or 9, 4, 30)
+	gap = math.clamp(gap or 4, 0, 40)
+	length = math.clamp(length or 5, 3, 14)
 	for _, item in ipairs(parts.crossLines or {}) do
 		local line = item.line
 		if item.axis == "up" then
 			line.Position = UDim2.new(0.5, 0, 0.5, -gap)
-			line.Size = UDim2.new(0, 2, 0, length)
+			line.Size = UDim2.new(0, 1, 0, length)
 		elseif item.axis == "down" then
 			line.Position = UDim2.new(0.5, 0, 0.5, gap)
-			line.Size = UDim2.new(0, 2, 0, length)
+			line.Size = UDim2.new(0, 1, 0, length)
 		elseif item.axis == "left" then
 			line.Position = UDim2.new(0.5, -gap, 0.5, 0)
-			line.Size = UDim2.new(0, length, 0, 2)
+			line.Size = UDim2.new(0, length, 0, 1)
 		else
 			line.Position = UDim2.new(0.5, gap, 0.5, 0)
-			line.Size = UDim2.new(0, length, 0, 2)
+			line.Size = UDim2.new(0, length, 0, 1)
 		end
 	end
 end
