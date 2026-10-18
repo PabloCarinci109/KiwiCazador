@@ -40,7 +40,11 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 - Las **casas ahora son de dos pisos** (con escalera, planta alta decorada y un **baúl extra**
   arriba) y el granero tiene **silos** de metal al lado. Se puede subir a mirar el mapa desde arriba.
 
-### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0)
+### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
+
+> **1.4.1:** el juego **no iniciaba en ningún modo** (WorldBuilder no importaba Config y el armado
+> del mundo fallaba al arrancar: "attempt to index nil with 'City'"). Ya está corregido: si el
+> Output muestra esa clase de error, actualizá a la build 1.4.1 o superior.
 
 - **Nuevo modo Asedio al Kiwi (5 vs 5):** el juego reparte **Cazadores** y **Defensores** en
   equipos parejos. El kiwi vive en su **casa del nido** (con **correa**: no se aleja de la casa) y
@@ -269,7 +273,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.3.0 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.4.1 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):

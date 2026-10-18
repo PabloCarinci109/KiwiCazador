@@ -594,6 +594,7 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 		refreshViewmodel()
 		HUD.hideResult()
 		HUD.hideVote()
+		HUD.setTeams(nil, nil, nil, nil)
 		HUD.setMenuVisible(true)
 		HUD.setMenuStatus("")
 		HUD.fade(false, 0.5)
@@ -670,6 +671,14 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 	end
 
 	HUD.updateState(newState)
+
+	-- Asedio: marcador de equipos arriba (equipo propio, ronda y puntos)
+	if newState.isAsedio and newState.teamScore then
+		HUD.setTeams(newState.team, newState.teamScore, newState.round, newState.roundsToWin)
+	else
+		HUD.setTeams(nil, nil, nil, nil)
+	end
+
 	applySpeed()
 end)
 
