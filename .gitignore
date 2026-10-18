@@ -1,0 +1,10 @@
+# Editores
+.vscode/
+.idea/
+
+# Python / build
+__pycache__/
+*.pyc
+
+# Logs
+*.log
