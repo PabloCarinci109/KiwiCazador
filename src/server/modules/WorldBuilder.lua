@@ -60,6 +60,54 @@ local function part(props)
 	return Util.makeSolid(props)
 end
 
+-- Baul reutilizable: lo usan las casas de las arenas y el bunker del asedio
+local function chestProp(parent, chests, base, label)
+	local function bx(name, cf, size, color, material)
+		return part({
+			Name = name,
+			Size = size,
+			CFrame = cf,
+			Color = color,
+			Material = material or Enum.Material.WoodPlanks,
+			CanCollide = true,
+			Parent = parent,
+		})
+	end
+	local body = bx("Baul", base * CFrame.new(0, 1.3, 0), Vector3.new(4.2, 2.6, 3.0), Color3.fromRGB(124, 84, 48), Enum.Material.WoodPlanks)
+	bx("AdornoBaul", base * CFrame.new(0, 1.3, 0), Vector3.new(4.35, 0.55, 3.15), Color3.fromRGB(214, 178, 74), Enum.Material.Metal)
+	local hinge = base * CFrame.new(0, 2.6, -1.5)
+	local lidClosed = hinge * CFrame.new(0, 0.25, 1.5)
+	local lidOpen = hinge * CFrame.Angles(math.rad(-78), 0, 0) * CFrame.new(0, 0.25, 1.5)
+	local lid = bx("TapaBaul", lidClosed, Vector3.new(4.2, 0.5, 3.0), Color3.fromRGB(136, 96, 56), Enum.Material.WoodPlanks)
+	local light = Instance.new("PointLight")
+	light.Name = "BrilloBaul"
+	light.Color = Color3.fromRGB(255, 214, 120)
+	light.Range = 18
+	light.Brightness = 1.4
+	light.Parent = body
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "AbrirBaul"
+	prompt.ActionText = "Abrir"
+	prompt.ObjectText = label or "Baúl"
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = body
+	local chest = {
+		body = body,
+		lid = lid,
+		lidClosed = lidClosed,
+		lidOpen = lidOpen,
+		light = light,
+		prompt = prompt,
+		used = false,
+		center = base.Position,
+	}
+	table.insert(chests, chest)
+	return chest
+end
+
 local function makeRustle(parentPart, color)
 	local emitter = Instance.new("ParticleEmitter")
 	emitter.Name = "Rustle"
@@ -1214,39 +1262,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 	end
 
 	local function makeChestProp(base, label)
-		local body = box("Baul", base * CFrame.new(0, 1.3, 0), Vector3.new(4.2, 2.6, 3.0), Color3.fromRGB(124, 84, 48), Enum.Material.WoodPlanks)
-		box("AdornoBaul", base * CFrame.new(0, 1.3, 0), Vector3.new(4.35, 0.55, 3.15), Color3.fromRGB(214, 178, 74), Enum.Material.Metal, false)
-		local hinge = base * CFrame.new(0, 2.6, -1.5)
-		local lidClosed = hinge * CFrame.new(0, 0.25, 1.5)
-		local lidOpen = hinge * CFrame.Angles(math.rad(-78), 0, 0) * CFrame.new(0, 0.25, 1.5)
-		local lid = box("TapaBaul", lidClosed, Vector3.new(4.2, 0.5, 3.0), Color3.fromRGB(136, 96, 56), Enum.Material.WoodPlanks)
-		local light = Instance.new("PointLight")
-		light.Name = "BrilloBaul"
-		light.Color = Color3.fromRGB(255, 214, 120)
-		light.Range = 18
-		light.Brightness = 1.4
-		light.Parent = body
-		local prompt = Instance.new("ProximityPrompt")
-		prompt.Name = "AbrirBaul"
-		prompt.ActionText = "Abrir"
-		prompt.ObjectText = label or "Baúl"
-		prompt.KeyboardKeyCode = Enum.KeyCode.E
-		prompt.HoldDuration = 0
-		prompt.MaxActivationDistance = 10
-		prompt.RequiresLineOfSight = false
-		prompt.Parent = body
-		local chest = {
-			body = body,
-			lid = lid,
-			lidClosed = lidClosed,
-			lidOpen = lidOpen,
-			light = light,
-			prompt = prompt,
-			used = false,
-			center = base.Position,
-		}
-		table.insert(self.chests, chest)
-		return chest
+		return chestProp(props, self.chests, base, label)
 	end
 
 	local function makeTable(cf, wood)
@@ -2329,6 +2345,207 @@ local function buildArena(index, zone, cfg, parent, rng)
 	}
 
 	return self
+end
+
+-- ===============================================================
+-- Bunker del Asedio
+-- El fuerte de los Defensores alrededor de la casa del kiwi. Se
+-- construye al arrancar cada partida de asedio (no queda en el mapa
+-- para los demas modos): muralla con troneras, porton, dos ductos de
+-- ventilacion, un tunel cubierto ("subsuelo"), barricadas de bolsas
+-- de arena y un baul para cada equipo.
+-- ===============================================================
+local FORT_MURO = Color3.fromRGB(118, 120, 114)
+local FORT_OSCURO = Color3.fromRGB(66, 70, 74)
+local FORT_BOLSA = Color3.fromRGB(178, 160, 118)
+
+function WorldBuilder.buildAsedioFort(arena)
+	if not arena or not arena.nest then
+		return nil
+	end
+
+	local centro = Vector3.new(arena.nest.pos.X, arena.floorY or arena.nest.pos.Y, arena.nest.pos.Z)
+	local haciaCentro = arena.center - centro
+	haciaCentro = Vector3.new(haciaCentro.X, 0, haciaCentro.Z)
+	if haciaCentro.Magnitude < 1 then
+		haciaCentro = Vector3.new(0, 0, 1)
+	end
+	haciaCentro = haciaCentro.Unit
+	local izq = Vector3.new(-haciaCentro.Z, 0, haciaCentro.X)
+
+	-- El bunker tiene que entrar en la arena: si el nido quedo muy al
+	-- borde, se achica un poco (y si no hay lugar, no se arma)
+	local H = Config.Asedio.bunkerHalf or 34
+	local borde = math.max(math.abs(centro.X - arena.center.X), math.abs(centro.Z - arena.center.Z))
+	H = math.min(H, arena.halfSize - borde - 8)
+	if H < 22 then
+		return nil
+	end
+	local ALTO = 11
+	local rInt = math.min(26, H - 6) -- radio de los puestos de adentro
+
+	local folder = Instance.new("Folder")
+	folder.Name = "BunkerAsedio"
+	folder.Parent = arena.folder
+
+	local function bloque(nombre, cf, size, color, material)
+		return part({
+			Name = nombre,
+			Size = size,
+			CFrame = cf,
+			Color = color,
+			Material = material or Enum.Material.Concrete,
+			CanCollide = true,
+			Parent = folder,
+		})
+	end
+
+	-- CFrame con el largo de la caja (eje X) siguiendo la tangente t
+	local function cfEn(pos, t)
+		return CFrame.new(pos) * CFrame.Angles(0, math.atan2(-t.Z, t.X), 0)
+	end
+
+	-- Punto del suelo (como los spawns del asedio)
+	local function pisoEn(x, z)
+		local params = RaycastParams.new()
+		params.IgnoreWater = true
+		local ray = workspace:Raycast(Vector3.new(x, centro.Y + 70, z), Vector3.new(0, -220, 0), params)
+		if ray and math.abs(ray.Position.Y - centro.Y) <= 9 then
+			return Vector3.new(x, ray.Position.Y, z)
+		end
+		return Vector3.new(x, centro.Y, z)
+	end
+
+	-- Una pared con sus aberturas ({ c = corrimiento, w = ancho })
+	local function pared(n, aberturas)
+		local base = centro + n * H
+		local t = Vector3.new(-n.Z, 0, n.X)
+		local L = H * 2
+		table.sort(aberturas, function(a, b) return a.c < b.c end)
+
+		local tramos = {}
+		local cursor = -L / 2
+		for _, a in ipairs(aberturas) do
+			local izquierda = a.c - a.w / 2
+			if izquierda - cursor > 0.8 then
+				table.insert(tramos, { cursor, izquierda })
+			end
+			cursor = a.c + a.w / 2
+		end
+		if L / 2 - cursor > 0.8 then
+			table.insert(tramos, { cursor, L / 2 })
+		end
+
+		for _, tr in ipairs(tramos) do
+			local ancho = tr[2] - tr[1]
+			local c = (tr[1] + tr[2]) / 2
+			local cf = cfEn(base + t * c, t)
+			if ancho > 17 then
+				-- Muro con tronera: abajo, arriba y columnas para disparar
+				bloque("Muro", cf * CFrame.new(0, 2.1, 0), Vector3.new(ancho, 4.2, 1.7), FORT_MURO)
+				bloque("Muro", cf * CFrame.new(0, 9.1, 0), Vector3.new(ancho, 3.8, 1.7), FORT_MURO)
+				local cols = math.max(2, math.floor(ancho / 8 + 0.5))
+				for i = 0, cols do
+					local cx = -ancho / 2 + (ancho / cols) * i
+					bloque("Columna", cf * CFrame.new(cx, 5.5, 0), Vector3.new(2.0, ALTO, 1.9), FORT_OSCURO, Enum.Material.CorrugatedMetal)
+				end
+			else
+				bloque("Muro", cf * CFrame.new(0, ALTO / 2, 0), Vector3.new(ancho, ALTO, 1.7), FORT_MURO)
+			end
+		end
+
+		-- Alero del pasillo de guardia (lado de adentro)
+		bloque("Alero", cfEn(base - n * 2.4 + Vector3.new(0, ALTO + 0.5, 0), t), Vector3.new(L, 0.9, 3.6), FORT_OSCURO, Enum.Material.CorrugatedMetal)
+
+		-- Marcos de cada abertura
+		for _, a in ipairs(aberturas) do
+			for _, lado in ipairs({ -1, 1 }) do
+				local cf = cfEn(base + t * (a.c + lado * (a.w / 2 + 0.6)), t)
+				bloque("Marco", cf * CFrame.new(0, ALTO / 2, 0), Vector3.new(1.4, ALTO + 0.6, 2.1), FORT_OSCURO, Enum.Material.CorrugatedMetal)
+			end
+		end
+
+		return base, t
+	end
+
+	-- Porton del frente (mira al centro de la arena)
+	local baseFrente, frenteT = pared(haciaCentro, { { c = 0, w = 12 } })
+	bloque("Dintel", cfEn(baseFrente + Vector3.new(0, 10.4, 0), frenteT), Vector3.new(12.4, 1.4, 2.1), FORT_OSCURO, Enum.Material.CorrugatedMetal)
+
+	-- Ductos de ventilacion: se entra agachado, sin pasar por el porton
+	local function ducto(n)
+		local base, t = pared(n, { { c = 0, w = 6 } })
+		bloque("DuctoTapa", cfEn(base + Vector3.new(0, 8.9, 0), t), Vector3.new(6.4, 4.2, 1.9), FORT_MURO)
+		local medio = base + n * 3
+		bloque("DuctoPiso", cfEn(medio + Vector3.new(0, 0.25, 0), t), Vector3.new(6, 0.5, 13.5), FORT_OSCURO, Enum.Material.CorrodedMetal)
+		bloque("DuctoTecho", cfEn(medio + Vector3.new(0, 6.6, 0), t), Vector3.new(6.8, 0.9, 13.5), FORT_OSCURO, Enum.Material.CorrodedMetal)
+		for _, lado in ipairs({ -1, 1 }) do
+			bloque("DuctoLado", cfEn(medio + t * lado * 3 + Vector3.new(0, 3.4, 0), t), Vector3.new(1.2, 6.4, 13.5), FORT_OSCURO, Enum.Material.CorrodedMetal)
+		end
+		-- Rejilla decorativa en la boca de afuera
+		for _, dx in ipairs({ -1.5, 1.5 }) do
+			bloque("Rejilla", cfEn(base + n * 9.5 + t * dx + Vector3.new(0, 5.6, 0), t), Vector3.new(1.2, 2.2, 0.4), FORT_BOLSA, Enum.Material.Metal)
+		end
+	end
+	ducto(izq)
+	ducto(-izq)
+
+	-- Tunel cubierto: el "subsuelo", se entra por atras de la muralla
+	local baseFondo, fondoT = pared(-haciaCentro, { { c = 0, w = 7 } })
+	local nFondo = -haciaCentro
+	bloque("TunelTapa", cfEn(baseFondo + Vector3.new(0, 9.4, 0), fondoT), Vector3.new(7.4, 3.2, 1.9), FORT_MURO)
+	local medioTunel = baseFondo + nFondo * 10
+	for _, lado in ipairs({ -1, 1 }) do
+		bloque("TunelLado", cfEn(medioTunel + fondoT * lado * 4 + Vector3.new(0, 3.7, 0), fondoT), Vector3.new(1.5, 7.4, 26), FORT_MURO)
+	end
+	bloque("TunelTecho", cfEn(medioTunel + Vector3.new(0, 7.8, 0), fondoT), Vector3.new(9.5, 1.0, 26), FORT_MURO)
+	for _, paso in ipairs({ -1, 0, 1 }) do
+		bloque("TunelViga", cfEn(medioTunel + nFondo * (paso * 8) + Vector3.new(0, 6.9, 0), fondoT), Vector3.new(8.2, 0.6, 1.0), FORT_OSCURO, Enum.Material.CorrodedMetal)
+	end
+	for _, lado in ipairs({ -1, 1 }) do
+		bloque("TunelMarco", cfEn(baseFondo + nFondo * 23 + fondoT * lado * 4 + Vector3.new(0, 3.7, 0), fondoT), Vector3.new(1.5, 7.4, 1.8), FORT_OSCURO, Enum.Material.CorrodedMetal)
+	end
+	bloque("TunelMarco", cfEn(baseFondo + nFondo * 23 + Vector3.new(0, 7.8, 0), fondoT), Vector3.new(9.5, 1.4, 1.8), FORT_OSCURO, Enum.Material.CorrodedMetal)
+
+	-- Barricadas de bolsas de arena
+	local function barricada(pos, t, largo)
+		local cf = cfEn(pos, t)
+		for fila = 1, 3 do
+			local anchoFila = math.max(3, largo - (3 - fila) * 2.4)
+			local cantidad = math.max(1, math.floor(anchoFila / 2.75 + 0.5))
+			for i = 1, cantidad do
+				local bx = -anchoFila / 2 + (anchoFila / cantidad) * (i - 0.5)
+				bloque("Bolsa", cf * CFrame.new(bx, fila * 1.0 - 0.5, (fila % 2 == 0) and 0.3 or -0.3), Vector3.new(2.6, 1.0, 1.7), FORT_BOLSA, Enum.Material.Fabric)
+			end
+		end
+	end
+
+	barricada(baseFrente + haciaCentro * 8 + frenteT * 11, frenteT, 13)
+	barricada(baseFrente + haciaCentro * 8 - frenteT * 11, frenteT, 13)
+	barricada(centro + izq * rInt + haciaCentro * 6, haciaCentro, 11)
+	barricada(centro - izq * rInt + haciaCentro * 6, haciaCentro, 11)
+
+	-- Baul de los Cazadores: al lado de su spawn (a ~100 studs del nido)
+	local angAtaque = 0.7
+	local dirAtaque = Vector3.new(math.cos(angAtaque), 0, math.sin(angAtaque))
+	local radioAtaque = math.min(Config.Asedio.attackSpawn or 100, arena.halfSize - 34)
+	local posAtaque = centro + dirAtaque * radioAtaque
+	posAtaque = arena:clampToBounds(posAtaque)
+	posAtaque = pisoEn(posAtaque.X, posAtaque.Z)
+	local tanAtaque = Vector3.new(-dirAtaque.Z, 0, dirAtaque.X)
+	barricada(posAtaque + dirAtaque * 7, tanAtaque, 12)
+	local baseAtaque = pisoEn(posAtaque.X + tanAtaque.X * 5, posAtaque.Z + tanAtaque.Z * 5)
+	local chestAtaque = chestProp(folder, {}, CFrame.new(baseAtaque), "Baúl Cazadores")
+
+	-- Baul de los Defensores: adentro del bunker, junto a la casa
+	local posDefensa = arena:clampToBounds(centro + izq * rInt)
+	local baseDefensa = pisoEn(posDefensa.X, posDefensa.Z)
+	local chestDefensa = chestProp(folder, {}, CFrame.new(baseDefensa), "Baúl Defensores")
+
+	return {
+		folder = folder,
+		chests = { attack = chestAtaque, defend = chestDefensa },
+	}
 end
 
 -- ===============================================================

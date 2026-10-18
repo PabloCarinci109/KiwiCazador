@@ -43,7 +43,7 @@
 
 local Config = {}
 
-Config.Version = "1.8.0"
+Config.Version = "1.9.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -296,9 +296,9 @@ Config.Hide = {
 Config.Loot = {
 	uses = 3,             -- usos por arma encontrada
 	pickupRange = 12,     -- distancia para abrir el baul
+	-- 10 armas en total (el cuchillo ya no sale de los baúles)
 	weapons = {
 		{ id = "revolver", weight = 22 },
-		{ id = "cuchillo", weight = 18 },
 		{ id = "arco", weight = 15 },
 		{ id = "lanzallamas", weight = 14, uses = 12 }, -- 12s de chorro (1 uso por tick)
 		{ id = "sniper", weight = 14 },
@@ -375,7 +375,9 @@ Config.Weapons = {
 		size = Vector3.new(0.22, 0.22, 2.6),
 	},
 	cuchillo = {
-		name = "Cuchillo",
+		-- El cuchillo mariposa va de fabrica (no sale de baules): todos lo
+		-- llevan como melee, con animacion de apertura estilo CS2 en la vista.
+		name = "Cuchillo mariposa",
 		color = Color3.fromRGB(224, 230, 240),
 		cooldown = 0.85,
 		melee = true,   -- no dispara: es un zarpazo cuerpo a cuerpo
@@ -523,6 +525,12 @@ Config.Player = {
 	regenDelay = 6,    -- segundos sin recibir daño para regenerar
 }
 
+-- Pasos: solo se escuchan cuando corres. Con Shift (caminar) o agachado
+-- vas en silencio (clave para no alertar al kiwi ni a los rivales).
+Config.Footsteps = {
+	runSpeed = 19,     -- a partir de esta velocidad se escuchan los pasos
+}
+
 -- ===============================================================
 -- DIFICULTADES
 -- ===============================================================
@@ -637,7 +645,7 @@ Config.Difficulties = {
 		blurb = "Un kiwi gigante te busca por la reserva. Escóndete y sobrevive hasta que se aburra.",
 		showKiwiState = true,
 		giant = true,
-		tools = { "rastreador", "relente" },
+		tools = { "rastreador", "relente", "cuchillo" },
 		kiwi = {
 			patrolSpeed = 13,
 			huntSpeed = 27,
@@ -663,7 +671,7 @@ Config.Multiplayer = {
 	tag = "¡Supervivencia!",
 	color = Color3.fromRGB(160, 140, 245),
 	blurb = "El kiwi gigante va comiendo cazadores: gana el último que quede vivo.",
-	tools = { "rastreador", "relente", "pintura" },
+	tools = { "rastreador", "relente", "pintura", "cuchillo" },
 	baseDifficulty = "normal",
 	maxPlayers = 12,
 	timeLimit = 300,
@@ -680,14 +688,15 @@ Config.Asedio = {
 	name = "Asedio al Kiwi",
 	tag = "¡5 vs 5!",
 	color = Color3.fromRGB(255, 176, 74),
-	blurb = "5 contra 5: un equipo cuida al kiwi en su casa y el otro entra a capturarlo con la red. Al mejor de 3 rondas.",
+	blurb = "5 contra 5: un equipo defiende al kiwi en su bunker (portón, ductos de ventilación y un túnel) y el otro entra a capturarlo con la red. Al mejor de 3 rondas.",
 	baseDifficulty = "normal",
 	maxPlayers = 10,
 	roundTime = 150,        -- segundos por ronda
 	breakTime = 7,          -- descanso entre rondas
 	roundsToWin = 2,        -- primero a 2 rondas gana la partida
 	respawn = 7,            -- segundos para volver tras un noqueo
-	nestRadius = 46,        -- el kiwi no se aleja mas de esto de su casa
+	nestRadius = 20,        -- el kiwi no se aleja mas de esto de su casa (queda dentro del bunker)
+	bunkerHalf = 34,        -- media medida del bunker de los Defensores (lo arma el asedio)
 	attackSpawn = 100,      -- a que distancia del nido aparecen los Cazadores
 	revolverUses = 40,      -- tiros de revolver que recibe cada cazador
 	paintDamage = 11,       -- la pintura tambien lastima un poco en este modo
@@ -697,8 +706,8 @@ Config.Asedio = {
 	teamDefend = "Defensores",
 	colorAttack = Color3.fromRGB(226, 116, 74),
 	colorDefend = Color3.fromRGB(88, 164, 240),
-	toolsAttack = { "red", "rifle", "rastreador", "pintura" },
-	toolsDefend = { "pintura", "rastreador" },
+	toolsAttack = { "red", "rifle", "rastreador", "pintura", "cuchillo" },
+	toolsDefend = { "pintura", "rastreador", "cuchillo" },
 }
 
 -- Ficha del modo para el menu (los detalles viven en Config.Asedio)
@@ -732,6 +741,26 @@ Config.Round = {
 	EatHold = 2.6,           -- cuanto dura "comerse" a un cazador (modo Colosal)
 	KoHold = 1.8,            -- cuanto dura un noqueado antes de volver al lobby
 	HubReturn = true,        -- devolver al lobby al terminar
+}
+
+-- ===============================================================
+-- CLIMA Y HORA
+-- ===============================================================
+Config.Weather = {
+	dayLength = 960,            -- segundos reales que dura un dia entero (24 h)
+	startClock = 15,            -- hora con la que arranca el servidor
+	duskStart = 16,             -- a partir de esta hora empieza a oscurecer
+	dawnEnd = 8,                -- hasta esta hora termina de amanecer
+	night = 0.28,               -- luz que queda de noche (1 = pleno dia)
+	changeEvery = { 150, 280 }, -- cada cuanto puede cambiar el clima (segundos, min..max)
+	firstChange = { 50, 110 },  -- el primer cambio llega antes (para verlo)
+	weights = { sol = 55, lluvia = 25, nieve = 20 }, -- chances de cada clima
+	blend = 12,                 -- segundos que tarda en entrar/salir el clima
+	snowGrow = 1 / 150,         -- velocidad con que se acumula la nieve (1 = todo blanco)
+	snowMelt = 1 / 110,         -- velocidad con que se derrite
+	snowWhite = 0.85,           -- cuanto blanquea el mapa la nieve acumulada
+	snowColor = Color3.fromRGB(238, 242, 248),
+	snowFog = Color3.fromRGB(226, 232, 244),
 }
 
 -- ===============================================================
@@ -769,6 +798,9 @@ Config.Text = {
 	HideBusy = "¡Ya hay alguien escondido ahí!",
 	HideEscape = "¡El kiwi husmeó tu escondite y escapaste! +%d monedas",
 	ChestLoot = "¡Encontraste: %s! (%d usos)",
+	AsedioChests = "Cada equipo tiene su baúl: una sola arma por jugador y por ronda",
+	ChestTeamWrong = "Ese es el baúl de los %s: busca el de tu equipo",
+	ChestTeamDone = "Ya sacaste tu arma de este baúl (una por ronda)",
 	WeaponOut = "Se te acabó: %s",
 	BoomShout = "¡%s disparó el %s!",
 	TankBoom = "¡%s le voló la mochila de combustible a %s!",
@@ -788,6 +820,9 @@ Config.Text = {
 	EatenMenu = "El kiwi te comió. Elige otro modo para volver a jugar.",
 	MapPickNotify = "¡Mapa elegido: %s!",
 	MapFallback = "Ese mapa estaba ocupado: esta partida va en %s.",
+	ClimaSol = "Se despejó: salió el sol",
+	ClimaLluvia = "Se largó a llover",
+	ClimaNieve = "Está nevando: la nieve se acumula en el piso",
 	HurtMsg = "¡%s te dio con %s! (-%d de vida)",
 	HurtGeneric = "¡%s! (-%d de vida)",
 	CarHit = "Te atropelló un auto",
@@ -826,6 +861,7 @@ Config.Sounds = {
 	flame = "rbxasset://sounds/unsheath.mp3",
 	flush = "rbxasset://sounds/swordlunge.wav",
 	rustle = "rbxasset://sounds/action_footsteps_plastic.mp3",
+	steps = "rbxasset://sounds/action_footsteps_plastic.mp3",
 	win = "rbxasset://sounds/electronicpingshort.wav",
 	lose = "rbxasset://sounds/uuhhh.mp3",
 	ui = "rbxasset://sounds/button.wav",
@@ -1198,6 +1234,54 @@ end
 -- ===============================================================
 local function part(props)
 	return Util.makeSolid(props)
+end
+
+-- Baul reutilizable: lo usan las casas de las arenas y el bunker del asedio
+local function chestProp(parent, chests, base, label)
+	local function bx(name, cf, size, color, material)
+		return part({
+			Name = name,
+			Size = size,
+			CFrame = cf,
+			Color = color,
+			Material = material or Enum.Material.WoodPlanks,
+			CanCollide = true,
+			Parent = parent,
+		})
+	end
+	local body = bx("Baul", base * CFrame.new(0, 1.3, 0), Vector3.new(4.2, 2.6, 3.0), Color3.fromRGB(124, 84, 48), Enum.Material.WoodPlanks)
+	bx("AdornoBaul", base * CFrame.new(0, 1.3, 0), Vector3.new(4.35, 0.55, 3.15), Color3.fromRGB(214, 178, 74), Enum.Material.Metal)
+	local hinge = base * CFrame.new(0, 2.6, -1.5)
+	local lidClosed = hinge * CFrame.new(0, 0.25, 1.5)
+	local lidOpen = hinge * CFrame.Angles(math.rad(-78), 0, 0) * CFrame.new(0, 0.25, 1.5)
+	local lid = bx("TapaBaul", lidClosed, Vector3.new(4.2, 0.5, 3.0), Color3.fromRGB(136, 96, 56), Enum.Material.WoodPlanks)
+	local light = Instance.new("PointLight")
+	light.Name = "BrilloBaul"
+	light.Color = Color3.fromRGB(255, 214, 120)
+	light.Range = 18
+	light.Brightness = 1.4
+	light.Parent = body
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "AbrirBaul"
+	prompt.ActionText = "Abrir"
+	prompt.ObjectText = label or "Baúl"
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = body
+	local chest = {
+		body = body,
+		lid = lid,
+		lidClosed = lidClosed,
+		lidOpen = lidOpen,
+		light = light,
+		prompt = prompt,
+		used = false,
+		center = base.Position,
+	}
+	table.insert(chests, chest)
+	return chest
 end
 
 local function makeRustle(parentPart, color)
@@ -2354,39 +2438,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 	end
 
 	local function makeChestProp(base, label)
-		local body = box("Baul", base * CFrame.new(0, 1.3, 0), Vector3.new(4.2, 2.6, 3.0), Color3.fromRGB(124, 84, 48), Enum.Material.WoodPlanks)
-		box("AdornoBaul", base * CFrame.new(0, 1.3, 0), Vector3.new(4.35, 0.55, 3.15), Color3.fromRGB(214, 178, 74), Enum.Material.Metal, false)
-		local hinge = base * CFrame.new(0, 2.6, -1.5)
-		local lidClosed = hinge * CFrame.new(0, 0.25, 1.5)
-		local lidOpen = hinge * CFrame.Angles(math.rad(-78), 0, 0) * CFrame.new(0, 0.25, 1.5)
-		local lid = box("TapaBaul", lidClosed, Vector3.new(4.2, 0.5, 3.0), Color3.fromRGB(136, 96, 56), Enum.Material.WoodPlanks)
-		local light = Instance.new("PointLight")
-		light.Name = "BrilloBaul"
-		light.Color = Color3.fromRGB(255, 214, 120)
-		light.Range = 18
-		light.Brightness = 1.4
-		light.Parent = body
-		local prompt = Instance.new("ProximityPrompt")
-		prompt.Name = "AbrirBaul"
-		prompt.ActionText = "Abrir"
-		prompt.ObjectText = label or "Baúl"
-		prompt.KeyboardKeyCode = Enum.KeyCode.E
-		prompt.HoldDuration = 0
-		prompt.MaxActivationDistance = 10
-		prompt.RequiresLineOfSight = false
-		prompt.Parent = body
-		local chest = {
-			body = body,
-			lid = lid,
-			lidClosed = lidClosed,
-			lidOpen = lidOpen,
-			light = light,
-			prompt = prompt,
-			used = false,
-			center = base.Position,
-		}
-		table.insert(self.chests, chest)
-		return chest
+		return chestProp(props, self.chests, base, label)
 	end
 
 	local function makeTable(cf, wood)
@@ -3472,6 +3524,207 @@ local function buildArena(index, zone, cfg, parent, rng)
 end
 
 -- ===============================================================
+-- Bunker del Asedio
+-- El fuerte de los Defensores alrededor de la casa del kiwi. Se
+-- construye al arrancar cada partida de asedio (no queda en el mapa
+-- para los demas modos): muralla con troneras, porton, dos ductos de
+-- ventilacion, un tunel cubierto ("subsuelo"), barricadas de bolsas
+-- de arena y un baul para cada equipo.
+-- ===============================================================
+local FORT_MURO = Color3.fromRGB(118, 120, 114)
+local FORT_OSCURO = Color3.fromRGB(66, 70, 74)
+local FORT_BOLSA = Color3.fromRGB(178, 160, 118)
+
+function WorldBuilder.buildAsedioFort(arena)
+	if not arena or not arena.nest then
+		return nil
+	end
+
+	local centro = Vector3.new(arena.nest.pos.X, arena.floorY or arena.nest.pos.Y, arena.nest.pos.Z)
+	local haciaCentro = arena.center - centro
+	haciaCentro = Vector3.new(haciaCentro.X, 0, haciaCentro.Z)
+	if haciaCentro.Magnitude &lt; 1 then
+		haciaCentro = Vector3.new(0, 0, 1)
+	end
+	haciaCentro = haciaCentro.Unit
+	local izq = Vector3.new(-haciaCentro.Z, 0, haciaCentro.X)
+
+	-- El bunker tiene que entrar en la arena: si el nido quedo muy al
+	-- borde, se achica un poco (y si no hay lugar, no se arma)
+	local H = Config.Asedio.bunkerHalf or 34
+	local borde = math.max(math.abs(centro.X - arena.center.X), math.abs(centro.Z - arena.center.Z))
+	H = math.min(H, arena.halfSize - borde - 8)
+	if H &lt; 22 then
+		return nil
+	end
+	local ALTO = 11
+	local rInt = math.min(26, H - 6) -- radio de los puestos de adentro
+
+	local folder = Instance.new("Folder")
+	folder.Name = "BunkerAsedio"
+	folder.Parent = arena.folder
+
+	local function bloque(nombre, cf, size, color, material)
+		return part({
+			Name = nombre,
+			Size = size,
+			CFrame = cf,
+			Color = color,
+			Material = material or Enum.Material.Concrete,
+			CanCollide = true,
+			Parent = folder,
+		})
+	end
+
+	-- CFrame con el largo de la caja (eje X) siguiendo la tangente t
+	local function cfEn(pos, t)
+		return CFrame.new(pos) * CFrame.Angles(0, math.atan2(-t.Z, t.X), 0)
+	end
+
+	-- Punto del suelo (como los spawns del asedio)
+	local function pisoEn(x, z)
+		local params = RaycastParams.new()
+		params.IgnoreWater = true
+		local ray = workspace:Raycast(Vector3.new(x, centro.Y + 70, z), Vector3.new(0, -220, 0), params)
+		if ray and math.abs(ray.Position.Y - centro.Y) &lt;= 9 then
+			return Vector3.new(x, ray.Position.Y, z)
+		end
+		return Vector3.new(x, centro.Y, z)
+	end
+
+	-- Una pared con sus aberturas ({ c = corrimiento, w = ancho })
+	local function pared(n, aberturas)
+		local base = centro + n * H
+		local t = Vector3.new(-n.Z, 0, n.X)
+		local L = H * 2
+		table.sort(aberturas, function(a, b) return a.c &lt; b.c end)
+
+		local tramos = {}
+		local cursor = -L / 2
+		for _, a in ipairs(aberturas) do
+			local izquierda = a.c - a.w / 2
+			if izquierda - cursor &gt; 0.8 then
+				table.insert(tramos, { cursor, izquierda })
+			end
+			cursor = a.c + a.w / 2
+		end
+		if L / 2 - cursor &gt; 0.8 then
+			table.insert(tramos, { cursor, L / 2 })
+		end
+
+		for _, tr in ipairs(tramos) do
+			local ancho = tr[2] - tr[1]
+			local c = (tr[1] + tr[2]) / 2
+			local cf = cfEn(base + t * c, t)
+			if ancho &gt; 17 then
+				-- Muro con tronera: abajo, arriba y columnas para disparar
+				bloque("Muro", cf * CFrame.new(0, 2.1, 0), Vector3.new(ancho, 4.2, 1.7), FORT_MURO)
+				bloque("Muro", cf * CFrame.new(0, 9.1, 0), Vector3.new(ancho, 3.8, 1.7), FORT_MURO)
+				local cols = math.max(2, math.floor(ancho / 8 + 0.5))
+				for i = 0, cols do
+					local cx = -ancho / 2 + (ancho / cols) * i
+					bloque("Columna", cf * CFrame.new(cx, 5.5, 0), Vector3.new(2.0, ALTO, 1.9), FORT_OSCURO, Enum.Material.CorrugatedMetal)
+				end
+			else
+				bloque("Muro", cf * CFrame.new(0, ALTO / 2, 0), Vector3.new(ancho, ALTO, 1.7), FORT_MURO)
+			end
+		end
+
+		-- Alero del pasillo de guardia (lado de adentro)
+		bloque("Alero", cfEn(base - n * 2.4 + Vector3.new(0, ALTO + 0.5, 0), t), Vector3.new(L, 0.9, 3.6), FORT_OSCURO, Enum.Material.CorrugatedMetal)
+
+		-- Marcos de cada abertura
+		for _, a in ipairs(aberturas) do
+			for _, lado in ipairs({ -1, 1 }) do
+				local cf = cfEn(base + t * (a.c + lado * (a.w / 2 + 0.6)), t)
+				bloque("Marco", cf * CFrame.new(0, ALTO / 2, 0), Vector3.new(1.4, ALTO + 0.6, 2.1), FORT_OSCURO, Enum.Material.CorrugatedMetal)
+			end
+		end
+
+		return base, t
+	end
+
+	-- Porton del frente (mira al centro de la arena)
+	local baseFrente, frenteT = pared(haciaCentro, { { c = 0, w = 12 } })
+	bloque("Dintel", cfEn(baseFrente + Vector3.new(0, 10.4, 0), frenteT), Vector3.new(12.4, 1.4, 2.1), FORT_OSCURO, Enum.Material.CorrugatedMetal)
+
+	-- Ductos de ventilacion: se entra agachado, sin pasar por el porton
+	local function ducto(n)
+		local base, t = pared(n, { { c = 0, w = 6 } })
+		bloque("DuctoTapa", cfEn(base + Vector3.new(0, 8.9, 0), t), Vector3.new(6.4, 4.2, 1.9), FORT_MURO)
+		local medio = base + n * 3
+		bloque("DuctoPiso", cfEn(medio + Vector3.new(0, 0.25, 0), t), Vector3.new(6, 0.5, 13.5), FORT_OSCURO, Enum.Material.CorrodedMetal)
+		bloque("DuctoTecho", cfEn(medio + Vector3.new(0, 6.6, 0), t), Vector3.new(6.8, 0.9, 13.5), FORT_OSCURO, Enum.Material.CorrodedMetal)
+		for _, lado in ipairs({ -1, 1 }) do
+			bloque("DuctoLado", cfEn(medio + t * lado * 3 + Vector3.new(0, 3.4, 0), t), Vector3.new(1.2, 6.4, 13.5), FORT_OSCURO, Enum.Material.CorrodedMetal)
+		end
+		-- Rejilla decorativa en la boca de afuera
+		for _, dx in ipairs({ -1.5, 1.5 }) do
+			bloque("Rejilla", cfEn(base + n * 9.5 + t * dx + Vector3.new(0, 5.6, 0), t), Vector3.new(1.2, 2.2, 0.4), FORT_BOLSA, Enum.Material.Metal)
+		end
+	end
+	ducto(izq)
+	ducto(-izq)
+
+	-- Tunel cubierto: el "subsuelo", se entra por atras de la muralla
+	local baseFondo, fondoT = pared(-haciaCentro, { { c = 0, w = 7 } })
+	local nFondo = -haciaCentro
+	bloque("TunelTapa", cfEn(baseFondo + Vector3.new(0, 9.4, 0), fondoT), Vector3.new(7.4, 3.2, 1.9), FORT_MURO)
+	local medioTunel = baseFondo + nFondo * 10
+	for _, lado in ipairs({ -1, 1 }) do
+		bloque("TunelLado", cfEn(medioTunel + fondoT * lado * 4 + Vector3.new(0, 3.7, 0), fondoT), Vector3.new(1.5, 7.4, 26), FORT_MURO)
+	end
+	bloque("TunelTecho", cfEn(medioTunel + Vector3.new(0, 7.8, 0), fondoT), Vector3.new(9.5, 1.0, 26), FORT_MURO)
+	for _, paso in ipairs({ -1, 0, 1 }) do
+		bloque("TunelViga", cfEn(medioTunel + nFondo * (paso * 8) + Vector3.new(0, 6.9, 0), fondoT), Vector3.new(8.2, 0.6, 1.0), FORT_OSCURO, Enum.Material.CorrodedMetal)
+	end
+	for _, lado in ipairs({ -1, 1 }) do
+		bloque("TunelMarco", cfEn(baseFondo + nFondo * 23 + fondoT * lado * 4 + Vector3.new(0, 3.7, 0), fondoT), Vector3.new(1.5, 7.4, 1.8), FORT_OSCURO, Enum.Material.CorrodedMetal)
+	end
+	bloque("TunelMarco", cfEn(baseFondo + nFondo * 23 + Vector3.new(0, 7.8, 0), fondoT), Vector3.new(9.5, 1.4, 1.8), FORT_OSCURO, Enum.Material.CorrodedMetal)
+
+	-- Barricadas de bolsas de arena
+	local function barricada(pos, t, largo)
+		local cf = cfEn(pos, t)
+		for fila = 1, 3 do
+			local anchoFila = math.max(3, largo - (3 - fila) * 2.4)
+			local cantidad = math.max(1, math.floor(anchoFila / 2.75 + 0.5))
+			for i = 1, cantidad do
+				local bx = -anchoFila / 2 + (anchoFila / cantidad) * (i - 0.5)
+				bloque("Bolsa", cf * CFrame.new(bx, fila * 1.0 - 0.5, (fila % 2 == 0) and 0.3 or -0.3), Vector3.new(2.6, 1.0, 1.7), FORT_BOLSA, Enum.Material.Fabric)
+			end
+		end
+	end
+
+	barricada(baseFrente + haciaCentro * 8 + frenteT * 11, frenteT, 13)
+	barricada(baseFrente + haciaCentro * 8 - frenteT * 11, frenteT, 13)
+	barricada(centro + izq * rInt + haciaCentro * 6, haciaCentro, 11)
+	barricada(centro - izq * rInt + haciaCentro * 6, haciaCentro, 11)
+
+	-- Baul de los Cazadores: al lado de su spawn (a ~100 studs del nido)
+	local angAtaque = 0.7
+	local dirAtaque = Vector3.new(math.cos(angAtaque), 0, math.sin(angAtaque))
+	local radioAtaque = math.min(Config.Asedio.attackSpawn or 100, arena.halfSize - 34)
+	local posAtaque = centro + dirAtaque * radioAtaque
+	posAtaque = arena:clampToBounds(posAtaque)
+	posAtaque = pisoEn(posAtaque.X, posAtaque.Z)
+	local tanAtaque = Vector3.new(-dirAtaque.Z, 0, dirAtaque.X)
+	barricada(posAtaque + dirAtaque * 7, tanAtaque, 12)
+	local baseAtaque = pisoEn(posAtaque.X + tanAtaque.X * 5, posAtaque.Z + tanAtaque.Z * 5)
+	local chestAtaque = chestProp(folder, {}, CFrame.new(baseAtaque), "Baúl Cazadores")
+
+	-- Baul de los Defensores: adentro del bunker, junto a la casa
+	local posDefensa = arena:clampToBounds(centro + izq * rInt)
+	local baseDefensa = pisoEn(posDefensa.X, posDefensa.Z)
+	local chestDefensa = chestProp(folder, {}, CFrame.new(baseDefensa), "Baúl Defensores")
+
+	return {
+		folder = folder,
+		chests = { attack = chestAtaque, defend = chestDefensa },
+	}
+end
+
+-- ===============================================================
 -- API principal
 -- ===============================================================
 function WorldBuilder.build(cfg)
@@ -3594,6 +3847,7 @@ function KiwiModel.build(parent, scale)
 
 	local model = Instance.new("Model")
 	model.Name = "Kiwi"
+	model:SetAttribute("NoNieve", true) -- la nieve acumulada no tapa al kiwi (es la presa)
 	model.Parent = parent
 
 	local body = piece("Part", "Cuerpo", BODY_SIZE * S, COLORS.body, Enum.Material.Fabric, Enum.PartType.Ball, model)
@@ -5602,43 +5856,63 @@ local function buildRocketTool(id)
 	return tool
 end
 
-local function buildKnifeTool(id)
-	local tool = prepareLootTool(id)
+-- Cuchillo mariposa: va de fabrica para todos (no es arma de baul).
+-- Modelo abierto de balisong: dos mangos de acero alineados y la hoja
+-- saliendo del pivote. La animacion estilo CS2 vive en la vista del cliente.
+local function buildKnifeTool(parent)
+	local tool = Instance.new("Tool")
+	tool.Name = Config.Weapons.cuchillo.name
+	tool.ToolTip = "Cuchillo mariposa: zarpazo corto. F para girarlo"
+	tool.CanBeDropped = false
+	tool.RequiresHandle = true
+	tool:SetAttribute("ToolId", "cuchillo")
 	tool.Grip = CFrame.new(0, -0.4, 0.15) * CFrame.Angles(math.rad(-90), 0, 0)
+	local acero = Color3.fromRGB(198, 204, 214)
+	local aceroOscuro = Color3.fromRGB(132, 138, 150)
+
+	-- Mango en la mano (el Handle) y el gemelo pegado al lado
 	local handle = newHandle({
-		Size = Vector3.new(0.3, 0.7, 0.42),
-		Color = Color3.fromRGB(62, 46, 34),
-		Material = Enum.Material.Wood,
+		Size = Vector3.new(0.18, 0.85, 0.36),
+		Color = aceroOscuro,
+		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
-		Name = "Guardia",
-		Size = Vector3.new(0.9, 0.16, 0.5),
-		CFrame = handle.CFrame * CFrame.new(0, 0.7, 0),
-		Color = Color3.fromRGB(150, 152, 164),
+		Name = "MangoB",
+		Size = Vector3.new(0.18, 0.85, 0.36),
+		CFrame = handle.CFrame * CFrame.new(0.24, 0, 0),
+		Color = aceroOscuro,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Pivote",
+		Size = Vector3.new(0.46, 0.12, 0.4),
+		CFrame = handle.CFrame * CFrame.new(0.12, 0.5, 0),
+		Color = acero,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
 		Name = "Hoja",
-		Size = Vector3.new(0.8, 2.4, 0.14),
-		CFrame = handle.CFrame * CFrame.new(0, 2.0, 0),
-		Color = Color3.fromRGB(226, 232, 240),
+		Size = Vector3.new(0.12, 1.7, 0.3),
+		CFrame = handle.CFrame * CFrame.new(0.12, 1.42, 0),
+		Color = Color3.fromRGB(228, 234, 244),
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
 		Name = "Punta",
-		CFrame = handle.CFrame * CFrame.new(0, 3.4, 0) * CFrame.Angles(0, 0, math.rad(45)),
-		Size = Vector3.new(0.55, 0.55, 0.14),
-		Color = Color3.fromRGB(226, 232, 240),
+		Size = Vector3.new(0.44, 0.44, 0.3),
+		CFrame = handle.CFrame * CFrame.new(0.12, 2.42, 0) * CFrame.Angles(0, 0, math.rad(45)),
+		Color = Color3.fromRGB(228, 234, 244),
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
 		Name = "Filo",
-		Size = Vector3.new(0.14, 2.3, 0.16),
-		CFrame = handle.CFrame * CFrame.new(0.34, 2.0, 0),
+		Size = Vector3.new(0.1, 1.5, 0.1),
+		CFrame = handle.CFrame * CFrame.new(0.2, 1.35, 0),
 		Color = Color3.fromRGB(255, 255, 255),
 		Material = Enum.Material.Neon,
 		Parent = tool,
@@ -5895,8 +6169,6 @@ local function buildLootTool(parent, id)
 		tool = buildBowTool(id)
 	elseif id == "sniper" then
 		tool = buildSniperTool(id)
-	elseif id == "cuchillo" then
-		tool = buildKnifeTool(id)
 	elseif id == "lanzallamas" then
 		tool = buildFlamethrowerTool(id)
 	elseif COUNTER_TOOLS[id] then
@@ -5931,6 +6203,7 @@ function ToolService.build()
 	buildTrap(folder)
 	buildPaintRifle(folder)
 	buildRelente(folder)
+	buildKnifeTool(folder)
 	buildLootTools(folder)
 
 	ToolService.folder = folder
@@ -5965,6 +6238,7 @@ function ToolService.give(player, only)
 	for _, template in ipairs(folder:GetChildren()) do
 		local toolId = template:GetAttribute("ToolId")
 		-- pintura, relente y las armas de baul solo se entregan cuando toca
+		-- (el cuchillo mariposa si va de fabrica para todos)
 		local locked = toolId == "pintura" or toolId == "relente"
 		if not locked then
 			for _, entry in ipairs(Config.Loot.weapons) do
@@ -6117,6 +6391,20 @@ function ToolService.takeTool(player, toolId)
 		end
 	end
 	return found
+end
+
+-- ¿El arma es de baul? (las de baul se gastan: "Uses" / consumeLoot)
+function ToolService.isLoot(player, toolId)
+	for _, container in ipairs({ player:FindFirstChildOfClass("Backpack"), player.Character }) do
+		if container then
+			for _, item in ipairs(container:GetChildren()) do
+				if item:IsA("Tool") and item:GetAttribute("ToolId") == toolId then
+					return item:GetAttribute("Loot") == true
+				end
+			end
+		end
+	end
+	return false
 end
 
 function ToolService.hasTools(player)
@@ -6485,7 +6773,10 @@ function Actions.fireWeapon(session, player, weaponId, data)
 		return
 	end
 
-	if ToolService.lootUses(player, weaponId) &lt;= 0 then
+	-- Solo las armas de baul se gastan por uso; el cuchillo mariposa
+	-- de fabrica no lleva "Uses" y no se consume.
+	local loot = ToolService.isLoot(player, weaponId)
+	if loot and ToolService.lootUses(player, weaponId) &lt;= 0 then
 		return
 	end
 
@@ -6495,7 +6786,9 @@ function Actions.fireWeapon(session, player, weaponId, data)
 	if cfg.melee then
 		Actions.melee(session, player, weaponId, cfg, muzzle, dir)
 		ToolService.startCooldown(player, weaponId, cfg.cooldown)
-		ToolService.consumeLoot(player, weaponId)
+		if loot then
+			ToolService.consumeLoot(player, weaponId)
+		end
 		return
 	end
 
@@ -7451,6 +7744,345 @@ return Actions
 				</Item>
 				<Item class="ModuleScript" referent="RBX018">
 					<Properties>
+						<string name="Name">Weather</string>
+						<ProtectedString name="Source">--[[
+	Weather.lua  (servidor)
+	Clima y paso del tiempo.
+
+	- El reloj del mundo avanza solo: amanece, atardece y se hace de
+	  noche (la luz del mapa se va apagando con el correr de la
+	  partida).
+	- Cada tanto el clima cambia al azar: sol, lluvia o nieve.
+	- Cuando nieva, el mapa se va tapando de blanco (la nieve se
+	  acumula en el piso) y cuando para, se derrite de a poco.
+	- El estado viaja al cliente por atributos del workspace
+	  ("Clima", "ClimaFuerza", "Nieve"): el cliente dibuja la lluvia
+	  y los copos, y aca se compone la luz y la niebla.
+
+	GameManager llama a Weather.setBase(preset) cada vez que cambia
+	de arena/modo; de ahi en mas la luz final la compone este modulo
+	(preset + hora + clima + nieve acumulada).
+--]]
+
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+
+local Shared = require(script.Parent.Shared)
+local Config = require(Shared.Config)
+local Net = require(Shared.Net)
+local Util = require(Shared.Util)
+
+local Weather = {}
+
+local SNOW = Config.Weather.snowColor
+
+local state = {
+	clock = 14,      -- hora del mundo (0 a 24)
+	kind = "sol",    -- sol | lluvia | nieve
+	force = 0,       -- 0 a 1: que tan metido esta el clima
+	accum = 0,       -- 0 a 1: nieve acumulada en el piso
+	painted = 0,     -- ultimo accum que se pinto en el mapa
+	nextAt = 0,      -- cuando vuelve a sortear el clima
+	base = nil,      -- preset de luz de la arena (sin clima)
+}
+
+local world
+local painting = false
+local snapshot = setmetatable({}, { __mode = "k" }) -- parte -&gt; color original
+
+local CLIMA_COLOR = {
+	sol = Color3.fromRGB(252, 220, 128),
+	lluvia = Color3.fromRGB(128, 168, 220),
+	nieve = Color3.fromRGB(224, 236, 250),
+}
+
+-- ===============================================================
+-- Hora del mundo
+-- ===============================================================
+-- Cuanta luz queda segun la hora: 1 = pleno dia, de noche queda Config.Weather.night
+local function dayLum(clock)
+	local w = Config.Weather
+	if clock &gt;= w.dawnEnd and clock &lt;= w.duskStart then
+		return 1
+	end
+	if clock &gt; w.duskStart and clock &lt; w.duskStart + 3 then
+		return 1 - (1 - w.night) * ((clock - w.duskStart) / 3)
+	end
+	if clock &gt;= w.duskStart + 3 or clock &lt;= 5 then
+		return w.night
+	end
+	return w.night + (1 - w.night) * ((clock - 5) / (w.dawnEnd - 5))
+end
+
+-- ===============================================================
+-- Luz compuesta: preset de la arena + hora + clima + nieve acumulada
+-- ===============================================================
+function Weather.apply()
+	local w = Config.Weather
+	local preset = state.base or Config.LightDefault
+	local lum = dayLum(state.clock)
+	local f = state.force
+
+	local ambient = preset.ambient * (0.35 + 0.65 * lum)
+	local outdoor = preset.outdoor * (0.35 + 0.65 * lum)
+	local brightness = preset.brightness * (0.40 + 0.60 * lum)
+	local fog = preset.fog * (0.45 + 0.55 * lum)
+	local fogStart = preset.fogStart
+	local fogEnd = preset.fogEnd
+
+	if state.kind == "lluvia" then
+		ambient = ambient * (1 - 0.25 * f)
+		outdoor = outdoor * (1 - 0.30 * f)
+		brightness = brightness * (1 - 0.35 * f)
+		fog = fog:Lerp(Color3.fromRGB(100, 108, 122), 0.60 * f)
+		fogStart = fogStart * (1 - 0.45 * f)
+		fogEnd = fogEnd * (1 - 0.55 * f)
+	elseif state.kind == "nieve" then
+		ambient = ambient:Lerp(Color3.fromRGB(172, 180, 196), 0.50 * f)
+		outdoor = outdoor:Lerp(Color3.fromRGB(200, 208, 224), 0.55 * f)
+		brightness = brightness * (1 - 0.18 * f)
+		fog = fog:Lerp(w.snowFog, 0.75 * f)
+		fogStart = fogStart * (1 - 0.40 * f)
+		fogEnd = fogEnd * (1 - 0.60 * f)
+	end
+
+	-- El piso nevado devuelve luz
+	if state.accum &gt; 0 then
+		ambient = ambient * (1 + 0.25 * state.accum)
+		outdoor = outdoor * (1 + 0.20 * state.accum)
+	end
+
+	Lighting.Ambient = ambient
+	Lighting.OutdoorAmbient = outdoor
+	Lighting.Brightness = brightness
+	Lighting.FogColor = fog
+	Lighting.FogStart = fogStart
+	Lighting.FogEnd = fogEnd
+	Lighting.ClockTime = state.clock
+
+	-- Con mal tiempo la atmosfera se espesa
+	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+	if atmosphere then
+		atmosphere.Density = 0.28 + 0.22 * f
+		atmosphere.Haze = 1.1 + 1.3 * f
+	end
+end
+
+-- ===============================================================
+-- Nieve acumulada (el mapa se pinta de blanco de a poco)
+-- ===============================================================
+local function pintarParte(part, target, raiz)
+	local material = part.Material
+	if material == Enum.Material.Neon or material == Enum.Material.Glass
+		or material == Enum.Material.ForceField then
+		return
+	end
+	if part.Transparency &gt;= 0.95 then
+		return
+	end
+	-- Lo marcado con NoNieve no se tapa (el kiwi, por ejemplo)
+	local nodo = part
+	while nodo and nodo ~= raiz do
+		if nodo:GetAttribute("NoNieve") then
+			return
+		end
+		nodo = nodo.Parent
+	end
+	local base = snapshot[part]
+	if not base then
+		if target &lt;= 0 then
+			return
+		end
+		base = part.Color
+		snapshot[part] = base
+	end
+	part.Color = base:Lerp(SNOW, target * Config.Weather.snowWhite)
+end
+
+-- Pinta todo el mapa de a tandas para no trabar el servidor
+function Weather.paint(target)
+	if painting or not world then
+		return false
+	end
+	painting = true
+	task.spawn(function()
+		local roots = {}
+		if world.lobby and world.lobby.folder then
+			table.insert(roots, world.lobby.folder)
+		end
+		for _, arena in ipairs(world.arenas or {}) do
+			if arena.folder then
+				table.insert(roots, arena.folder)
+			end
+		end
+		local n = 0
+		for _, root in ipairs(roots) do
+			for _, part in ipairs(root:GetDescendants()) do
+				if part:IsA("BasePart") then
+					pintarParte(part, target, root)
+					n = n + 1
+					if n &gt;= 400 then
+						n = 0
+						task.wait()
+					end
+				end
+			end
+		end
+		painting = false
+	end)
+	return true
+end
+
+-- ===============================================================
+-- Clima
+-- ===============================================================
+local function sortear()
+	local w = Config.Weather
+	local total = 0
+	for _, peso in pairs(w.weights) do
+		total = total + peso
+	end
+	local sorteo = math.random() * total
+	local elegido = "sol"
+	for id, peso in pairs(w.weights) do
+		sorteo = sorteo - peso
+		if sorteo &lt;= 0 then
+			elegido = id
+			break
+		end
+	end
+	-- No repite el clima anterior: siempre hay un cambio a la vista
+	if elegido == state.kind then
+		if state.kind == "sol" then
+			elegido = math.random() &lt; 0.5 and "lluvia" or "nieve"
+		elseif state.kind == "lluvia" then
+			elegido = math.random() &lt; 0.5 and "sol" or "nieve"
+		else
+			elegido = math.random() &lt; 0.5 and "sol" or "lluvia"
+		end
+	end
+
+	local rango = w.changeEvery
+	state.nextAt = os.clock() + math.random(rango[1], rango[2])
+
+	if elegido ~= state.kind then
+		state.kind = elegido
+		local texto = Config.Text.ClimaSol
+		if elegido == "lluvia" then
+			texto = Config.Text.ClimaLluvia
+		elseif elegido == "nieve" then
+			texto = Config.Text.ClimaNieve
+		end
+		for _, player in ipairs(Players:GetPlayers()) do
+			Net.get("Notify"):FireClient(player, texto, Util.colorToTable(CLIMA_COLOR[elegido]), 5)
+		end
+	end
+end
+
+local function publicar(nombre, valor)
+	if workspace:GetAttribute(nombre) ~= valor then
+		workspace:SetAttribute(nombre, valor)
+	end
+end
+
+function Weather.publish()
+	publicar("Clima", state.kind)
+	publicar("ClimaFuerza", math.floor(state.force * 50 + 0.5) / 50)
+	publicar("Nieve", math.floor(state.accum * 50 + 0.5) / 50)
+end
+
+function Weather.tick(dt)
+	local w = Config.Weather
+
+	-- Paso del tiempo: un dia completo cada w.dayLength segundos
+	state.clock = (state.clock + dt * 24 / w.dayLength) % 24
+
+	if os.clock() &gt;= state.nextAt then
+		sortear()
+	end
+
+	local goal = (state.kind == "sol") and 0 or 1
+	local step = dt / math.max(w.blend, 0.1)
+	state.force = state.force + math.clamp(goal - state.force, -step, step)
+
+	if state.kind == "nieve" and state.force &gt; 0.35 then
+		state.accum = math.min(1, state.accum + dt * w.snowGrow * state.force)
+	elseif state.accum &gt; 0 then
+		state.accum = math.max(0, state.accum - dt * w.snowMelt)
+	end
+
+	Weather.apply()
+
+	if math.abs(state.accum - state.painted) &gt;= 0.035
+		or (state.accum &lt;= 0 and state.painted &gt; 0) then
+		if Weather.paint(state.accum) then
+			state.painted = state.accum
+		end
+	end
+
+	Weather.publish()
+end
+
+-- ===============================================================
+-- API
+-- ===============================================================
+-- GameManager avisa que preset de luz corresponde (arena / lobby / modo)
+function Weather.setBase(preset)
+	if not preset then
+		return
+	end
+	state.base = preset
+	Weather.apply()
+end
+
+-- Solo para pruebas (AutoTest): clava un clima ya mismo
+function Weather.force(kind)
+	if kind ~= "sol" and kind ~= "lluvia" and kind ~= "nieve" then
+		return
+	end
+	state.kind = kind
+	state.force = (kind == "sol") and 0 or 1
+	state.nextAt = os.clock() + 600
+	Weather.apply()
+	Weather.publish()
+end
+
+-- Arranca el reloj y el sorteo de clima (lo llama GameManager.init)
+function Weather.start(gameWorld)
+	world = gameWorld
+	state.base = Config.LightDefault
+	state.clock = Config.Weather.startClock or 15
+	state.kind = "sol"
+	state.force = 0
+	state.accum = 0
+	state.painted = 0
+	local primero = Config.Weather.firstChange or Config.Weather.changeEvery
+	state.nextAt = os.clock() + math.random(primero[1], primero[2])
+
+	Weather.apply()
+	Weather.publish()
+
+	task.spawn(function()
+		local last = os.clock()
+		while true do
+			task.wait(0.5)
+			local now = os.clock()
+			local dt = now - last
+			last = now
+			local ok, err = pcall(Weather.tick, dt)
+			if not ok then
+				warn("[Kiwi Cazador] clima: " .. tostring(err))
+			end
+		end
+	end)
+end
+
+return Weather
+</ProtectedString>
+					</Properties>
+				</Item>
+				<Item class="ModuleScript" referent="RBX019">
+					<Properties>
 						<string name="Name">GameManager</string>
 						<ProtectedString name="Source">--[[
 	GameManager.lua  (servidor)
@@ -7477,6 +8109,7 @@ local WorldBuilder = require(script.Parent.WorldBuilder)
 local KiwiController = require(script.Parent.KiwiController)
 local ToolService = require(script.Parent.ToolService)
 local Actions = require(script.Parent.Actions)
+local Weather = require(script.Parent.Weather)
 
 local GameManager = {}
 
@@ -7503,13 +8136,8 @@ local function applyLighting(preset)
 	if not preset then
 		return
 	end
-	Lighting.Ambient = preset.ambient
-	Lighting.OutdoorAmbient = preset.outdoor
-	Lighting.Brightness = preset.brightness
-	Lighting.FogColor = preset.fog
-	Lighting.FogStart = preset.fogStart
-	Lighting.FogEnd = preset.fogEnd
-	Lighting.ClockTime = preset.clock
+	-- La luz final la compone Weather: preset de la arena + hora + clima
+	Weather.setBase(preset)
 end
 
 local function applyZoneLighting(arena)
@@ -7633,6 +8261,9 @@ function Session.new(modeId, rng)
 	self.chosenMap = nil
 	self.voteDone = false
 	self.knocked = {}
+	self.looted = {}       -- quien ya saco su arma del baul de equipo (asedio)
+	self.fort = nil        -- bunker del asedio (se destruye al terminar)
+	self.fortChests = nil
 
 	if modeId == "asedio" then
 		self.isMulti = false
@@ -8432,6 +9063,30 @@ function Session:allocateArena(mapId)
 	return false
 end
 
+-- Arma el bunker de los Defensores (solo asedio, una vez por partida)
+function Session:buildFort()
+	if self.fort or not self.arena or not self.arena.nest then
+		return
+	end
+	local ok, fort = pcall(WorldBuilder.buildAsedioFort, self.arena)
+	if not ok or not fort then
+		warn("[Kiwi Cazador] no se pudo armar el bunker del asedio: " .. tostring(fort))
+		return
+	end
+	self.fort = fort
+	self.fortChests = fort.chests
+	for side, chest in pairs(fort.chests) do
+		chest.team = side
+		chest.teamName = side == "attack" and Config.Asedio.teamAttack or Config.Asedio.teamDefend
+		chest.prompt.Triggered:Connect(function(who)
+			local session = playerSession[who]
+			if session then
+				session:openChest(who, chest)
+			end
+		end)
+	end
+end
+
 function Session:spawnsFor(player)
 	-- Asedio: cada equipo aparece alrededor de la casa del kiwi
 	if self.isAsedio and self.arena and self.arena.nest then
@@ -8452,17 +9107,30 @@ function Session:spawnsFor(player)
 			radius = math.min(Config.Asedio.attackSpawn, (self.arena.halfSize or 150) - 34)
 			angle = angle + 0.7
 		end
-		local point = nest + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
-		point = self.arena:clampToBounds(point)
-		local params = RaycastParams.new()
-		params.IgnoreWater = true
-		local ray = workspace:Raycast(Vector3.new(point.X, nest.Y + 70, point.Z), Vector3.new(0, -220, 0), params)
-		if ray and math.abs(ray.Position.Y - nest.Y) &lt;= 9 then
-			point = ray.Position
-		else
-			point = Vector3.new(point.X, self.arena.floorY or nest.Y, point.Z)
+
+		-- Busca suelo firme en ese angulo (avisa si el punto esta tapado)
+		local function punto(radio)
+			local p = nest + Vector3.new(math.cos(angle) * radio, 0, math.sin(angle) * radio)
+			p = self.arena:clampToBounds(p)
+			local params = RaycastParams.new()
+			params.IgnoreWater = true
+			local ray = workspace:Raycast(Vector3.new(p.X, nest.Y + 70, p.Z), Vector3.new(0, -220, 0), params)
+			if ray then
+				local dy = ray.Position.Y - nest.Y
+				if dy &gt;= -1 and dy &lt;= 2.5 then
+					return ray.Position, true
+				end
+			end
+			return Vector3.new(p.X, self.arena.floorY or nest.Y, p.Z), false
 		end
-		return point + Vector3.new(0, 4, 0)
+
+		local point, limpio = punto(radius)
+		if side == "defend" and not limpio then
+			-- El punto cayo sobre la casa de arriba: se corre hacia la muralla
+			point = punto(math.min(30, (Config.Asedio.bunkerHalf or 34) - 4))
+		end
+		-- OJO: devuelve CFrame (lo usa character:PivotTo); antes daba Vector3
+		return CFrame.lookAt(point + Vector3.new(0, 4, 0), Vector3.new(nest.X, point.Y + 4, nest.Z))
 	end
 
 	local index = 1
@@ -8485,7 +9153,11 @@ function Session:teleportToArena(player)
 	if not character then
 		return
 	end
-	character:PivotTo(self:spawnsFor(player))
+	local target = self:spawnsFor(player)
+	if typeof(target) == "Vector3" then
+		target = CFrame.new(target)
+	end
+	character:PivotTo(target)
 	local root = getRoot(player)
 	if root then
 		root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
@@ -8502,6 +9174,9 @@ end
 function Session:startCountdown()
 	if self.isAsedio and not self.teamsReady then
 		self:assignTeams()
+	end
+	if self.isAsedio then
+		self:buildFort()
 	end
 	self.phase = "countdown"
 	self.phaseEnds = os.clock() + Config.Round.Countdown
@@ -8538,6 +9213,14 @@ function Session:startPlaying()
 			chest.prompt.Enabled = true
 		end
 	end
+	-- Baules de equipo del asedio: se recargan para todos cada ronda
+	self.looted = {}
+	if self.fortChests then
+		for _, chest in pairs(self.fortChests) do
+			chest.lid.CFrame = chest.lidClosed
+			chest.light.Brightness = 1.4
+		end
+	end
 	local zone = self.arena and self.arena.safeZone
 	if zone then
 		zone.active = false
@@ -8572,6 +9255,9 @@ function Session:startPlaying()
 		else
 			self:notify(player, "¡A cazar al kiwi!", COLOR.good)
 		end
+	end
+	if self.isAsedio and self.fort then
+		self:notifyAll(Config.Text.AsedioChests, COLOR.info, 7)
 	end
 	self:event("start", { pos = self.arena.spawns[1].Position })
 end
@@ -8740,6 +9426,12 @@ function Session:finish()
 	self.projectiles = {}
 	self:clearTraps()
 	Actions.clearPickups(self)
+
+	if self.fort then
+		self.fort:Destroy()
+		self.fort = nil
+		self.fortChests = nil
+	end
 
 	if Config.Round.HubReturn then
 		self:returnAllToLobby()
@@ -9048,24 +9740,8 @@ function Session:exitSpot(player, caught)
 end
 
 -- ---------------- baules de armas ----------------
-function Session:openChest(player, index)
-	local chest = self.arena and self.arena.chests and self.arena.chests[index]
-	if not chest or chest.used then
-		return
-	end
-	if self.phase ~= "playing" or self.hidden[player] then
-		return
-	end
-	local root = getRoot(player)
-	if not root or (root.Position - chest.center).Magnitude &gt; Config.Loot.pickupRange then
-		return
-	end
-
-	chest.used = true
-	chest.lid.CFrame = chest.lidOpen
-	chest.light.Brightness = 0
-	chest.prompt.Enabled = false
-
+-- Reparte un arma de baul (lo usan los baules comunes y los de equipo)
+function Session:lootChest(player, chest)
 	local weapons = Config.Loot.weapons
 	local total = 0
 	for _, entry in ipairs(weapons) do
@@ -9105,6 +9781,51 @@ function Session:openChest(player, index)
 	self:notify(player, string.format(Config.Text.ChestLoot, cfg.name, pick.uses or Config.Loot.uses), cfg.color, 5)
 	self:event("chestopen", { pos = chest.center })
 	self:sendUpdate(player)
+end
+
+function Session:openChest(player, chest)
+	if not chest then
+		return
+	end
+	if self.phase ~= "playing" or self.hidden[player] then
+		return
+	end
+	local root = getRoot(player)
+	if not root or (root.Position - chest.center).Magnitude &gt; Config.Loot.pickupRange + 2 then
+		return
+	end
+
+	-- Baul de equipo (asedio): cada jugador saca UNA sola arma por ronda
+	if chest.team then
+		local side = self.teamOf[player] or "attack"
+		if side ~= chest.team then
+			self:notify(player, string.format(Config.Text.ChestTeamWrong, chest.teamName or chest.team), COLOR.warn, 4)
+			return
+		end
+		if self.looted[player] then
+			self:notify(player, Config.Text.ChestTeamDone, COLOR.warn, 4)
+			return
+		end
+		self.looted[player] = true
+		-- La tapa se abre y se vuelve a cerrar: el baul queda para el resto
+		chest.lid.CFrame = chest.lidOpen
+		task.delay(1.1, function()
+			if chest.lid and chest.lid.Parent then
+				chest.lid.CFrame = chest.lidClosed
+			end
+		end)
+		self:lootChest(player, chest)
+		return
+	end
+
+	if chest.used then
+		return
+	end
+	chest.used = true
+	chest.lid.CFrame = chest.lidOpen
+	chest.light.Brightness = 0
+	chest.prompt.Enabled = false
+	self:lootChest(player, chest)
 end
 
 -- ---------------- bucle ----------------
@@ -9434,6 +10155,7 @@ function GameManager.init()
 	Net.init()
 	world = WorldBuilder.build(Config)
 	ToolService.build()
+	Weather.start(world)
 
 	workspace.Gravity = Config.World.Gravity
 
@@ -9518,11 +10240,11 @@ function GameManager.init()
 				end)
 			end
 		end
-		for chestIndex, chest in ipairs(arena.chests or {}) do
+		for _, chest in ipairs(arena.chests or {}) do
 			chest.prompt.Triggered:Connect(function(who)
 				local session = playerSession[who]
 				if session then
-					session:openChest(who, chestIndex)
+					session:openChest(who, chest)
 				end
 			end)
 		end
@@ -9694,21 +10416,21 @@ return GameManager
 			</Item>
 		</Item>
 	</Item>
-	<Item class="StarterPlayer" referent="RBX019">
+	<Item class="StarterPlayer" referent="RBX020">
 		<Properties>
 			<string name="Name">StarterPlayer</string>
 			<float name="CharacterWalkSpeed">16</float>
 			<bool name="EnableMouseLockOption">true</bool>
 		</Properties>
-		<Item class="StarterPlayerScripts" referent="RBX020">
+		<Item class="StarterPlayerScripts" referent="RBX021">
 			<Properties>
 				<string name="Name">StarterPlayerScripts</string>
 			</Properties>
-			<Item class="Folder" referent="RBX021">
+			<Item class="Folder" referent="RBX022">
 				<Properties>
 					<string name="Name">KiwiClient</string>
 				</Properties>
-				<Item class="LocalScript" referent="RBX022">
+				<Item class="LocalScript" referent="RBX023">
 					<Properties>
 						<string name="Name">Main</string>
 						<ProtectedString name="Source">--[[
@@ -9738,9 +10460,13 @@ local Util = require(Shared.Util)
 
 local HUD = require(script.Parent.modules.HUD)
 local ViewModel = require(script.Parent.modules.ViewModel)
+local WeatherFX = require(script.Parent.modules.WeatherFX)
 
 local player = Players.LocalPlayer
 local remotes = Net.init()
+
+-- Lluvia y nieve: efectos locales que siguen a la camara
+WeatherFX.start()
 
 local state = { active = false, phase = "none", diff = nil }
 local sprinting = false
@@ -9802,6 +10528,79 @@ local function sound2D(soundId, volume, pitch)
 	end
 	sound:Play()
 	Debris:AddItem(sound, 5)
+end
+
+-- ===============================================================
+-- Pasos: solo se escuchan al correr. Con Shift (caminar) o agachado
+-- no haces ruido. Ademas se apaga el sonido de pasos por defecto.
+-- ===============================================================
+local pasoAcumulado = {}
+
+local function sonidoPaso(position, volume, pitch)
+	local holder = Instance.new("Part")
+	holder.Name = "FxPaso"
+	holder.Size = Vector3.new(1, 1, 1)
+	holder.Anchored = true
+	holder.CanCollide = false
+	holder.CanQuery = false
+	holder.CanTouch = false
+	holder.Transparency = 1
+	holder.Position = position
+	holder.Parent = workspace
+
+	local sound = Instance.new("Sound")
+	sound.SoundId = Config.Sounds.steps
+	sound.Volume = volume
+	sound.RollOffMinDistance = 5
+	sound.RollOffMaxDistance = 85
+	sound.PlaybackSpeed = pitch or 1
+	sound.Parent = holder
+	sound:Play()
+	Debris:AddItem(holder, 3)
+end
+
+local function updatePasos(dt)
+	local umbral = (Config.Footsteps and Config.Footsteps.runSpeed) or 19
+	for _, other in ipairs(Players:GetPlayers()) do
+		local character = other.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+		-- Apaga el "Running" que trae Roblox por defecto: asi solo suenan
+		-- nuestros pasos, y solo cuando corresponde
+		if root then
+			local porDefecto = root:FindFirstChild("Running")
+			if not porDefecto then
+				local emisor = root:FindFirstChildOfClass("AudioEmitter")
+				porDefecto = emisor and emisor:FindFirstChild("Running")
+			end
+			if porDefecto and (porDefecto:IsA("Sound") or porDefecto:IsA("AudioPlayer")) then
+				porDefecto.Volume = 0
+			end
+		end
+
+		local pisa = root and humanoid and humanoid.Health &gt; 0
+			and humanoid.FloorMaterial ~= Enum.Material.Air
+		if pisa then
+			local v = root.AssemblyLinearVelocity
+			local rapidez = math.sqrt(v.X * v.X + v.Z * v.Z)
+			if rapidez &gt;= umbral then
+				local acumulado = (pasoAcumulado[other] or 0) + dt
+				local intervalo = math.clamp(10.5 / math.max(rapidez, 1), 0.24, 0.6)
+				if acumulado &gt;= intervalo then
+					acumulado = 0
+					-- Un tono distinto por jugador para no sonar todos igual
+					local tono = 0.94 + (other.UserId % 4) * 0.03
+					sonidoPaso(root.Position + Vector3.new(0, -1.7, 0), other == player and 0.4 or 0.5, tono)
+				end
+				pasoAcumulado[other] = acumulado
+			else
+				pasoAcumulado[other] = nil
+			end
+		else
+			pasoAcumulado[other] = nil
+		end
+	end
 end
 
 -- ===============================================================
@@ -10414,8 +11213,13 @@ local function fireTool(toolId)
 		revolver = 0.7, cohete = 1.0, arco = 0.5, cuchillo = 0.35, lanzallamas = 0.15,
 		ak = 0.8, m4 = 0.7, mp5 = 0.5, glock = 0.5, escopeta = 0.95,
 	}
-	ViewModel.recoil(RECOIL[toolId] or 0)
-	ViewModel.flash()
+	if toolId == "cuchillo" then
+		-- Cuchillo mariposa: pega un zarpazo (sin fogonazo ni patada de arma)
+		ViewModel.slash()
+	else
+		ViewModel.recoil(RECOIL[toolId] or 0)
+		ViewModel.flash()
+	end
 
 	-- Patada de camara estilo Counter Blox: 2 * (1 - control) grados
 	local shootCfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[toolId]
@@ -10536,6 +11340,9 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		-- Shift: caminar despacio (por defecto el personaje corre)
 		sprinting = true
 		applySpeed()
+	elseif input.KeyCode == Enum.KeyCode.F then
+		-- Cuchillo mariposa: F lo hace dar vueltas en la mano (estilo CS2)
+		ViewModel.spin()
 	elseif input.KeyCode == Enum.KeyCode.Tab then
 		HUD.setScoreboardVisible(true)
 	elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.LeftAlt
@@ -11134,6 +11941,9 @@ RunService.Heartbeat:Connect(function(dt)
 	-- Chorros de llama y fuegos que quedaron viejos
 	flameCleanup()
 
+	-- Pasos: correr suena; caminar con Shift o agachado, no
+	updatePasos(dt)
+
 	local remaining = remainingCooldowns
 	for toolId, data in pairs(cooldowns) do
 		data.left = math.max(0, data.left - dt)
@@ -11151,11 +11961,11 @@ remotes.RequestState:FireServer()
 </ProtectedString>
 					</Properties>
 				</Item>
-				<Item class="Folder" referent="RBX023">
+				<Item class="Folder" referent="RBX024">
 					<Properties>
 						<string name="Name">modules</string>
 					</Properties>
-					<Item class="ModuleScript" referent="RBX024">
+					<Item class="ModuleScript" referent="RBX025">
 						<Properties>
 							<string name="Name">HUD</string>
 							<ProtectedString name="Source">--[[
@@ -11399,7 +12209,8 @@ local function buildMenu(parent)
 			.. "4) Trampa de fruta (1 por jugador): el kiwi queda atrapado 3 s; ve por él o disparale.\n"
 			.. "5) Rifle de pintura: mancha, marca (se ve entre las paredes) y frena. Clic derecho: mira.\n"
 			.. "En Kiwi Colosal llevas rastreador y rifle ralentizador (frena al gigante, no lo duerme).\n"
-			.. "V: vista en primera persona. Corres siempre; con Shift caminas despacio (menos ruido) y con Ctrl vas en sigilo.",
+			.. "V: vista en primera persona. Corres siempre; con Shift caminas despacio (menos ruido) y con Ctrl vas en sigilo.\n"
+			.. "F: con el cuchillo mariposa lo haces girar en la mano (todos lo llevan de fábrica). El clima cambia solo: sol, lluvia o nieve; si nieva, la nieve se acumula en el piso.",
 	}, help)
 
 	return menu
@@ -13121,7 +13932,7 @@ return HUD
 </ProtectedString>
 						</Properties>
 					</Item>
-					<Item class="ModuleScript" referent="RBX025">
+					<Item class="ModuleScript" referent="RBX026">
 						<Properties>
 							<string name="Name">ViewModel</string>
 							<ProtectedString name="Source">--[[
@@ -13158,6 +13969,9 @@ local recoilRoll = 0   -- volcado al azar de la patada (estilo Counter)
 local camKick = Vector2.new(0, 0) -- patada de camara (radianes)
 local flashTimer = 0   -- fogonazo del canon
 local reparentDirty = true -- hay que reacomodar piezas (arma/visibilidad)
+-- Animacion del cuchillo mariposa (estilo CS2): giro al equiparlo, F = inspeccion
+local FX = { kind = nil, t = 0, dur = 0 }
+local knifeOpen = 1    -- 1 = hoja abierta, 0 = plegada
 
 -- Posicion del arma respecto de la camara (estilo Counter Blox: al costado,
 -- bien abajo a la derecha y con una leve inclinacion, para no tapar la vista)
@@ -13169,7 +13983,7 @@ local ADS = CFrame.new(0.05, -1.0, -2.35)
 -- ===============================================================
 -- Construccion de las armas (cajas simples, estilo Counter)
 -- ===============================================================
-local function piece(model, size, cf, color, material, shape)
+local function piece(model, size, cf, color, material, shape, anim)
 	local p = Instance.new("Part")
 	p.Name = "Pieza"
 	p.Size = size
@@ -13187,7 +14001,7 @@ local function piece(model, size, cf, color, material, shape)
 		p.Shape = shape
 	end
 	p.Parent = folder
-	table.insert(model.pieces, { part = p, cf = cf })
+	table.insert(model.pieces, { part = p, cf = cf, anim = anim })
 	return p
 end
 
@@ -13252,13 +14066,23 @@ local function buildArco()
 	return model
 end
 
+-- Cuchillo mariposa estilo CS2: dos mangos de acero y la hoja que gira
+-- sobre el pivote. El modelo se guarda ABIERTO; "closed" es el giro que
+-- devuelve cada pieza a la pose plegada para las animaciones (apertura).
 local function buildCuchillo()
 	local model = { pieces = {} }
-	piece(model, Vector3.new(0.3, 0.7, 0.4), CFrame.new(0, -0.7, -0.4), Color3.fromRGB(62, 46, 34), Enum.Material.Wood)
-	piece(model, Vector3.new(0.85, 0.16, 0.45), CFrame.new(0, -0.28, -0.4), Color3.fromRGB(130, 134, 144))
-	piece(model, Vector3.new(0.72, 2.3, 0.12), CFrame.new(0, 0.95, -0.4), Color3.fromRGB(226, 232, 240))
-	piece(model, Vector3.new(0.1, 2.2, 0.14), CFrame.new(0.3, 0.95, -0.4), Color3.fromRGB(255, 255, 255), Enum.Material.Neon)
-	model.muzzle = Vector3.new(0, 2.2, -0.4)
+	local acero = Color3.fromRGB(206, 212, 222)
+	local aceroOscuro = Color3.fromRGB(150, 156, 168)
+	local pivote = { pivot = Vector3.new(0, -0.28, -0.40), closed = CFrame.Angles(math.rad(-180), 0, 0) }
+	-- Mangos alineados (el de abajo esta en la mano)
+	piece(model, Vector3.new(0.16, 0.95, 0.30), CFrame.new(-0.09, -0.765, -0.40), aceroOscuro)
+	piece(model, Vector3.new(0.16, 0.95, 0.30), CFrame.new(0.09, -0.765, -0.40), aceroOscuro)
+	piece(model, Vector3.new(0.30, 0.10, 0.32), CFrame.new(0, -0.28, -0.40), acero)
+	-- Hoja (abre y cierra girando sobre el pivote)
+	piece(model, Vector3.new(0.10, 1.15, 0.28), CFrame.new(0, 0.295, -0.40), acero, nil, nil, pivote)
+	piece(model, Vector3.new(0.30, 0.30, 0.28), CFrame.new(0, 0.94, -0.40) * CFrame.Angles(0, 0, math.rad(45)), acero, nil, nil, pivote)
+	piece(model, Vector3.new(0.10, 1.05, 0.10), CFrame.new(0.068, 0.275, -0.40), Color3.fromRGB(255, 255, 255), Enum.Material.Neon, nil, pivote)
+	model.muzzle = Vector3.new(0, 1.12, -0.40)
 	return model
 end
 
@@ -13428,6 +14252,11 @@ function ViewModel.setWeapon(id)
 		models[id] = BUILDERS[id]()
 	end
 	current = models[id]
+	-- Al sacar el cuchillo mariposa se abre con un giro (estilo CS2)
+	if id == "cuchillo" then
+		FX = { kind = "draw", t = 0, dur = 0.75 }
+		knifeOpen = 0
+	end
 	-- Fogonazo: una bolita neon en la boca del canon
 	if current and not current.flash then
 		local flash = piece(current, Vector3.new(0.72, 0.5, 0.5),
@@ -13473,6 +14302,20 @@ end
 
 function ViewModel.flash()
 	flashTimer = 0.055
+end
+
+-- Inspeccion (tecla F): la mariposa da dos vueltas en la mano
+function ViewModel.spin()
+	if currentId == "cuchillo" and visible and not hiddenByScope then
+		FX = { kind = "inspect", t = 0, dur = 1.1 }
+	end
+end
+
+-- Zarpazo: el cuchillo barre de costado al atacar
+function ViewModel.slash()
+	if currentId == "cuchillo" and visible and not hiddenByScope then
+		FX = { kind = "slash", t = 0, dur = 0.24 }
+	end
 end
 
 function ViewModel.hasWeapon(id)
@@ -13567,8 +14410,43 @@ local function stepUnbound(dt)
 		* CFrame.new(bobX + sway.X * 2.6, bobY + sway.Y * 2.2, recoil * 0.5)
 	local final = base * CFrame.Angles(-sway.Y * 2.4 - recoil * 0.2, -sway.X * 2.4, recoilRoll * recoil * 2)
 
+	-- Animacion del cuchillo mariposa: apertura al equipar, giro (F) y zarpazo
+	local animCF = nil
+	if FX.kind then
+		FX.t = FX.t + dt
+		local raw = math.clamp(FX.t / FX.dur, 0, 1)
+		if FX.kind == "draw" then
+			local e = 1 - (1 - raw) ^ 2.4
+			animCF = CFrame.Angles(0, 0, math.rad(360) * (1 - e))
+				* CFrame.new(0, 0.16 * math.sin(math.pi * e), 0.14 * math.sin(math.pi * e))
+			knifeOpen = math.clamp(e * 1.6, 0, 1)
+		elseif FX.kind == "slash" then
+			local swipe = math.sin(math.pi * raw)
+			animCF = CFrame.Angles(math.rad(-16 * swipe), math.rad(-150 * swipe), math.rad(30 * swipe))
+				* CFrame.new(0, 0.05 * swipe, -0.35 * swipe)
+		elseif FX.kind == "inspect" then
+			local e = raw * raw * (3 - 2 * raw)
+			animCF = CFrame.Angles(0, 0, math.rad(720) * (1 - e))
+				* CFrame.new(0, 0.12 * math.sin(math.pi * raw), 0)
+		end
+		if raw &gt;= 1 then
+			FX.kind = nil
+		end
+	end
+	-- Si un zarpazo interrumpio la apertura, la hoja termina de abrirse sola
+	if FX.kind ~= "draw" and knifeOpen &lt; 1 then
+		knifeOpen = math.min(1, knifeOpen + dt * 5)
+	end
+
+	local posed = animCF and final * animCF or final
 	for _, item in ipairs(current.pieces) do
-		item.part.CFrame = final * item.cf
+		local cf = item.cf
+		local anim = item.anim
+		if anim and knifeOpen &lt; 1 then
+			local rot = anim.closed:Lerp(CFrame.new(), knifeOpen)
+			cf = CFrame.new(anim.pivot) * rot * CFrame.new(-anim.pivot) * cf
+		end
+		item.part.CFrame = posed * cf
 	end
 
 	-- Fogonazo: se ve un instante al disparar
@@ -13588,6 +14466,194 @@ end
 RunService:BindToRenderStep("KiwiVistaArmas", Enum.RenderPriority.Camera.Value + 1, stepUnbound)
 
 return ViewModel
+</ProtectedString>
+						</Properties>
+					</Item>
+					<Item class="ModuleScript" referent="RBX027">
+						<Properties>
+							<string name="Name">WeatherFX</string>
+							<ProtectedString name="Source">--[[
+	WeatherFX.lua  (cliente)
+	Dibuja el clima del lado del jugador:
+
+		- lluvia: rayas finas que caen alrededor de la camara
+		  (parts locales: no viajan al servidor)
+		- nieve: copos con particulas (textura de estrella)
+
+	Lee los atributos que publica el servidor en el workspace:
+		"Clima" (sol | lluvia | nieve) y "ClimaFuerza" (0 a 1).
+
+	La luz, la niebla y la nieve acumulada del piso las maneja el
+	servidor en Lighting; aca solo se ven los copos y las gotas.
+--]]
+
+local RunService = game:GetService("RunService")
+
+local WeatherFX = {}
+
+local RAIN_MAX = 90
+local RAIN_RADIUS = 27    -- radio alrededor de la camara donde cae la lluvia
+local RAIN_TOP = 22       -- altura sobre la camara donde nace la gota
+local RAIN_BOTTOM = -9    -- a esta altura bajo la camara, la gota se recicla
+
+local RAIN_COLOR = Color3.fromRGB(168, 190, 216)
+local RAIN_TRANSPARENCY = 0.35
+
+local started = false
+local gotas = {}
+local nube
+local copos
+local fuerza = 0
+
+-- ===============================================================
+-- Lluvia (rayas)
+-- ===============================================================
+local function nacimientoGota(g)
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+	local base = camera.CFrame.Position
+	local angulo = math.random() * math.pi * 2
+	local radio = math.sqrt(math.random()) * RAIN_RADIUS
+	g.parte.Position = Vector3.new(
+		base.X + math.cos(angulo) * radio,
+		base.Y + RAIN_TOP + math.random() * 10,
+		base.Z + math.sin(angulo) * radio
+	)
+end
+
+local function nuevaGota()
+	local parte = Instance.new("Part")
+	parte.Name = "GotaLluvia"
+	parte.Size = Vector3.new(0.07, 0.8 + math.random() * 0.7, 0.07)
+	parte.Color = RAIN_COLOR
+	parte.Material = Enum.Material.SmoothPlastic
+	parte.Transparency = 1
+	parte.Anchored = true
+	parte.CanCollide = false
+	parte.CanQuery = false
+	parte.CanTouch = false
+	parte.CastShadow = false
+	parte.Position = Vector3.new(0, -600, 0)
+	parte.Parent = workspace
+	local g = { parte = parte, vy = 80 + math.random() * 30 }
+	nacimientoGota(g)
+	return g
+end
+
+-- ===============================================================
+-- Nieve (copos de particulas)
+-- ===============================================================
+local function armarNube()
+	if nube and nube.Parent then
+		return
+	end
+	nube = Instance.new("Part")
+	nube.Name = "ClimaNube"
+	nube.Size = Vector3.new(64, 2, 64) -- el "techo" del que caen los copos
+	nube.Transparency = 1
+	nube.Anchored = true
+	nube.CanCollide = false
+	nube.CanQuery = false
+	nube.CanTouch = false
+	nube.CastShadow = false
+	nube.Parent = workspace
+
+	copos = Instance.new("ParticleEmitter")
+	copos.Name = "Copos"
+	copos.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	copos.LightEmission = 0.35
+	copos.LightInfluence = 0.45
+	copos.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+	copos.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.42),
+		NumberSequenceKeypoint.new(1, 0.6),
+	})
+	copos.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.12),
+		NumberSequenceKeypoint.new(0.85, 0.4),
+		NumberSequenceKeypoint.new(1, 0.85),
+	})
+	copos.Lifetime = NumberRange.new(7, 12)
+	copos.Rate = 0
+	copos.Speed = NumberRange.new(2.5, 5)
+	copos.SpreadAngle = Vector2.new(14, 14)
+	copos.Acceleration = Vector3.new(2.4, -2.2, 1.6)
+	copos.Drag = 0.35
+	copos.Rotation = NumberRange.new(0, 360)
+	copos.RotSpeed = NumberRange.new(-42, 42)
+	copos.VelocityInheritance = 0.05
+	copos.EmissionDirection = Enum.NormalId.Bottom
+	copos.Shape = Enum.ParticleEmitterShape.Box
+	copos.Enabled = false
+	copos.Parent = nube
+end
+
+-- ===============================================================
+-- Cuadro a cuadro
+-- ===============================================================
+local function paso(dt)
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+
+	local kind = workspace:GetAttribute("Clima") or "sol"
+	local objetivo = workspace:GetAttribute("ClimaFuerza") or 0
+	if kind == "sol" then
+		objetivo = 0
+	end
+	fuerza = fuerza + (objetivo - fuerza) * math.min(1, dt * 4)
+
+	-- Lluvia
+	local activas = 0
+	if kind == "lluvia" then
+		activas = math.floor(RAIN_MAX * math.clamp(fuerza, 0, 1) + 0.5)
+	end
+	for i = 1, RAIN_MAX do
+		local g = gotas[i]
+		if not g then
+			g = nuevaGota()
+			gotas[i] = g
+		end
+		local parte = g.parte
+		if i &lt;= activas then
+			if parte.Transparency ~= RAIN_TRANSPARENCY then
+				parte.Transparency = RAIN_TRANSPARENCY
+			end
+			parte.Position = parte.Position + Vector3.new(2.2 * dt, -g.vy * dt, 1.2 * dt)
+			if parte.Position.Y &lt; camera.CFrame.Position.Y + RAIN_BOTTOM then
+				nacimientoGota(g)
+			end
+		elseif parte.Transparency ~= 1 then
+			parte.Transparency = 1
+		end
+	end
+
+	-- Nieve
+	if kind == "nieve" and fuerza &gt; 0.02 then
+		armarNube()
+		if nube and copos then
+			nube.CFrame = CFrame.new(camera.CFrame.Position + Vector3.new(0, 26, 0))
+			copos.Enabled = true
+			copos.Rate = 160 * math.clamp(fuerza, 0, 1)
+		end
+	elseif copos and copos.Enabled then
+		copos.Enabled = false
+		copos.Rate = 0
+	end
+end
+
+function WeatherFX.start()
+	if started then
+		return
+	end
+	started = true
+	RunService.RenderStepped:Connect(paso)
+end
+
+return WeatherFX
 </ProtectedString>
 						</Properties>
 					</Item>

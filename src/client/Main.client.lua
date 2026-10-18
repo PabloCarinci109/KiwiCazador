@@ -25,9 +25,13 @@ local Util = require(Shared.Util)
 
 local HUD = require(script.Parent.modules.HUD)
 local ViewModel = require(script.Parent.modules.ViewModel)
+local WeatherFX = require(script.Parent.modules.WeatherFX)
 
 local player = Players.LocalPlayer
 local remotes = Net.init()
+
+-- Lluvia y nieve: efectos locales que siguen a la camara
+WeatherFX.start()
 
 local state = { active = false, phase = "none", diff = nil }
 local sprinting = false
@@ -89,6 +93,79 @@ local function sound2D(soundId, volume, pitch)
 	end
 	sound:Play()
 	Debris:AddItem(sound, 5)
+end
+
+-- ===============================================================
+-- Pasos: solo se escuchan al correr. Con Shift (caminar) o agachado
+-- no haces ruido. Ademas se apaga el sonido de pasos por defecto.
+-- ===============================================================
+local pasoAcumulado = {}
+
+local function sonidoPaso(position, volume, pitch)
+	local holder = Instance.new("Part")
+	holder.Name = "FxPaso"
+	holder.Size = Vector3.new(1, 1, 1)
+	holder.Anchored = true
+	holder.CanCollide = false
+	holder.CanQuery = false
+	holder.CanTouch = false
+	holder.Transparency = 1
+	holder.Position = position
+	holder.Parent = workspace
+
+	local sound = Instance.new("Sound")
+	sound.SoundId = Config.Sounds.steps
+	sound.Volume = volume
+	sound.RollOffMinDistance = 5
+	sound.RollOffMaxDistance = 85
+	sound.PlaybackSpeed = pitch or 1
+	sound.Parent = holder
+	sound:Play()
+	Debris:AddItem(holder, 3)
+end
+
+local function updatePasos(dt)
+	local umbral = (Config.Footsteps and Config.Footsteps.runSpeed) or 19
+	for _, other in ipairs(Players:GetPlayers()) do
+		local character = other.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+		-- Apaga el "Running" que trae Roblox por defecto: asi solo suenan
+		-- nuestros pasos, y solo cuando corresponde
+		if root then
+			local porDefecto = root:FindFirstChild("Running")
+			if not porDefecto then
+				local emisor = root:FindFirstChildOfClass("AudioEmitter")
+				porDefecto = emisor and emisor:FindFirstChild("Running")
+			end
+			if porDefecto and (porDefecto:IsA("Sound") or porDefecto:IsA("AudioPlayer")) then
+				porDefecto.Volume = 0
+			end
+		end
+
+		local pisa = root and humanoid and humanoid.Health > 0
+			and humanoid.FloorMaterial ~= Enum.Material.Air
+		if pisa then
+			local v = root.AssemblyLinearVelocity
+			local rapidez = math.sqrt(v.X * v.X + v.Z * v.Z)
+			if rapidez >= umbral then
+				local acumulado = (pasoAcumulado[other] or 0) + dt
+				local intervalo = math.clamp(10.5 / math.max(rapidez, 1), 0.24, 0.6)
+				if acumulado >= intervalo then
+					acumulado = 0
+					-- Un tono distinto por jugador para no sonar todos igual
+					local tono = 0.94 + (other.UserId % 4) * 0.03
+					sonidoPaso(root.Position + Vector3.new(0, -1.7, 0), other == player and 0.4 or 0.5, tono)
+				end
+				pasoAcumulado[other] = acumulado
+			else
+				pasoAcumulado[other] = nil
+			end
+		else
+			pasoAcumulado[other] = nil
+		end
+	end
 end
 
 -- ===============================================================
@@ -701,8 +778,13 @@ local function fireTool(toolId)
 		revolver = 0.7, cohete = 1.0, arco = 0.5, cuchillo = 0.35, lanzallamas = 0.15,
 		ak = 0.8, m4 = 0.7, mp5 = 0.5, glock = 0.5, escopeta = 0.95,
 	}
-	ViewModel.recoil(RECOIL[toolId] or 0)
-	ViewModel.flash()
+	if toolId == "cuchillo" then
+		-- Cuchillo mariposa: pega un zarpazo (sin fogonazo ni patada de arma)
+		ViewModel.slash()
+	else
+		ViewModel.recoil(RECOIL[toolId] or 0)
+		ViewModel.flash()
+	end
 
 	-- Patada de camara estilo Counter Blox: 2 * (1 - control) grados
 	local shootCfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[toolId]
@@ -823,6 +905,9 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		-- Shift: caminar despacio (por defecto el personaje corre)
 		sprinting = true
 		applySpeed()
+	elseif input.KeyCode == Enum.KeyCode.F then
+		-- Cuchillo mariposa: F lo hace dar vueltas en la mano (estilo CS2)
+		ViewModel.spin()
 	elseif input.KeyCode == Enum.KeyCode.Tab then
 		HUD.setScoreboardVisible(true)
 	elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.LeftAlt
@@ -1420,6 +1505,9 @@ RunService.Heartbeat:Connect(function(dt)
 
 	-- Chorros de llama y fuegos que quedaron viejos
 	flameCleanup()
+
+	-- Pasos: correr suena; caminar con Shift o agachado, no
+	updatePasos(dt)
 
 	local remaining = remainingCooldowns
 	for toolId, data in pairs(cooldowns) do

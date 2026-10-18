@@ -54,6 +54,7 @@ function KiwiModel.build(parent, scale)
 
 	local model = Instance.new("Model")
 	model.Name = "Kiwi"
+	model:SetAttribute("NoNieve", true) -- la nieve acumulada no tapa al kiwi (es la presa)
 	model.Parent = parent
 
 	local body = piece("Part", "Cuerpo", BODY_SIZE * S, COLORS.body, Enum.Material.Fabric, Enum.PartType.Ball, model)

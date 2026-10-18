@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.8.0"
+Config.Version = "1.9.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -263,9 +263,9 @@ Config.Hide = {
 Config.Loot = {
 	uses = 3,             -- usos por arma encontrada
 	pickupRange = 12,     -- distancia para abrir el baul
+	-- 10 armas en total (el cuchillo ya no sale de los baúles)
 	weapons = {
 		{ id = "revolver", weight = 22 },
-		{ id = "cuchillo", weight = 18 },
 		{ id = "arco", weight = 15 },
 		{ id = "lanzallamas", weight = 14, uses = 12 }, -- 12s de chorro (1 uso por tick)
 		{ id = "sniper", weight = 14 },
@@ -342,7 +342,9 @@ Config.Weapons = {
 		size = Vector3.new(0.22, 0.22, 2.6),
 	},
 	cuchillo = {
-		name = "Cuchillo",
+		-- El cuchillo mariposa va de fabrica (no sale de baules): todos lo
+		-- llevan como melee, con animacion de apertura estilo CS2 en la vista.
+		name = "Cuchillo mariposa",
 		color = Color3.fromRGB(224, 230, 240),
 		cooldown = 0.85,
 		melee = true,   -- no dispara: es un zarpazo cuerpo a cuerpo
@@ -490,6 +492,12 @@ Config.Player = {
 	regenDelay = 6,    -- segundos sin recibir daño para regenerar
 }
 
+-- Pasos: solo se escuchan cuando corres. Con Shift (caminar) o agachado
+-- vas en silencio (clave para no alertar al kiwi ni a los rivales).
+Config.Footsteps = {
+	runSpeed = 19,     -- a partir de esta velocidad se escuchan los pasos
+}
+
 -- ===============================================================
 -- DIFICULTADES
 -- ===============================================================
@@ -604,7 +612,7 @@ Config.Difficulties = {
 		blurb = "Un kiwi gigante te busca por la reserva. Escóndete y sobrevive hasta que se aburra.",
 		showKiwiState = true,
 		giant = true,
-		tools = { "rastreador", "relente" },
+		tools = { "rastreador", "relente", "cuchillo" },
 		kiwi = {
 			patrolSpeed = 13,
 			huntSpeed = 27,
@@ -630,7 +638,7 @@ Config.Multiplayer = {
 	tag = "¡Supervivencia!",
 	color = Color3.fromRGB(160, 140, 245),
 	blurb = "El kiwi gigante va comiendo cazadores: gana el último que quede vivo.",
-	tools = { "rastreador", "relente", "pintura" },
+	tools = { "rastreador", "relente", "pintura", "cuchillo" },
 	baseDifficulty = "normal",
 	maxPlayers = 12,
 	timeLimit = 300,
@@ -647,14 +655,15 @@ Config.Asedio = {
 	name = "Asedio al Kiwi",
 	tag = "¡5 vs 5!",
 	color = Color3.fromRGB(255, 176, 74),
-	blurb = "5 contra 5: un equipo cuida al kiwi en su casa y el otro entra a capturarlo con la red. Al mejor de 3 rondas.",
+	blurb = "5 contra 5: un equipo defiende al kiwi en su bunker (portón, ductos de ventilación y un túnel) y el otro entra a capturarlo con la red. Al mejor de 3 rondas.",
 	baseDifficulty = "normal",
 	maxPlayers = 10,
 	roundTime = 150,        -- segundos por ronda
 	breakTime = 7,          -- descanso entre rondas
 	roundsToWin = 2,        -- primero a 2 rondas gana la partida
 	respawn = 7,            -- segundos para volver tras un noqueo
-	nestRadius = 46,        -- el kiwi no se aleja mas de esto de su casa
+	nestRadius = 20,        -- el kiwi no se aleja mas de esto de su casa (queda dentro del bunker)
+	bunkerHalf = 34,        -- media medida del bunker de los Defensores (lo arma el asedio)
 	attackSpawn = 100,      -- a que distancia del nido aparecen los Cazadores
 	revolverUses = 40,      -- tiros de revolver que recibe cada cazador
 	paintDamage = 11,       -- la pintura tambien lastima un poco en este modo
@@ -664,8 +673,8 @@ Config.Asedio = {
 	teamDefend = "Defensores",
 	colorAttack = Color3.fromRGB(226, 116, 74),
 	colorDefend = Color3.fromRGB(88, 164, 240),
-	toolsAttack = { "red", "rifle", "rastreador", "pintura" },
-	toolsDefend = { "pintura", "rastreador" },
+	toolsAttack = { "red", "rifle", "rastreador", "pintura", "cuchillo" },
+	toolsDefend = { "pintura", "rastreador", "cuchillo" },
 }
 
 -- Ficha del modo para el menu (los detalles viven en Config.Asedio)
@@ -699,6 +708,26 @@ Config.Round = {
 	EatHold = 2.6,           -- cuanto dura "comerse" a un cazador (modo Colosal)
 	KoHold = 1.8,            -- cuanto dura un noqueado antes de volver al lobby
 	HubReturn = true,        -- devolver al lobby al terminar
+}
+
+-- ===============================================================
+-- CLIMA Y HORA
+-- ===============================================================
+Config.Weather = {
+	dayLength = 960,            -- segundos reales que dura un dia entero (24 h)
+	startClock = 15,            -- hora con la que arranca el servidor
+	duskStart = 16,             -- a partir de esta hora empieza a oscurecer
+	dawnEnd = 8,                -- hasta esta hora termina de amanecer
+	night = 0.28,               -- luz que queda de noche (1 = pleno dia)
+	changeEvery = { 150, 280 }, -- cada cuanto puede cambiar el clima (segundos, min..max)
+	firstChange = { 50, 110 },  -- el primer cambio llega antes (para verlo)
+	weights = { sol = 55, lluvia = 25, nieve = 20 }, -- chances de cada clima
+	blend = 12,                 -- segundos que tarda en entrar/salir el clima
+	snowGrow = 1 / 150,         -- velocidad con que se acumula la nieve (1 = todo blanco)
+	snowMelt = 1 / 110,         -- velocidad con que se derrite
+	snowWhite = 0.85,           -- cuanto blanquea el mapa la nieve acumulada
+	snowColor = Color3.fromRGB(238, 242, 248),
+	snowFog = Color3.fromRGB(226, 232, 244),
 }
 
 -- ===============================================================
@@ -736,6 +765,9 @@ Config.Text = {
 	HideBusy = "¡Ya hay alguien escondido ahí!",
 	HideEscape = "¡El kiwi husmeó tu escondite y escapaste! +%d monedas",
 	ChestLoot = "¡Encontraste: %s! (%d usos)",
+	AsedioChests = "Cada equipo tiene su baúl: una sola arma por jugador y por ronda",
+	ChestTeamWrong = "Ese es el baúl de los %s: busca el de tu equipo",
+	ChestTeamDone = "Ya sacaste tu arma de este baúl (una por ronda)",
 	WeaponOut = "Se te acabó: %s",
 	BoomShout = "¡%s disparó el %s!",
 	TankBoom = "¡%s le voló la mochila de combustible a %s!",
@@ -755,6 +787,9 @@ Config.Text = {
 	EatenMenu = "El kiwi te comió. Elige otro modo para volver a jugar.",
 	MapPickNotify = "¡Mapa elegido: %s!",
 	MapFallback = "Ese mapa estaba ocupado: esta partida va en %s.",
+	ClimaSol = "Se despejó: salió el sol",
+	ClimaLluvia = "Se largó a llover",
+	ClimaNieve = "Está nevando: la nieve se acumula en el piso",
 	HurtMsg = "¡%s te dio con %s! (-%d de vida)",
 	HurtGeneric = "¡%s! (-%d de vida)",
 	CarHit = "Te atropelló un auto",
@@ -793,6 +828,7 @@ Config.Sounds = {
 	flame = "rbxasset://sounds/unsheath.mp3",
 	flush = "rbxasset://sounds/swordlunge.wav",
 	rustle = "rbxasset://sounds/action_footsteps_plastic.mp3",
+	steps = "rbxasset://sounds/action_footsteps_plastic.mp3",
 	win = "rbxasset://sounds/electronicpingshort.wav",
 	lose = "rbxasset://sounds/uuhhh.mp3",
 	ui = "rbxasset://sounds/button.wav",

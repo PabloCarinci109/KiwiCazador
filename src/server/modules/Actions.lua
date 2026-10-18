@@ -318,7 +318,10 @@ function Actions.fireWeapon(session, player, weaponId, data)
 		return
 	end
 
-	if ToolService.lootUses(player, weaponId) <= 0 then
+	-- Solo las armas de baul se gastan por uso; el cuchillo mariposa
+	-- de fabrica no lleva "Uses" y no se consume.
+	local loot = ToolService.isLoot(player, weaponId)
+	if loot and ToolService.lootUses(player, weaponId) <= 0 then
 		return
 	end
 
@@ -328,7 +331,9 @@ function Actions.fireWeapon(session, player, weaponId, data)
 	if cfg.melee then
 		Actions.melee(session, player, weaponId, cfg, muzzle, dir)
 		ToolService.startCooldown(player, weaponId, cfg.cooldown)
-		ToolService.consumeLoot(player, weaponId)
+		if loot then
+			ToolService.consumeLoot(player, weaponId)
+		end
 		return
 	end
 

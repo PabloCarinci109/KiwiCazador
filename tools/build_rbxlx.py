@@ -11,11 +11,12 @@ File > Open from File... y se publica con File > Publish to Roblox.
 """
 
 from pathlib import Path
+import os
 import xml.etree.ElementTree as ET
 
 RAIZ = Path(__file__).resolve().parent.parent
 SRC = RAIZ / "src"
-SALIDA = RAIZ / "KiwiCazador.rbxlx"
+SALIDA = Path(os.environ.get("KIWI_OUT", str(RAIZ / "KiwiCazador.rbxlx")))
 
 
 class Referencias:
@@ -90,9 +91,11 @@ def construir():
     servicio_srv, _ = item(raiz, "ServerScriptService", "ServerScriptService")
     servidor, _ = item(servicio_srv, "Folder", "KiwiServer")
     agregar_fuente(servidor, "Script", "Main", SRC / "server" / "Main.server.lua")
+    if os.environ.get("KIWI_AUTOTEST"):
+        agregar_fuente(servidor, "Script", "AutoTest", SRC / "server" / "AutoTest.server.lua")
     modulos_srv, _ = item(servidor, "Folder", "modules")
     for nombre in ("Shared", "WorldBuilder", "KiwiModel", "KiwiController",
-                   "ToolService", "Actions", "GameManager"):
+                   "ToolService", "Actions", "Weather", "GameManager"):
         agregar_fuente(modulos_srv, "ModuleScript", nombre, SRC / "server" / "modules" / (nombre + ".lua"))
 
     # StarterPlayer.StarterPlayerScripts.KiwiClient
@@ -105,6 +108,7 @@ def construir():
     modulos_cli, _ = item(cliente, "Folder", "modules")
     agregar_fuente(modulos_cli, "ModuleScript", "HUD", SRC / "client" / "modules" / "HUD.lua")
     agregar_fuente(modulos_cli, "ModuleScript", "ViewModel", SRC / "client" / "modules" / "ViewModel.lua")
+    agregar_fuente(modulos_cli, "ModuleScript", "WeatherFX", SRC / "client" / "modules" / "WeatherFX.lua")
 
     return raiz
 

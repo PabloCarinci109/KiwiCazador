@@ -42,6 +42,21 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 ### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
 
+> **1.9.0:** arreglado el **asedio** (un error de teleport hacía que los jugadores quedaran en el
+> lobby sin armas ni kiwi: el spawn devolvía la posición en vez del CFrame completo). El nido del
+> kiwi ahora es un **bunker de los Defensores**: muralla con **troneras**, **portón** al frente,
+> **dos ductos de ventilación** (se entra agachado) y un **túnel cubierto** por atrás, más
+> **barricadas de bolsas de arena**. Cada equipo tiene su **baúl**: de ahí sacás **UNA sola arma
+> por ronda** (el arma es para vos; el baúl sigue abierto para el resto). El arsenal de baúles
+> quedó en **10 armas** (salió el cuchillo). Y los **pasos ahora suenan solo al correr**: con
+> **Shift** (caminar) o **Ctrl** (agachado) vas en silencio, y se apagó el sonido de pasos que
+> Roblox trae por defecto. Además llegó el **cuchillo mariposa**: va **de fábrica para todos**
+> (no sale de los baúles), se **abre con un giro** al equiparlo, el **clic** pega un **zarpazo**
+> corto y con **F** lo hacés **girar en la mano** (estilo CS2). Y el mundo ahora tiene **clima y
+> hora**: el sol va **oscureciendo** con el correr de la partida y cada tanto cambia el tiempo
+> al azar (**sol, lluvia o nieve**); cuando **nieva**, caen los copos y la nieve **se acumula en
+> el piso y los techos** (el mapa se ve nevado) hasta que para y se derrite sola.
+
 > **1.8.0:** el personaje ahora **corre siempre** (con **Shift** camina despacio y hace menos
 > ruido) y en partida el **mouse queda oculto y centrado** (se fue la manito que tapaba el punto
 > de mira). La cámara **abre un poco el FOV al correr** para sentir la velocidad. El
@@ -95,6 +110,9 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 - **Movilidad:** el personaje **corre siempre**; **Shift** lo hace **caminar despacio** y
   **Ctrl / Alt / C** agacharse en sigilo (la cámara baja y el arma se afirma: menos dispersión).
   **V** cambia a primera persona.
+- **Clima y hora:** el día avanza solo (amanece, **oscurece** y vuelve a aclarar) y el tiempo
+  cambia al azar: **sol, lluvia o nieve**. Con la nevada caen los copos, la nieve **se acumula en
+  el piso** y blanquea el mapa entero; cuando para, se derrite sola.
 - **Créditos:** las fórmulas de disparo, retroceso, cabeza y zoom están inspiradas en el código
   público de **Counter Blox: Sauce - Restored** (licencia MIT) — ver [`LICENSE-CB.md`](LICENSE-CB.md).
 
@@ -113,6 +131,7 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 | **1 / 2 / 3 / 4 / 5** | Cambiar de herramienta (red / rifle / rastreador / trampa / pintura; en Colosal: rastreador / ralentizador) |
 | **Shift** | Caminar despacio (hacés menos ruido; por defecto corrés, y el kiwi te oye antes) |
 | **Ctrl**, **Alt** o **C** | Agachado en sigilo (casi no te oye; la cámara baja y el arma se afirma: menos dispersión) |
+| **F** | Con el **cuchillo mariposa** (de fábrica para todos): lo hacés **girar en la mano**, estilo CS2 |
 | **E** | **Esconderte** en un armario, barril o pajar / **abrir un baúl**. Dentro del escondite, E otra vez te saca |
 | **Tab** | **Tabla estilo Counter** (equipos, marcador y capturas en Asedio) + tabla de jugadores de Roblox |
 
@@ -149,8 +168,11 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
   **AK-47** (34 de daño, automática), **M4A1** (30, automática y precisa), **MP5** (22, muy
   manejable), **Glock-18** (26, pistola) y **Escopeta** (8 perdigones: de cerca es letal).
   Las automáticas **se disparan dejando el clic apretado**; con **clic derecho** apuntás y la
-  dispersión se cierra. Junto al **Revólver**, el **Francotirador**, el **Arco**, el **Cuchillo**,
-  el **Lanzallamas** y el **Lanzacohetes** (y el **tranquilizante** de siempre).
+  dispersión se cierra. Junto al **Revólver**, el **Francotirador**, el **Arco**, el
+  **Lanzallamas** y el **Lanzacohetes** (y el **tranquilizante** de siempre).
+- **Cuchillo mariposa** 🔪 — no sale de los baúles: lo llevan **todos de fábrica** en cualquier
+  modo. Al equiparlo se **abre con un giro** (estilo CS2), el **clic** pega un **zarpazo** rápido
+  y **F** lo hace **girar en la mano**.
 
 ### Escondites y baúles (1.2.0, ampliados en 1.3.0)
 
@@ -291,12 +313,15 @@ Crea estas carpetas y scripts **con estos nombres exactos** (importan las mayús
     - ModuleScript `Actions` → `src/server/modules/Actions.lua`
     - ModuleScript `ToolService` → `src/server/modules/ToolService.lua`
     - ModuleScript `Shared` → `src/server/modules/Shared.lua`
+    - ModuleScript `Weather` → `src/server/modules/Weather.lua`
 
 **3. StarterPlayer → StarterPlayerScripts**
 - Folder llamada `KiwiClient`
   - **LocalScript** llamado `Main` → pega `src/client/Main.client.lua`
   - Folder llamada `modules`
     - ModuleScript `HUD` → pega `src/client/modules/HUD.lua`
+    - ModuleScript `ViewModel` → pega `src/client/modules/ViewModel.lua`
+    - ModuleScript `WeatherFX` → pega `src/client/modules/WeatherFX.lua`
 
 > ⚠️ Si algo no carga, mira la sección **Problemas comunes** más abajo. El juego avisa
 > con mensajes claros en el Output de Studio si falta una carpeta.
@@ -316,7 +341,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.8.0 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.0 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):

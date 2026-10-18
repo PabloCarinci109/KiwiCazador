@@ -32,6 +32,9 @@ local recoilRoll = 0   -- volcado al azar de la patada (estilo Counter)
 local camKick = Vector2.new(0, 0) -- patada de camara (radianes)
 local flashTimer = 0   -- fogonazo del canon
 local reparentDirty = true -- hay que reacomodar piezas (arma/visibilidad)
+-- Animacion del cuchillo mariposa (estilo CS2): giro al equiparlo, F = inspeccion
+local FX = { kind = nil, t = 0, dur = 0 }
+local knifeOpen = 1    -- 1 = hoja abierta, 0 = plegada
 
 -- Posicion del arma respecto de la camara (estilo Counter Blox: al costado,
 -- bien abajo a la derecha y con una leve inclinacion, para no tapar la vista)
@@ -43,7 +46,7 @@ local ADS = CFrame.new(0.05, -1.0, -2.35)
 -- ===============================================================
 -- Construccion de las armas (cajas simples, estilo Counter)
 -- ===============================================================
-local function piece(model, size, cf, color, material, shape)
+local function piece(model, size, cf, color, material, shape, anim)
 	local p = Instance.new("Part")
 	p.Name = "Pieza"
 	p.Size = size
@@ -61,7 +64,7 @@ local function piece(model, size, cf, color, material, shape)
 		p.Shape = shape
 	end
 	p.Parent = folder
-	table.insert(model.pieces, { part = p, cf = cf })
+	table.insert(model.pieces, { part = p, cf = cf, anim = anim })
 	return p
 end
 
@@ -126,13 +129,23 @@ local function buildArco()
 	return model
 end
 
+-- Cuchillo mariposa estilo CS2: dos mangos de acero y la hoja que gira
+-- sobre el pivote. El modelo se guarda ABIERTO; "closed" es el giro que
+-- devuelve cada pieza a la pose plegada para las animaciones (apertura).
 local function buildCuchillo()
 	local model = { pieces = {} }
-	piece(model, Vector3.new(0.3, 0.7, 0.4), CFrame.new(0, -0.7, -0.4), Color3.fromRGB(62, 46, 34), Enum.Material.Wood)
-	piece(model, Vector3.new(0.85, 0.16, 0.45), CFrame.new(0, -0.28, -0.4), Color3.fromRGB(130, 134, 144))
-	piece(model, Vector3.new(0.72, 2.3, 0.12), CFrame.new(0, 0.95, -0.4), Color3.fromRGB(226, 232, 240))
-	piece(model, Vector3.new(0.1, 2.2, 0.14), CFrame.new(0.3, 0.95, -0.4), Color3.fromRGB(255, 255, 255), Enum.Material.Neon)
-	model.muzzle = Vector3.new(0, 2.2, -0.4)
+	local acero = Color3.fromRGB(206, 212, 222)
+	local aceroOscuro = Color3.fromRGB(150, 156, 168)
+	local pivote = { pivot = Vector3.new(0, -0.28, -0.40), closed = CFrame.Angles(math.rad(-180), 0, 0) }
+	-- Mangos alineados (el de abajo esta en la mano)
+	piece(model, Vector3.new(0.16, 0.95, 0.30), CFrame.new(-0.09, -0.765, -0.40), aceroOscuro)
+	piece(model, Vector3.new(0.16, 0.95, 0.30), CFrame.new(0.09, -0.765, -0.40), aceroOscuro)
+	piece(model, Vector3.new(0.30, 0.10, 0.32), CFrame.new(0, -0.28, -0.40), acero)
+	-- Hoja (abre y cierra girando sobre el pivote)
+	piece(model, Vector3.new(0.10, 1.15, 0.28), CFrame.new(0, 0.295, -0.40), acero, nil, nil, pivote)
+	piece(model, Vector3.new(0.30, 0.30, 0.28), CFrame.new(0, 0.94, -0.40) * CFrame.Angles(0, 0, math.rad(45)), acero, nil, nil, pivote)
+	piece(model, Vector3.new(0.10, 1.05, 0.10), CFrame.new(0.068, 0.275, -0.40), Color3.fromRGB(255, 255, 255), Enum.Material.Neon, nil, pivote)
+	model.muzzle = Vector3.new(0, 1.12, -0.40)
 	return model
 end
 
@@ -302,6 +315,11 @@ function ViewModel.setWeapon(id)
 		models[id] = BUILDERS[id]()
 	end
 	current = models[id]
+	-- Al sacar el cuchillo mariposa se abre con un giro (estilo CS2)
+	if id == "cuchillo" then
+		FX = { kind = "draw", t = 0, dur = 0.75 }
+		knifeOpen = 0
+	end
 	-- Fogonazo: una bolita neon en la boca del canon
 	if current and not current.flash then
 		local flash = piece(current, Vector3.new(0.72, 0.5, 0.5),
@@ -347,6 +365,20 @@ end
 
 function ViewModel.flash()
 	flashTimer = 0.055
+end
+
+-- Inspeccion (tecla F): la mariposa da dos vueltas en la mano
+function ViewModel.spin()
+	if currentId == "cuchillo" and visible and not hiddenByScope then
+		FX = { kind = "inspect", t = 0, dur = 1.1 }
+	end
+end
+
+-- Zarpazo: el cuchillo barre de costado al atacar
+function ViewModel.slash()
+	if currentId == "cuchillo" and visible and not hiddenByScope then
+		FX = { kind = "slash", t = 0, dur = 0.24 }
+	end
 end
 
 function ViewModel.hasWeapon(id)
@@ -441,8 +473,43 @@ local function stepUnbound(dt)
 		* CFrame.new(bobX + sway.X * 2.6, bobY + sway.Y * 2.2, recoil * 0.5)
 	local final = base * CFrame.Angles(-sway.Y * 2.4 - recoil * 0.2, -sway.X * 2.4, recoilRoll * recoil * 2)
 
+	-- Animacion del cuchillo mariposa: apertura al equipar, giro (F) y zarpazo
+	local animCF = nil
+	if FX.kind then
+		FX.t = FX.t + dt
+		local raw = math.clamp(FX.t / FX.dur, 0, 1)
+		if FX.kind == "draw" then
+			local e = 1 - (1 - raw) ^ 2.4
+			animCF = CFrame.Angles(0, 0, math.rad(360) * (1 - e))
+				* CFrame.new(0, 0.16 * math.sin(math.pi * e), 0.14 * math.sin(math.pi * e))
+			knifeOpen = math.clamp(e * 1.6, 0, 1)
+		elseif FX.kind == "slash" then
+			local swipe = math.sin(math.pi * raw)
+			animCF = CFrame.Angles(math.rad(-16 * swipe), math.rad(-150 * swipe), math.rad(30 * swipe))
+				* CFrame.new(0, 0.05 * swipe, -0.35 * swipe)
+		elseif FX.kind == "inspect" then
+			local e = raw * raw * (3 - 2 * raw)
+			animCF = CFrame.Angles(0, 0, math.rad(720) * (1 - e))
+				* CFrame.new(0, 0.12 * math.sin(math.pi * raw), 0)
+		end
+		if raw >= 1 then
+			FX.kind = nil
+		end
+	end
+	-- Si un zarpazo interrumpio la apertura, la hoja termina de abrirse sola
+	if FX.kind ~= "draw" and knifeOpen < 1 then
+		knifeOpen = math.min(1, knifeOpen + dt * 5)
+	end
+
+	local posed = animCF and final * animCF or final
 	for _, item in ipairs(current.pieces) do
-		item.part.CFrame = final * item.cf
+		local cf = item.cf
+		local anim = item.anim
+		if anim and knifeOpen < 1 then
+			local rot = anim.closed:Lerp(CFrame.new(), knifeOpen)
+			cf = CFrame.new(anim.pivot) * rot * CFrame.new(-anim.pivot) * cf
+		end
+		item.part.CFrame = posed * cf
 	end
 
 	-- Fogonazo: se ve un instante al disparar

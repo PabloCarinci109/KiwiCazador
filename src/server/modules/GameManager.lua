@@ -23,6 +23,7 @@ local WorldBuilder = require(script.Parent.WorldBuilder)
 local KiwiController = require(script.Parent.KiwiController)
 local ToolService = require(script.Parent.ToolService)
 local Actions = require(script.Parent.Actions)
+local Weather = require(script.Parent.Weather)
 
 local GameManager = {}
 
@@ -49,13 +50,8 @@ local function applyLighting(preset)
 	if not preset then
 		return
 	end
-	Lighting.Ambient = preset.ambient
-	Lighting.OutdoorAmbient = preset.outdoor
-	Lighting.Brightness = preset.brightness
-	Lighting.FogColor = preset.fog
-	Lighting.FogStart = preset.fogStart
-	Lighting.FogEnd = preset.fogEnd
-	Lighting.ClockTime = preset.clock
+	-- La luz final la compone Weather: preset de la arena + hora + clima
+	Weather.setBase(preset)
 end
 
 local function applyZoneLighting(arena)
@@ -179,6 +175,9 @@ function Session.new(modeId, rng)
 	self.chosenMap = nil
 	self.voteDone = false
 	self.knocked = {}
+	self.looted = {}       -- quien ya saco su arma del baul de equipo (asedio)
+	self.fort = nil        -- bunker del asedio (se destruye al terminar)
+	self.fortChests = nil
 
 	if modeId == "asedio" then
 		self.isMulti = false
@@ -978,6 +977,30 @@ function Session:allocateArena(mapId)
 	return false
 end
 
+-- Arma el bunker de los Defensores (solo asedio, una vez por partida)
+function Session:buildFort()
+	if self.fort or not self.arena or not self.arena.nest then
+		return
+	end
+	local ok, fort = pcall(WorldBuilder.buildAsedioFort, self.arena)
+	if not ok or not fort then
+		warn("[Kiwi Cazador] no se pudo armar el bunker del asedio: " .. tostring(fort))
+		return
+	end
+	self.fort = fort
+	self.fortChests = fort.chests
+	for side, chest in pairs(fort.chests) do
+		chest.team = side
+		chest.teamName = side == "attack" and Config.Asedio.teamAttack or Config.Asedio.teamDefend
+		chest.prompt.Triggered:Connect(function(who)
+			local session = playerSession[who]
+			if session then
+				session:openChest(who, chest)
+			end
+		end)
+	end
+end
+
 function Session:spawnsFor(player)
 	-- Asedio: cada equipo aparece alrededor de la casa del kiwi
 	if self.isAsedio and self.arena and self.arena.nest then
@@ -998,17 +1021,30 @@ function Session:spawnsFor(player)
 			radius = math.min(Config.Asedio.attackSpawn, (self.arena.halfSize or 150) - 34)
 			angle = angle + 0.7
 		end
-		local point = nest + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
-		point = self.arena:clampToBounds(point)
-		local params = RaycastParams.new()
-		params.IgnoreWater = true
-		local ray = workspace:Raycast(Vector3.new(point.X, nest.Y + 70, point.Z), Vector3.new(0, -220, 0), params)
-		if ray and math.abs(ray.Position.Y - nest.Y) <= 9 then
-			point = ray.Position
-		else
-			point = Vector3.new(point.X, self.arena.floorY or nest.Y, point.Z)
+
+		-- Busca suelo firme en ese angulo (avisa si el punto esta tapado)
+		local function punto(radio)
+			local p = nest + Vector3.new(math.cos(angle) * radio, 0, math.sin(angle) * radio)
+			p = self.arena:clampToBounds(p)
+			local params = RaycastParams.new()
+			params.IgnoreWater = true
+			local ray = workspace:Raycast(Vector3.new(p.X, nest.Y + 70, p.Z), Vector3.new(0, -220, 0), params)
+			if ray then
+				local dy = ray.Position.Y - nest.Y
+				if dy >= -1 and dy <= 2.5 then
+					return ray.Position, true
+				end
+			end
+			return Vector3.new(p.X, self.arena.floorY or nest.Y, p.Z), false
 		end
-		return point + Vector3.new(0, 4, 0)
+
+		local point, limpio = punto(radius)
+		if side == "defend" and not limpio then
+			-- El punto cayo sobre la casa de arriba: se corre hacia la muralla
+			point = punto(math.min(30, (Config.Asedio.bunkerHalf or 34) - 4))
+		end
+		-- OJO: devuelve CFrame (lo usa character:PivotTo); antes daba Vector3
+		return CFrame.lookAt(point + Vector3.new(0, 4, 0), Vector3.new(nest.X, point.Y + 4, nest.Z))
 	end
 
 	local index = 1
@@ -1031,7 +1067,11 @@ function Session:teleportToArena(player)
 	if not character then
 		return
 	end
-	character:PivotTo(self:spawnsFor(player))
+	local target = self:spawnsFor(player)
+	if typeof(target) == "Vector3" then
+		target = CFrame.new(target)
+	end
+	character:PivotTo(target)
 	local root = getRoot(player)
 	if root then
 		root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
@@ -1048,6 +1088,9 @@ end
 function Session:startCountdown()
 	if self.isAsedio and not self.teamsReady then
 		self:assignTeams()
+	end
+	if self.isAsedio then
+		self:buildFort()
 	end
 	self.phase = "countdown"
 	self.phaseEnds = os.clock() + Config.Round.Countdown
@@ -1084,6 +1127,14 @@ function Session:startPlaying()
 			chest.prompt.Enabled = true
 		end
 	end
+	-- Baules de equipo del asedio: se recargan para todos cada ronda
+	self.looted = {}
+	if self.fortChests then
+		for _, chest in pairs(self.fortChests) do
+			chest.lid.CFrame = chest.lidClosed
+			chest.light.Brightness = 1.4
+		end
+	end
 	local zone = self.arena and self.arena.safeZone
 	if zone then
 		zone.active = false
@@ -1118,6 +1169,9 @@ function Session:startPlaying()
 		else
 			self:notify(player, "¡A cazar al kiwi!", COLOR.good)
 		end
+	end
+	if self.isAsedio and self.fort then
+		self:notifyAll(Config.Text.AsedioChests, COLOR.info, 7)
 	end
 	self:event("start", { pos = self.arena.spawns[1].Position })
 end
@@ -1286,6 +1340,12 @@ function Session:finish()
 	self.projectiles = {}
 	self:clearTraps()
 	Actions.clearPickups(self)
+
+	if self.fort then
+		self.fort:Destroy()
+		self.fort = nil
+		self.fortChests = nil
+	end
 
 	if Config.Round.HubReturn then
 		self:returnAllToLobby()
@@ -1594,24 +1654,8 @@ function Session:exitSpot(player, caught)
 end
 
 -- ---------------- baules de armas ----------------
-function Session:openChest(player, index)
-	local chest = self.arena and self.arena.chests and self.arena.chests[index]
-	if not chest or chest.used then
-		return
-	end
-	if self.phase ~= "playing" or self.hidden[player] then
-		return
-	end
-	local root = getRoot(player)
-	if not root or (root.Position - chest.center).Magnitude > Config.Loot.pickupRange then
-		return
-	end
-
-	chest.used = true
-	chest.lid.CFrame = chest.lidOpen
-	chest.light.Brightness = 0
-	chest.prompt.Enabled = false
-
+-- Reparte un arma de baul (lo usan los baules comunes y los de equipo)
+function Session:lootChest(player, chest)
 	local weapons = Config.Loot.weapons
 	local total = 0
 	for _, entry in ipairs(weapons) do
@@ -1651,6 +1695,51 @@ function Session:openChest(player, index)
 	self:notify(player, string.format(Config.Text.ChestLoot, cfg.name, pick.uses or Config.Loot.uses), cfg.color, 5)
 	self:event("chestopen", { pos = chest.center })
 	self:sendUpdate(player)
+end
+
+function Session:openChest(player, chest)
+	if not chest then
+		return
+	end
+	if self.phase ~= "playing" or self.hidden[player] then
+		return
+	end
+	local root = getRoot(player)
+	if not root or (root.Position - chest.center).Magnitude > Config.Loot.pickupRange + 2 then
+		return
+	end
+
+	-- Baul de equipo (asedio): cada jugador saca UNA sola arma por ronda
+	if chest.team then
+		local side = self.teamOf[player] or "attack"
+		if side ~= chest.team then
+			self:notify(player, string.format(Config.Text.ChestTeamWrong, chest.teamName or chest.team), COLOR.warn, 4)
+			return
+		end
+		if self.looted[player] then
+			self:notify(player, Config.Text.ChestTeamDone, COLOR.warn, 4)
+			return
+		end
+		self.looted[player] = true
+		-- La tapa se abre y se vuelve a cerrar: el baul queda para el resto
+		chest.lid.CFrame = chest.lidOpen
+		task.delay(1.1, function()
+			if chest.lid and chest.lid.Parent then
+				chest.lid.CFrame = chest.lidClosed
+			end
+		end)
+		self:lootChest(player, chest)
+		return
+	end
+
+	if chest.used then
+		return
+	end
+	chest.used = true
+	chest.lid.CFrame = chest.lidOpen
+	chest.light.Brightness = 0
+	chest.prompt.Enabled = false
+	self:lootChest(player, chest)
 end
 
 -- ---------------- bucle ----------------
@@ -1980,6 +2069,7 @@ function GameManager.init()
 	Net.init()
 	world = WorldBuilder.build(Config)
 	ToolService.build()
+	Weather.start(world)
 
 	workspace.Gravity = Config.World.Gravity
 
@@ -2064,11 +2154,11 @@ function GameManager.init()
 				end)
 			end
 		end
-		for chestIndex, chest in ipairs(arena.chests or {}) do
+		for _, chest in ipairs(arena.chests or {}) do
 			chest.prompt.Triggered:Connect(function(who)
 				local session = playerSession[who]
 				if session then
-					session:openChest(who, chestIndex)
+					session:openChest(who, chest)
 				end
 			end)
 		end

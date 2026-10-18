@@ -567,43 +567,63 @@ local function buildRocketTool(id)
 	return tool
 end
 
-local function buildKnifeTool(id)
-	local tool = prepareLootTool(id)
+-- Cuchillo mariposa: va de fabrica para todos (no es arma de baul).
+-- Modelo abierto de balisong: dos mangos de acero alineados y la hoja
+-- saliendo del pivote. La animacion estilo CS2 vive en la vista del cliente.
+local function buildKnifeTool(parent)
+	local tool = Instance.new("Tool")
+	tool.Name = Config.Weapons.cuchillo.name
+	tool.ToolTip = "Cuchillo mariposa: zarpazo corto. F para girarlo"
+	tool.CanBeDropped = false
+	tool.RequiresHandle = true
+	tool:SetAttribute("ToolId", "cuchillo")
 	tool.Grip = CFrame.new(0, -0.4, 0.15) * CFrame.Angles(math.rad(-90), 0, 0)
+	local acero = Color3.fromRGB(198, 204, 214)
+	local aceroOscuro = Color3.fromRGB(132, 138, 150)
+
+	-- Mango en la mano (el Handle) y el gemelo pegado al lado
 	local handle = newHandle({
-		Size = Vector3.new(0.3, 0.7, 0.42),
-		Color = Color3.fromRGB(62, 46, 34),
-		Material = Enum.Material.Wood,
+		Size = Vector3.new(0.18, 0.85, 0.36),
+		Color = aceroOscuro,
+		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
-		Name = "Guardia",
-		Size = Vector3.new(0.9, 0.16, 0.5),
-		CFrame = handle.CFrame * CFrame.new(0, 0.7, 0),
-		Color = Color3.fromRGB(150, 152, 164),
+		Name = "MangoB",
+		Size = Vector3.new(0.18, 0.85, 0.36),
+		CFrame = handle.CFrame * CFrame.new(0.24, 0, 0),
+		Color = aceroOscuro,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Pivote",
+		Size = Vector3.new(0.46, 0.12, 0.4),
+		CFrame = handle.CFrame * CFrame.new(0.12, 0.5, 0),
+		Color = acero,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
 		Name = "Hoja",
-		Size = Vector3.new(0.8, 2.4, 0.14),
-		CFrame = handle.CFrame * CFrame.new(0, 2.0, 0),
-		Color = Color3.fromRGB(226, 232, 240),
+		Size = Vector3.new(0.12, 1.7, 0.3),
+		CFrame = handle.CFrame * CFrame.new(0.12, 1.42, 0),
+		Color = Color3.fromRGB(228, 234, 244),
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
 		Name = "Punta",
-		CFrame = handle.CFrame * CFrame.new(0, 3.4, 0) * CFrame.Angles(0, 0, math.rad(45)),
-		Size = Vector3.new(0.55, 0.55, 0.14),
-		Color = Color3.fromRGB(226, 232, 240),
+		Size = Vector3.new(0.44, 0.44, 0.3),
+		CFrame = handle.CFrame * CFrame.new(0.12, 2.42, 0) * CFrame.Angles(0, 0, math.rad(45)),
+		Color = Color3.fromRGB(228, 234, 244),
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
 	weldPiece(handle, {
 		Name = "Filo",
-		Size = Vector3.new(0.14, 2.3, 0.16),
-		CFrame = handle.CFrame * CFrame.new(0.34, 2.0, 0),
+		Size = Vector3.new(0.1, 1.5, 0.1),
+		CFrame = handle.CFrame * CFrame.new(0.2, 1.35, 0),
 		Color = Color3.fromRGB(255, 255, 255),
 		Material = Enum.Material.Neon,
 		Parent = tool,
@@ -860,8 +880,6 @@ local function buildLootTool(parent, id)
 		tool = buildBowTool(id)
 	elseif id == "sniper" then
 		tool = buildSniperTool(id)
-	elseif id == "cuchillo" then
-		tool = buildKnifeTool(id)
 	elseif id == "lanzallamas" then
 		tool = buildFlamethrowerTool(id)
 	elseif COUNTER_TOOLS[id] then
@@ -896,6 +914,7 @@ function ToolService.build()
 	buildTrap(folder)
 	buildPaintRifle(folder)
 	buildRelente(folder)
+	buildKnifeTool(folder)
 	buildLootTools(folder)
 
 	ToolService.folder = folder
@@ -930,6 +949,7 @@ function ToolService.give(player, only)
 	for _, template in ipairs(folder:GetChildren()) do
 		local toolId = template:GetAttribute("ToolId")
 		-- pintura, relente y las armas de baul solo se entregan cuando toca
+		-- (el cuchillo mariposa si va de fabrica para todos)
 		local locked = toolId == "pintura" or toolId == "relente"
 		if not locked then
 			for _, entry in ipairs(Config.Loot.weapons) do
@@ -1082,6 +1102,20 @@ function ToolService.takeTool(player, toolId)
 		end
 	end
 	return found
+end
+
+-- ¿El arma es de baul? (las de baul se gastan: "Uses" / consumeLoot)
+function ToolService.isLoot(player, toolId)
+	for _, container in ipairs({ player:FindFirstChildOfClass("Backpack"), player.Character }) do
+		if container then
+			for _, item in ipairs(container:GetChildren()) do
+				if item:IsA("Tool") and item:GetAttribute("ToolId") == toolId then
+					return item:GetAttribute("Loot") == true
+				end
+			end
+		end
+	end
+	return false
 end
 
 function ToolService.hasTools(player)

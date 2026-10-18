@@ -239,7 +239,8 @@ local function buildMenu(parent)
 			.. "4) Trampa de fruta (1 por jugador): el kiwi queda atrapado 3 s; ve por él o disparale.\n"
 			.. "5) Rifle de pintura: mancha, marca (se ve entre las paredes) y frena. Clic derecho: mira.\n"
 			.. "En Kiwi Colosal llevas rastreador y rifle ralentizador (frena al gigante, no lo duerme).\n"
-			.. "V: vista en primera persona. Corres siempre; con Shift caminas despacio (menos ruido) y con Ctrl vas en sigilo.",
+			.. "V: vista en primera persona. Corres siempre; con Shift caminas despacio (menos ruido) y con Ctrl vas en sigilo.\n"
+			.. "F: con el cuchillo mariposa lo haces girar en la mano (todos lo llevan de fábrica). El clima cambia solo: sol, lluvia o nieve; si nieva, la nieve se acumula en el piso.",
 	}, help)
 
 	return menu
