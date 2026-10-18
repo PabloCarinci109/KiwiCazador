@@ -296,6 +296,36 @@ local function buildSessionHud(parent)
 	}, top)
 	parts.arenaLabel = arenaLabel
 
+	-- Vida del cazador (las armas de baul de los baules hacen daño)
+	local hpBack = new("Frame", {
+		Name = "Vida",
+		Position = UDim2.new(0, 16, 0, 52),
+		Size = UDim2.new(0, 240, 0, 10),
+		BackgroundColor3 = Color3.fromRGB(52, 58, 66),
+		BackgroundTransparency = 0.25,
+		BorderSizePixel = 0,
+	}, top)
+	corner(5, hpBack)
+	local hpFill = new("Frame", {
+		Name = "Relleno",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.fromRGB(102, 209, 130),
+		BorderSizePixel = 0,
+	}, hpBack)
+	corner(5, hpFill)
+	parts.hpFill = hpFill
+	parts.hpText = new("TextLabel", {
+		Name = "VidaTexto",
+		Position = UDim2.new(0, 264, 0, 47),
+		Size = UDim2.new(0, 60, 0, 16),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = COLOR.muted,
+		Text = "100",
+	}, top)
+
 	local objective = new("TextLabel", {
 		Name = "Objetivo",
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -746,6 +776,214 @@ local function buildResult(parent)
 end
 
 -- ===============================================================
+-- VOTACION DE MAPA
+-- ===============================================================
+local function buildVote(parent)
+	local vote = new("Frame", {
+		Name = "Voto",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.52),
+		Size = UDim2.new(0, 720, 0, 500),
+		BackgroundColor3 = COLOR.panel,
+		BackgroundTransparency = 0.06,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 30,
+	}, parent)
+	corner(18, vote)
+	stroke(COLOR.accent, 1.5, 0.4, vote)
+	padding(20, vote)
+	parts.votePanel = vote
+
+	parts.voteTitle = new("TextLabel", {
+		Name = "Titulo",
+		Size = UDim2.new(1, 0, 0, 34),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBlack,
+		TextScaled = true,
+		TextColor3 = COLOR.text,
+		Text = "¡ELIGE EL MAPA!",
+		ZIndex = 31,
+	}, vote)
+
+	parts.voteStatus = new("TextLabel", {
+		Name = "Estado",
+		Position = UDim2.new(0, 0, 0, 38),
+		Size = UDim2.new(1, 0, 0, 20),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 14,
+		TextColor3 = COLOR.accent,
+		Text = "",
+		ZIndex = 31,
+	}, vote)
+
+	local grid = new("Frame", {
+		Name = "Mapas",
+		Position = UDim2.new(0, 0, 0, 66),
+		Size = UDim2.new(1, 0, 1, -116),
+		BackgroundTransparency = 1,
+		ZIndex = 31,
+	}, vote)
+	new("UIGridLayout", {
+		CellSize = UDim2.new(0.485, 0, 0, 116),
+		CellPadding = UDim2.new(0.03, 0, 0, 10),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, grid)
+
+	parts.voteButtons = {}
+	for index, zone in ipairs(Config.Zones) do
+		local button = new("TextButton", {
+			Name = zone.id,
+			LayoutOrder = index,
+			BackgroundColor3 = COLOR.panelSoft,
+			BackgroundTransparency = 0.05,
+			BorderSizePixel = 0,
+			AutoButtonColor = false,
+			Text = "",
+			ZIndex = 32,
+		}, grid)
+		corner(12, button)
+		local border = stroke(zone.grass, 1.5, 0.4, button)
+
+		new("TextLabel", {
+			Name = "Nombre",
+			Position = UDim2.new(0, 14, 0, 8),
+			Size = UDim2.new(1, -78, 0, 22),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamBold,
+			TextSize = 17,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextColor3 = zone.grass,
+			Text = zone.name,
+			ZIndex = 33,
+		}, button)
+
+		new("TextLabel", {
+			Name = "Pista",
+			Position = UDim2.new(0, 14, 0, 32),
+			Size = UDim2.new(1, -78, 0, 34),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.Gotham,
+			TextSize = 13,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			TextColor3 = COLOR.muted,
+			Text = zone.hint or "",
+			ZIndex = 33,
+		}, button)
+
+		local votes = new("TextLabel", {
+			Name = "Votos",
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -12, 0, 6),
+			Size = UDim2.new(0, 56, 0, 32),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamBlack,
+			TextSize = 26,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			TextColor3 = COLOR.text,
+			Text = "0",
+			ZIndex = 33,
+		}, button)
+
+		local mine = new("TextLabel", {
+			Name = "Mio",
+			Position = UDim2.new(0, 14, 1, -26),
+			Size = UDim2.new(1, -28, 0, 18),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamBold,
+			TextSize = 12,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextColor3 = COLOR.accent,
+			Text = "",
+			ZIndex = 33,
+		}, button)
+
+		button.MouseButton1Click:Connect(function()
+			if callbacks.onVote then
+				callbacks.onVote(zone.id)
+			end
+		end)
+		button.MouseEnter:Connect(function()
+			TweenService:Create(button, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(40, 46, 54) }):Play()
+		end)
+		button.MouseLeave:Connect(function()
+			TweenService:Create(button, TweenInfo.new(0.15), { BackgroundColor3 = COLOR.panelSoft }):Play()
+		end)
+
+		parts.voteButtons[zone.id] = { button = button, border = border, votes = votes, mine = mine }
+	end
+
+	local randomBtn = new("TextButton", {
+		Name = "AlAzar",
+		Position = UDim2.new(0, 0, 1, -44),
+		Size = UDim2.new(1, 0, 0, 34),
+		BackgroundColor3 = Color3.fromRGB(44, 48, 56),
+		BorderSizePixel = 0,
+		AutoButtonColor = true,
+		Font = Enum.Font.GothamBold,
+		TextSize = 14,
+		TextColor3 = COLOR.muted,
+		Text = "AL AZAR (que lo elija el juego)",
+		ZIndex = 32,
+	}, vote)
+	corner(10, randomBtn)
+	randomBtn.MouseButton1Click:Connect(function()
+		if callbacks.onVote then
+			callbacks.onVote("random")
+		end
+	end)
+	parts.voteRandom = randomBtn
+end
+
+function HUD.showVote(vote)
+	if not parts.votePanel then
+		return
+	end
+	parts.votePanel.Visible = true
+
+	local chosenName = nil
+	for _, zone in ipairs(Config.Zones) do
+		if zone.id == (vote.chosen or "") then
+			chosenName = zone.name
+		end
+	end
+	if vote.done then
+		parts.voteTitle.Text = chosenName and ("MAPA: " .. string.upper(chosenName)) or "¡MAPA ELEGIDO!"
+		parts.voteStatus.Text = "¡Arrancando!"
+	else
+		parts.voteTitle.Text = (vote.total or 1) > 1 and "¡VOTEN EL MAPA!" or "¡ELIGE EL MAPA!"
+		parts.voteStatus.Text = string.format("Tiempo: %d s  ·  El mapa más votado gana", vote.left or 0)
+	end
+
+	for _, zone in ipairs(Config.Zones) do
+		local chip = parts.voteButtons[zone.id]
+		if chip then
+			local mine = vote.mine == zone.id
+			chip.votes.Text = tostring((vote.counts and vote.counts[zone.id]) or 0)
+			chip.mine.Text = mine and "TU ELECCIÓN" or ""
+			chip.border.Color = mine and COLOR.accent or zone.grass
+			chip.border.Transparency = mine and 0.05 or 0.45
+			if vote.done then
+				chip.button.BackgroundColor3 = (vote.chosen == zone.id) and Color3.fromRGB(46, 62, 50) or COLOR.panelSoft
+			end
+		end
+	end
+	if parts.voteRandom then
+		parts.voteRandom.Visible = not vote.done
+		parts.voteRandom.TextColor3 = (vote.mine == "random") and COLOR.accent or COLOR.muted
+	end
+end
+
+function HUD.hideVote()
+	if parts.votePanel then
+		parts.votePanel.Visible = false
+	end
+end
+
+-- ===============================================================
 -- API
 -- ===============================================================
 function HUD.init(playerGui, handlers)
@@ -767,6 +1005,17 @@ function HUD.init(playerGui, handlers)
 	buildNotices(screen)
 	buildResult(screen)
 	buildScope(screen)
+	buildVote(screen)
+
+	local hurt = new("Frame", {
+		Name = "Dolor",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.fromRGB(160, 24, 24),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ZIndex = 38,
+	}, screen)
+	parts.hurt = hurt
 
 	local fade = new("Frame", {
 		Name = "Fade",
@@ -790,7 +1039,31 @@ function HUD.setMenuVisible(visible)
 	end
 	if visible then
 		HUD.clearTracker()
+		HUD.hideVote()
 	end
+end
+
+function HUD.setHealth(hp, maxHp)
+	maxHp = maxHp or 100
+	local ratio = math.clamp((hp or maxHp) / maxHp, 0, 1)
+	if parts.hpFill then
+		parts.hpFill.Size = UDim2.fromScale(ratio, 1)
+		parts.hpFill.BackgroundColor3 = ratio > 0.55 and Color3.fromRGB(102, 209, 130)
+			or (ratio > 0.25 and Color3.fromRGB(238, 196, 92) or Color3.fromRGB(232, 108, 100))
+	end
+	if parts.hpText then
+		parts.hpText.Text = tostring(math.floor(hp or maxHp))
+	end
+end
+
+function HUD.hurt()
+	if not parts.hurt then
+		return
+	end
+	parts.hurt.BackgroundTransparency = 0.55
+	TweenService:Create(parts.hurt, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 1,
+	}):Play()
 end
 
 function HUD.setMenuStatus(text, color)
@@ -852,6 +1125,7 @@ function HUD.updateState(state)
 	end
 
 	HUD.setMenuVisible(false)
+	HUD.setHealth(state.hp, state.maxHp)
 
 	local accent = Util.colorFromTable(state.modeColor)
 	if parts.modeLabel then
@@ -859,8 +1133,9 @@ function HUD.updateState(state)
 		parts.modeLabel.TextColor3 = accent
 	end
 	if parts.arenaLabel then
-		if state.waiting then
-			parts.arenaLabel.Text = string.format("Esperando jugadores... (%d)", state.playerCount or 1)
+		if state.vote then
+			parts.arenaLabel.Text = state.vote.done and "Mapa listo"
+				or string.format("Votación de mapa (%d jugadores)", state.playerCount or 1)
 		else
 			parts.arenaLabel.Text = "Reserva: " .. (state.arenaName or "?")
 		end
@@ -894,8 +1169,8 @@ function HUD.updateState(state)
 	end
 
 	if parts.progress then
-		if state.phase == "waiting" then
-			parts.progress.Text = "Preparando la cacería"
+		if state.phase == "vote" then
+			parts.progress.Text = state.progressText or "Elige el mapa"
 		elseif state.phase == "countdown" then
 			parts.progress.Text = "Preparados..."
 		elseif state.progressText then

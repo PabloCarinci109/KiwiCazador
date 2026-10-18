@@ -337,12 +337,10 @@ end
 	Disparan un proyectil con empujon; recarga y usos los controla
 	Actions.fireWeapon en el servidor.
 ]]
-local function buildLootTool(parent, id)
+-- Cada arma de baul tiene SU propio modelo (arco, revolver, sniper y
+-- lanzamisiles no se parecen entre si).
+local function prepareLootTool(id)
 	local cfg = Config.Weapons[id]
-	if not cfg then
-		return nil
-	end
-
 	local tool = Instance.new("Tool")
 	tool.Name = cfg.name
 	tool.ToolTip = "Arma de baúl: usos limitados"
@@ -351,34 +349,214 @@ local function buildLootTool(parent, id)
 	tool:SetAttribute("ToolId", id)
 	tool:SetAttribute("Loot", true)
 	tool:SetAttribute("Uses", Config.Loot.uses)
-	tool.Grip = CFrame.new(0, -0.35, 0.5) * CFrame.Angles(math.rad(-90), 0, 0)
+	return tool
+end
 
+local function buildRevolverTool(id)
+	local tool = prepareLootTool(id)
+	tool.Grip = CFrame.new(0, -0.2, 0.4) * CFrame.Angles(math.rad(-90), 0, 0)
 	local handle = newHandle({
-		Size = Vector3.new(0.4, 0.7, 2.2),
-		Color = Color3.fromRGB(58, 58, 66),
+		Size = Vector3.new(0.26, 0.95, 0.5),
+		Color = Color3.fromRGB(122, 86, 58),
 		Material = Enum.Material.Wood,
 		Parent = tool,
 	})
-
 	weldPiece(handle, {
 		Name = "Canon",
 		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(2.4, 0.32, 0.32),
-		CFrame = handle.CFrame * CFrame.new(0, 0.24, -0.5) * CFrame.Angles(0, math.rad(90), 0),
+		Size = Vector3.new(1.7, 0.2, 0.2),
+		CFrame = handle.CFrame * CFrame.new(0, 0.45, -0.75) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(184, 186, 200),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Tambor",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.44, 0.56, 0.56),
+		CFrame = handle.CFrame * CFrame.new(0, 0.42, -0.32) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(150, 152, 166),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Martillo",
+		Size = Vector3.new(0.14, 0.42, 0.3),
+		CFrame = handle.CFrame * CFrame.new(0, 0.68, 0.24),
+		Color = Color3.fromRGB(120, 122, 132),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	return tool
+end
+
+local function buildBowTool(id)
+	local tool = prepareLootTool(id)
+	tool.Grip = CFrame.new(0, -0.45, 0.35) * CFrame.Angles(math.rad(-90), 0, 0)
+	local handle = newHandle({
+		Size = Vector3.new(0.26, 1.0, 0.34),
+		Color = Color3.fromRGB(126, 90, 58),
+		Material = Enum.Material.Wood,
+		Parent = tool,
+	})
+	local wood = Color3.fromRGB(146, 106, 66)
+	weldPiece(handle, {
+		Name = "LimbA1",
+		Size = Vector3.new(0.18, 1.5, 0.26),
+		CFrame = handle.CFrame * CFrame.new(0, 0.95, -0.12) * CFrame.Angles(math.rad(-14), 0, 0),
+		Color = wood, Material = Enum.Material.Wood, Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "LimbA2",
+		Size = Vector3.new(0.18, 1.4, 0.26),
+		CFrame = handle.CFrame * CFrame.new(0, 1.9, -0.55) * CFrame.Angles(math.rad(-34), 0, 0),
+		Color = wood, Material = Enum.Material.Wood, Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "LimbB1",
+		Size = Vector3.new(0.18, 1.5, 0.26),
+		CFrame = handle.CFrame * CFrame.new(0, -0.95, -0.12) * CFrame.Angles(math.rad(14), 0, 0),
+		Color = wood, Material = Enum.Material.Wood, Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "LimbB2",
+		Size = Vector3.new(0.18, 1.4, 0.26),
+		CFrame = handle.CFrame * CFrame.new(0, -1.9, -0.55) * CFrame.Angles(math.rad(34), 0, 0),
+		Color = wood, Material = Enum.Material.Wood, Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Cuerda",
+		Size = Vector3.new(0.07, 4.9, 0.07),
+		CFrame = handle.CFrame * CFrame.new(0, 0, -0.94),
+		Color = Color3.fromRGB(238, 238, 226),
+		Material = Enum.Material.Fabric,
+		Parent = tool,
+	})
+	return tool
+end
+
+local function buildSniperTool(id)
+	local tool = prepareLootTool(id)
+	tool.Grip = CFrame.new(0, -0.2, 0.5) * CFrame.Angles(math.rad(-90), 0, 0)
+	local handle = newHandle({
+		Size = Vector3.new(0.34, 0.55, 1.5),
+		Color = Color3.fromRGB(52, 58, 52),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Culata",
+		Size = Vector3.new(0.3, 0.85, 1.1),
+		CFrame = handle.CFrame * CFrame.new(0, -0.45, 1.15) * CFrame.Angles(math.rad(14), 0, 0),
+		Color = Color3.fromRGB(92, 66, 46),
+		Material = Enum.Material.Wood,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "CanonLargo",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(4.6, 0.2, 0.2),
+		CFrame = handle.CFrame * CFrame.new(0, 0.28, -2.0) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(44, 48, 46),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "MiraTelescopica",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(1.25, 0.44, 0.44),
+		CFrame = handle.CFrame * CFrame.new(0, 0.68, -0.55) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(28, 30, 32),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Lente",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.4, 0.4, 0.4),
+		CFrame = handle.CFrame * CFrame.new(0, 0.68, -1.2),
+		Color = Color3.fromRGB(120, 190, 220),
+		Material = Enum.Material.Neon,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Pata",
+		Size = Vector3.new(0.1, 0.9, 0.1),
+		CFrame = handle.CFrame * CFrame.new(-0.2, -0.45, -2.6) * CFrame.Angles(math.rad(14), 0, math.rad(16)),
+		Color = Color3.fromRGB(44, 48, 46), Material = Enum.Material.Metal, Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "PataB",
+		Size = Vector3.new(0.1, 0.9, 0.1),
+		CFrame = handle.CFrame * CFrame.new(0.2, -0.45, -2.6) * CFrame.Angles(math.rad(14), 0, math.rad(-16)),
+		Color = Color3.fromRGB(44, 48, 46), Material = Enum.Material.Metal, Parent = tool,
+	})
+	return tool
+end
+
+local function buildRocketTool(id)
+	local cfg = Config.Weapons[id]
+	local tool = prepareLootTool(id)
+	tool.Grip = CFrame.new(0, -0.75, 0.55) * CFrame.Angles(math.rad(-90), 0, 0)
+	local handle = newHandle({
+		Size = Vector3.new(0.34, 0.95, 0.7),
+		Color = Color3.fromRGB(60, 62, 56),
+		Material = Enum.Material.Plastic,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Tubo",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(4.6, 1.05, 1.05),
+		CFrame = handle.CFrame * CFrame.new(0, 0.9, -1.6) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(96, 106, 74),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Escapes",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.7, 1.25, 1.25),
+		CFrame = handle.CFrame * CFrame.new(0, 0.9, 0.75) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(48, 50, 46),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Cabeza",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.95, 0.95, 0.95),
+		CFrame = handle.CFrame * CFrame.new(0, 0.9, -4.1),
 		Color = cfg.color,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
-
 	weldPiece(handle, {
-		Name = "Nucleo",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(0.7, 0.7, 0.7),
-		CFrame = handle.CFrame * CFrame.new(0.12, -0.5, 0.55),
-		Color = cfg.color,
-		Material = Enum.Material.Neon,
+		Name = "MiraCohete",
+		Size = Vector3.new(0.22, 0.6, 0.7),
+		CFrame = handle.CFrame * CFrame.new(0, 1.6, -0.9),
+		Color = Color3.fromRGB(58, 60, 64),
+		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
+	return tool
+end
+
+local function buildLootTool(parent, id)
+	if not Config.Weapons[id] then
+		return nil
+	end
+
+	local tool
+	if id == "revolver" then
+		tool = buildRevolverTool(id)
+	elseif id == "arco" then
+		tool = buildBowTool(id)
+	elseif id == "sniper" then
+		tool = buildSniperTool(id)
+	else
+		tool = buildRocketTool(id)
+	end
 
 	tool.Parent = parent
 	return tool

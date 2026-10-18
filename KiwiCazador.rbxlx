@@ -43,7 +43,7 @@
 
 local Config = {}
 
-Config.Version = "1.2.0"
+Config.Version = "1.3.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -66,13 +66,82 @@ Config.Lobby = {
 	SpawnOffset = Vector3.new(0, 5, 34),
 }
 
--- Zonas decorativas: cada arena recibe una (5 temas distintos)
+-- Mapas jugables: cada arena es un mapa distinto y se eligen por votacion.
+-- id: se usa en la votacion; theme: como se construye el mapa.
 Config.Zones = {
-	{ name = "Bosque de Kauri",   grass = Color3.fromRGB(74, 118, 72),  tree = Color3.fromRGB(88, 62, 44) },
-	{ name = "Humedal de Punga",  grass = Color3.fromRGB(86, 122, 92),  tree = Color3.fromRGB(74, 58, 46) },
-	{ name = "Pradera de Manuka", grass = Color3.fromRGB(122, 132, 78), tree = Color3.fromRGB(96, 74, 52) },
-	{ name = "Costa de Totara",   grass = Color3.fromRGB(120, 138, 94), tree = Color3.fromRGB(118, 74, 52) },
-	{ name = "Valle de Helechos", grass = Color3.fromRGB(62, 106, 78),  tree = Color3.fromRGB(66, 54, 46) },
+	{
+		id = "bosque", name = "Bosque de Kauri", theme = "bosque",
+		hint = "Arboles gigantes y helechos",
+		grass = Color3.fromRGB(74, 118, 72), ground = Enum.Material.LeafyGrass,
+		tree = Color3.fromRGB(88, 62, 44),
+		wall = Color3.fromRGB(204, 190, 166), roof = Color3.fromRGB(148, 76, 54), floor = Color3.fromRGB(104, 84, 64),
+		fence = Color3.fromRGB(96, 74, 52),
+		pond = { color = Color3.fromRGB(64, 122, 150), material = Enum.Material.Water, scale = 1 },
+	},
+	{
+		id = "dunas", name = "Dunas de Te Paki", theme = "dunas",
+		hint = "Arena, cactus y medanos",
+		grass = Color3.fromRGB(214, 188, 136), ground = Enum.Material.Sand,
+		tree = Color3.fromRGB(122, 138, 82),
+		wall = Color3.fromRGB(198, 172, 128), roof = Color3.fromRGB(150, 108, 72), floor = Color3.fromRGB(166, 138, 100),
+		fence = Color3.fromRGB(158, 128, 88),
+		pond = { color = Color3.fromRGB(74, 168, 160), material = Enum.Material.Water, scale = 0.7 },
+	},
+	{
+		id = "ciudad", name = "Ciudad de Auckland", theme = "ciudad",
+		hint = "Calles, plazas y torre mirador",
+		grass = Color3.fromRGB(118, 120, 124), ground = Enum.Material.Concrete,
+		tree = Color3.fromRGB(86, 96, 72),
+		wall = Color3.fromRGB(196, 190, 182), roof = Color3.fromRGB(72, 76, 84), floor = Color3.fromRGB(96, 96, 100),
+		fence = Color3.fromRGB(124, 126, 132),
+		pond = false,
+	},
+	{
+		id = "costa", name = "Costa de Totara", theme = "costa",
+		hint = "Playa, palmeras y mar",
+		grass = Color3.fromRGB(224, 204, 156), ground = Enum.Material.Sand,
+		tree = Color3.fromRGB(118, 88, 58),
+		wall = Color3.fromRGB(206, 196, 176), roof = Color3.fromRGB(96, 132, 140), floor = Color3.fromRGB(150, 126, 96),
+		fence = Color3.fromRGB(120, 96, 66),
+		pond = { color = Color3.fromRGB(38, 108, 158), material = Enum.Material.Water, scale = 1.7 },
+	},
+	{
+		id = "alpes", name = "Alpes del Sur", theme = "alpes",
+		hint = "Nieve, pinos y lago congelado",
+		grass = Color3.fromRGB(238, 242, 248), ground = Enum.Material.Snow,
+		tree = Color3.fromRGB(70, 56, 46),
+		wall = Color3.fromRGB(160, 130, 96), roof = Color3.fromRGB(110, 78, 58), floor = Color3.fromRGB(104, 84, 66),
+		fence = Color3.fromRGB(122, 98, 74),
+		pond = { color = Color3.fromRGB(176, 214, 232), material = Enum.Material.Ice, scale = 1 },
+	},
+}
+
+-- Votacion de mapa: al entrar a una partida cada jugador elige el mapa.
+-- Con un solo jugador (o si todos ya votaron) arranca al instante.
+Config.Vote = {
+	multiTime = 18,    -- tiempo de votacion en Multijugador
+	soloTime = 20,     -- tiempo maximo si el jugador no elige en modos solo
+	revealTime = 1.2,  -- pausa despues del voto antes de la cuenta regresiva
+}
+
+-- Iluminacion por mapa: se aplica al arrancar la ronda y se restaura al salir.
+-- ambient/outdoor/brightness: colores de luz; fog: niebla; clock: hora del dia.
+Config.LightDefault = {
+	ambient = Color3.fromRGB(70, 70, 70),
+	outdoor = Color3.fromRGB(128, 128, 128),
+	brightness = 2,
+	fog = Color3.fromRGB(192, 192, 192),
+	fogStart = 0,
+	fogEnd = 100000,
+	clock = 14,
+}
+
+Config.ZoneLight = {
+	bosque = { ambient = Color3.fromRGB(74, 80, 70), outdoor = Color3.fromRGB(120, 130, 118), brightness = 2, fog = Color3.fromRGB(168, 188, 178), fogStart = 220, fogEnd = 950, clock = 15.2 },
+	dunas = { ambient = Color3.fromRGB(118, 104, 84), outdoor = Color3.fromRGB(176, 154, 122), brightness = 2.6, fog = Color3.fromRGB(226, 202, 158), fogStart = 180, fogEnd = 850, clock = 14 },
+	ciudad = { ambient = Color3.fromRGB(94, 98, 106), outdoor = Color3.fromRGB(132, 138, 148), brightness = 1.9, fog = Color3.fromRGB(176, 184, 196), fogStart = 200, fogEnd = 900, clock = 16.2 },
+	costa = { ambient = Color3.fromRGB(108, 118, 130), outdoor = Color3.fromRGB(158, 172, 188), brightness = 2.4, fog = Color3.fromRGB(198, 218, 234), fogStart = 260, fogEnd = 1150, clock = 13.2 },
+	alpes = { ambient = Color3.fromRGB(150, 160, 176), outdoor = Color3.fromRGB(202, 212, 226), brightness = 2.8, fog = Color3.fromRGB(224, 234, 246), fogStart = 200, fogEnd = 1000, clock = 12 },
 }
 
 -- ===============================================================
@@ -124,9 +193,14 @@ Config.Tracker = {
 	range = 900,       -- distancia maxima para dar la pista
 }
 
--- Mira del rifle tranquilizante (clic derecho para apuntar)
+-- Mira (clic derecho para apuntar). Cada arma puede tener su zoom.
 Config.Scope = {
 	fov = 30,          -- campo de vision mientras apuntas (mas chico = mas zoom)
+	weapons = {
+		sniper = 16,   -- el francotirador tiene el zoom mas fuerte
+		revolver = 34,
+		arco = 28,
+	},
 }
 
 -- Trampa de fruta: el kiwi hambriento va solo hacia la fruta...
@@ -183,9 +257,10 @@ Config.Loot = {
 	uses = 3,             -- usos por arma encontrada
 	pickupRange = 12,     -- distancia para abrir el baul
 	weapons = {
-		{ id = "cohete", weight = 3 },
+		{ id = "cohete", weight = 4 },
 		{ id = "revolver", weight = 3 },
 		{ id = "arco", weight = 3 },
+		{ id = "sniper", weight = 3 },
 	},
 }
 
@@ -197,6 +272,7 @@ Config.Weapons = {
 		speed = 92,
 		life = 5,
 		blast = 16,
+		damage = 40,    -- daño a otros cazadores (al kiwi solo lo relentiza)
 		knockback = 92,
 		slowFactor = 0.12,
 		slowTime = 2.6,
@@ -209,6 +285,7 @@ Config.Weapons = {
 		speed = 230,
 		life = 1.6,
 		blast = 0,
+		damage = 20,
 		knockback = 38,
 		slowFactor = 0.55,
 		slowTime = 1.6,
@@ -221,10 +298,24 @@ Config.Weapons = {
 		speed = 165,
 		life = 2.6,
 		blast = 9,
+		damage = 26,
 		knockback = 24,
 		slowFactor = 0.35,
 		slowTime = 3.2,
 		size = Vector3.new(0.22, 0.22, 2.0),
+	},
+	sniper = {
+		name = "Francotirador",
+		color = Color3.fromRGB(150, 220, 190),
+		cooldown = 2.8,
+		speed = 420,
+		life = 5,
+		blast = 0,
+		damage = 48,    -- el golpe mas fuerte contra otros cazadores
+		knockback = 58,
+		slowFactor = 0.30,
+		slowTime = 2.0,
+		size = Vector3.new(0.22, 0.22, 2.6),
 	},
 }
 
@@ -232,6 +323,9 @@ Config.Player = {
 	walkSpeed = 16,
 	sprintSpeed = 24,
 	sneakSpeed = 7,
+	maxHealth = 100,   -- vida de los cazadores (las armas de baul hieren)
+	regen = 4,         -- vida por segundo fuera de combate
+	regenDelay = 6,    -- segundos sin recibir daño para regenerar
 }
 
 -- ===============================================================
@@ -376,7 +470,6 @@ Config.Multiplayer = {
 	blurb = "El kiwi gigante va comiendo cazadores: gana el último que quede vivo.",
 	tools = { "rastreador", "relente", "pintura" },
 	baseDifficulty = "normal",
-	waitTime = 12,          -- tiempo de espera antes de empezar la ronda
 	maxPlayers = 12,
 	timeLimit = 300,
 	scoreboardSize = 8,     -- cuantas filas ve el jugador
@@ -394,6 +487,7 @@ Config.Round = {
 	UpdateInterval = 0.5,    -- cada cuanto se refresca el HUD
 	KiwiRespawnDelay = 1.0,  -- espera entre capturas (modo solo)
 	EatHold = 2.6,           -- cuanto dura "comerse" a un cazador (modo Colosal)
+	KoHold = 1.8,            -- cuanto dura un noqueado antes de volver al lobby
 	HubReturn = true,        -- devolver al lobby al terminar
 }
 
@@ -436,6 +530,12 @@ Config.Text = {
 	BoomShout = "¡%s disparó el %s!",
 	BoomHit = "¡Le diste con el %s!",
 	SniffCaught = "¡El kiwi encontró a %s escondido y se lo comió!",
+	EatenMenu = "El kiwi te comió. Elige otro modo para volver a jugar.",
+	MapPickNotify = "¡Mapa elegido: %s!",
+	MapFallback = "Ese mapa estaba ocupado: esta partida va en %s.",
+	HurtMsg = "¡%s te dio con %s! (-%d de vida)",
+	KoedAll = "¡%s dejó fuera a %s de un disparo!",
+	KoMenu = "Te noquearon a tiros. Elige otro modo para volver a jugar.",
 	DeathTitle = "¡TE COMIÓ EL KIWI!",
 	DeathSubtitle = "Vuelves al lobby... la reserva no perdona.",
 	SlowHit = "¡Diste al kiwi gigante! Va más lento por %d segundos.",
@@ -632,6 +732,7 @@ local REMOTE_NAMES = {
 	"RequestLeave",    -- ()
 	"RequestState",    -- ()
 	"ToolAction",      -- (toolId, data)
+	"VoteMap",         -- (mapId)
 	-- Servidor -&gt; Cliente
 	"SessionUpdate",   -- (state)
 	"SessionEnd",      -- (result)
@@ -1018,6 +1119,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 	local self = setmetatable({}, Arena)
 	self.index = index
 	self.name = zone.name
+	self.mapId = zone.id or ("map" .. index)
 	self.zone = zone
 	self.center = Vector3.new(index * cfg.World.ArenaSpacing, cfg.World.FloorY, 0)
 	self.halfSize = cfg.World.ArenaSize * 0.5
@@ -1053,7 +1155,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 		Size = Vector3.new(half * 2, 10, half * 2),
 		Position = center + Vector3.new(0, -5, 0),
 		Color = zone.grass,
-		Material = Enum.Material.LeafyGrass,
+		Material = zone.ground or Enum.Material.LeafyGrass,
 		CanCollide = true,
 		Parent = folder,
 	})
@@ -1073,60 +1175,267 @@ local function buildArena(index, zone, cfg, parent, rng)
 		})
 	end
 
-	-- ---------------- Cerco decorativo ----------------
-	local fenceColor = Color3.fromRGB(96, 74, 52)
-	for i = 0, 3 do
-		part({
-			Name = "Cerco",
-			Size = Vector3.new(half * 2, 5, 1.2),
-			CFrame = CFrame.new(center + Vector3.new(0, 2, 0))
-				* CFrame.Angles(0, i * math.pi * 0.5, 0)
-				* CFrame.new(0, 0, -half + 6),
-			Color = fenceColor,
-			Material = Enum.Material.WoodPlanks,
-			CanCollide = true,
-			Parent = props,
-		})
+	-- ---------------- Limites del mapa (no se puede salir) ----------------
+	-- Ciudad: murallones tipo edificio. Duna/naturaleza: montañas y arboles.
+	local theme = zone.theme or "bosque"
+
+	if theme == "ciudad" then
+		-- Muralla de edificio alrededor de toda la manzana
+		local wallH = 48
+		local wallCol = Color3.fromRGB(148, 148, 152)
+		local wallTrim = Color3.fromRGB(110, 112, 118)
+		local glassCol = Color3.fromRGB(96, 132, 148)
+		for i = 0, 3 do
+			local side = CFrame.new(center) * CFrame.Angles(0, i * math.pi * 0.5, 0)
+			part({
+				Name = "MuroCiudad",
+				Size = Vector3.new(half * 2 + 10, wallH, 5),
+				CFrame = side * CFrame.new(0, wallH * 0.5, -half + 4),
+				Color = wallCol,
+				Material = Enum.Material.Concrete,
+				CanCollide = true,
+				Parent = props,
+			})
+			part({
+				Name = "CornisaCiudad",
+				Size = Vector3.new(half * 2 + 12, 2.4, 6.6),
+				CFrame = side * CFrame.new(0, wallH + 1, -half + 4),
+				Color = wallTrim,
+				Material = Enum.Material.Concrete,
+				CanCollide = true,
+				Parent = props,
+			})
+			-- Tiras de ventanas (dos pisos de oficinas)
+			for row = 0, 1 do
+				for w = -6, 6 do
+					local wx = w * 40
+					if math.abs(wx) &lt; half - 20 then
+						part({
+							Name = "VentanaCiudad",
+							Size = Vector3.new(26, 9, 0.6),
+							CFrame = side * CFrame.new(wx, 14 + row * 17, -half + 6.6),
+							Color = glassCol,
+							Material = Enum.Material.Glass,
+							CanCollide = false,
+							Parent = props,
+						})
+					end
+				end
+			end
+		end
+		-- Torres en las esquinas
+		for sx = -1, 1, 2 do
+			for sz = -1, 1, 2 do
+				part({
+					Name = "TorreEsquina",
+					Size = Vector3.new(18, 62, 18),
+					CFrame = CFrame.new(center + Vector3.new(sx * (half - 8), 31, sz * (half - 8))),
+					Color = wallTrim,
+					Material = Enum.Material.Concrete,
+					CanCollide = true,
+					Parent = props,
+				})
+			end
+		end
+		-- Skyline: edificios de fondo (afuera del area jugable)
+		for i = 1, 16 do
+			local a = (i / 16) * math.pi * 2
+			local dist = half + rng:NextNumber(55, 130)
+			local h = rng:NextNumber(70, 170)
+			local w = rng:NextNumber(30, 56)
+			part({
+				Name = "Skyline",
+				Size = Vector3.new(w, h, w),
+				CFrame = CFrame.new(center + Vector3.new(math.cos(a) * dist, h * 0.5 - 6, math.sin(a) * dist)),
+				Color = i % 3 == 0 and Color3.fromRGB(96, 102, 116) or Color3.fromRGB(74, 78, 90),
+				Material = Enum.Material.Concrete,
+				CanCollide = false,
+				Parent = props,
+			})
+		end
+	else
+		-- Montañas de roca que cierran el mapa
+		local palettes = {
+			bosque = { Color3.fromRGB(92, 100, 84), Color3.fromRGB(112, 116, 98), Color3.fromRGB(74, 118, 72), Enum.Material.LeafyGrass },
+			dunas = { Color3.fromRGB(188, 156, 106), Color3.fromRGB(208, 178, 128), Color3.fromRGB(226, 200, 148), Enum.Material.Sand },
+			costa = { Color3.fromRGB(108, 98, 86), Color3.fromRGB(130, 118, 102), Color3.fromRGB(104, 122, 92), Enum.Material.Ground },
+			alpes = { Color3.fromRGB(112, 120, 132), Color3.fromRGB(138, 148, 160), Color3.fromRGB(238, 244, 252), Enum.Material.Snow },
+		}
+		local pal = palettes[theme] or palettes.bosque
+		local snowy = theme == "alpes"
+		local sideLen = half * 2
+		local count = math.floor(sideLen / 26)
+		local ringDist = half - 9
+		for side = 0, 3 do
+			local sideCF = CFrame.new(center) * CFrame.Angles(0, side * math.pi * 0.5, 0)
+			for i = 1, count do
+				local x = -half + (i - 0.5) * (sideLen / count) + rng:NextNumber(-3, 3)
+				local base = sideCF * CFrame.new(x, 0, -(ringDist + rng:NextNumber(-2, 4)))
+				local h = rng:NextNumber(22, 48)
+				local w = rng:NextNumber(26, 42)
+				local d = rng:NextNumber(14, 22)
+				part({
+					Name = "Montana",
+					Size = Vector3.new(w, h, d),
+					CFrame = base * CFrame.new(0, h * 0.5 - 2, 0)
+						* CFrame.Angles(rng:NextNumber(-0.08, 0.08), rng:NextNumber(-0.12, 0.12), rng:NextNumber(-0.08, 0.08)),
+					Color = i % 2 == 0 and pal[1] or pal[2],
+					Material = Enum.Material.Rock,
+					CanCollide = true,
+					Parent = props,
+				})
+				if snowy and i % 2 == 0 then
+					part({
+						Name = "NieveMontana",
+						Size = Vector3.new(w * 0.68, h * 0.3, d * 0.68),
+						CFrame = base * CFrame.new(0, h - h * 0.12 - 2, 0),
+						Color = Color3.fromRGB(240, 246, 252),
+						Material = Enum.Material.Snow,
+						CanCollide = false,
+						Parent = props,
+					})
+				end
+			end
+		end
+		-- Esquinas montañosas (sin huecos)
+		for sx = -1, 1, 2 do
+			for sz = -1, 1, 2 do
+				part({
+					Name = "MontanaEsquina",
+					Size = Vector3.new(44, 48, 44),
+					CFrame = CFrame.new(center + Vector3.new(sx * (half - 8), 21, sz * (half - 8))),
+					Color = pal[2],
+					Material = Enum.Material.Rock,
+					CanCollide = true,
+					Parent = props,
+				})
+			end
+		end
+		-- Picos de fondo (paisaje)
+		for i = 1, 14 do
+			local a = (i / 14) * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
+			local dist = half + rng:NextNumber(50, 140)
+			local size = rng:NextNumber(110, 210)
+			part({
+				Name = "PicoFondo",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(size, size * rng:NextNumber(0.8, 1.2), size),
+				Position = center + Vector3.new(math.cos(a) * dist, -size * 0.28, math.sin(a) * dist),
+				Color = pal[3],
+				Material = pal[4],
+				CanCollide = false,
+				Parent = props,
+			})
+		end
+		-- En el bosque ademas hay una linea de kauris gigantes
+		if theme == "bosque" then
+			for i = 1, 26 do
+				local a = (i / 26) * math.pi * 2 + rng:NextNumber(-0.06, 0.06)
+				local dist = half - 22 + rng:NextNumber(-6, 6)
+				local pos = center + Vector3.new(math.cos(a) * dist, 0, math.sin(a) * dist)
+				local hh = rng:NextNumber(40, 62)
+				part({
+					Name = "KauriGigante",
+					Size = Vector3.new(4.4, hh, 4.4),
+					Position = pos + Vector3.new(0, hh * 0.5, 0),
+					Color = zone.tree,
+					Material = Enum.Material.Wood,
+					CanCollide = true,
+					Parent = props,
+				})
+				part({
+					Name = "CopaKauri",
+					Shape = Enum.PartType.Ball,
+					Size = Vector3.new(26, 20, 26),
+					Position = pos + Vector3.new(0, hh + 6, 0),
+					Color = Color3.fromRGB(58, 104, 60),
+					Material = Enum.Material.LeafyGrass,
+					CanCollide = false,
+					Parent = props,
+				})
+			end
+		end
 	end
 
-	-- ---------------- Colinas suaves ----------------
-	for i = 1, 3 do
-		local angle = rng:NextNumber(0, math.pi * 2)
-		local radius = rng:NextNumber(half * 0.35, half * 0.7)
-		local hillSize = rng:NextNumber(70, 110)
-		part({
-			Name = "Colina",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(hillSize, hillSize * 0.9, hillSize),
-			Position = center + Vector3.new(math.cos(angle) * radius, -hillSize * 0.32, math.sin(angle) * radius),
-			Color = Color3.fromRGB(zone.grass.R * 240, zone.grass.G * 240, zone.grass.B * 240),
-			Material = Enum.Material.Ground,
-			Parent = props,
-		})
+	-- ---------------- Colinas suaves (arena, nieve y medanos) ----------------
+	if zone.theme ~= "ciudad" then
+		for i = 1, 3 do
+			local angle = rng:NextNumber(0, math.pi * 2)
+			local radius = rng:NextNumber(half * 0.35, half * 0.7)
+			local hillSize = rng:NextNumber(70, 110)
+			part({
+				Name = "Colina",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(hillSize, hillSize * 0.9, hillSize),
+				Position = center + Vector3.new(math.cos(angle) * radius, -hillSize * 0.32, math.sin(angle) * radius),
+				Color = Color3.fromRGB(zone.grass.R * 240, zone.grass.G * 240, zone.grass.B * 240),
+				Material = zone.ground or Enum.Material.Ground,
+				Parent = props,
+			})
+		end
 	end
 
-	-- ---------------- Estanque ----------------
-	do
+	-- ---------------- Agua del mapa (con fondo y borde de piedra) ----------------
+	local pondCfg = zone.pond
+	if pondCfg ~= false then
+		local water = pondCfg or {}
+		local scale = water.scale or 1
 		local angle = rng:NextNumber(0, math.pi * 2)
 		local radius = rng:NextNumber(half * 0.25, half * 0.55)
 		local pondPos = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+		local pondR = 26 * scale
+		local icy = zone.theme == "alpes"
+
+		-- Fondo (para que no se vea el pasto a traves del agua)
+		part({
+			Name = "FondoEstanque",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.5, pondR * 2 - 1.2, pondR * 2 - 1.2),
+			CFrame = CFrame.new(pondPos + Vector3.new(0, 0.06, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = icy and Color3.fromRGB(178, 200, 214) or Color3.fromRGB(56, 66, 70),
+			Material = icy and Enum.Material.Ice or Enum.Material.Slate,
+			CanCollide = false,
+			Parent = props,
+		})
+
+		-- Espejo de agua finito (antes era un cilindro grueso que parecia flotar)
 		local pond = part({
 			Name = "Estanque",
 			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(2, 52, 52),
-			CFrame = CFrame.new(pondPos + Vector3.new(0, 1.1, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-			Color = Color3.fromRGB(64, 122, 150),
-			Material = Enum.Material.Water,
+			Size = Vector3.new(0.6, pondR * 2, pondR * 2),
+			CFrame = CFrame.new(pondPos + Vector3.new(0, 0.42, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = water.color or Color3.fromRGB(64, 122, 150),
+			Material = water.material or Enum.Material.Water,
 			Transparency = 0.25,
 			CanCollide = false,
 			Parent = props,
 		})
+
+		-- Borde de piedras: contiene el agua y se ve natural
+		local rimColor = icy and Color3.fromRGB(212, 226, 236) or Color3.fromRGB(122, 118, 110)
+		local rimMaterial = icy and Enum.Material.Ice or Enum.Material.Rock
+		local rimCount = math.clamp(math.floor(pondR / 3), 10, 22)
+		for i = 1, rimCount do
+			local a = (i - 1) / rimCount * math.pi * 2 + rng:NextNumber(-0.08, 0.08)
+			local size = rng:NextNumber(2.6, 4.8)
+			part({
+				Name = "BordeEstanque",
+				Size = Vector3.new(size, rng:NextNumber(1.4, 2.6), size),
+				CFrame = CFrame.new(pondPos + Vector3.new(math.cos(a) * (pondR - 1.4), 0.5, math.sin(a) * (pondR - 1.4)))
+					* CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0),
+				Color = rimColor,
+				Material = rimMaterial,
+				CanCollide = true,
+				Parent = props,
+			})
+		end
+
 		for i = 1, 10 do
 			local a = rng:NextNumber(0, math.pi * 2)
 			part({
 				Name = "Junco",
 				Size = Vector3.new(0.5, rng:NextNumber(4, 7), 0.5),
-				Position = pondPos + Vector3.new(math.cos(a) * 26, 2.5, math.sin(a) * 26),
+				Position = pondPos + Vector3.new(math.cos(a) * (pondR + 2.5), 2.5, math.sin(a) * (pondR + 2.5)),
 				Color = Color3.fromRGB(110, 132, 74),
 				Material = Enum.Material.Grass,
 				Parent = props,
@@ -1477,13 +1786,205 @@ local function buildArena(index, zone, cfg, parent, rng)
 		end
 	end
 
+	-- Medano de arena (Dunas): limita la vista y da volumen
+	local function makeDuneMound(pos, scale)
+		scale = scale or rng:NextNumber(0.9, 1.5)
+		for i = 1, 3 do
+			local s = rng:NextNumber(16, 26) * scale
+			part({
+				Name = "Medano",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(s, s * 0.42, s),
+				Position = pos + Vector3.new(rng:NextNumber(-7, 7), -s * 0.22 + rng:NextNumber(0, 2), rng:NextNumber(-7, 7)),
+				Color = Color3.fromRGB(224, 200, 150),
+				Material = Enum.Material.Sand,
+				CanCollide = false,
+				Parent = props,
+			})
+		end
+	end
+
+	-- Cactus (Dunas): escondite chico
+	local function makeCactus(pos, scale)
+		scale = scale or rng:NextNumber(0.85, 1.35)
+		local green = Color3.fromRGB(96, 138, 84)
+		local trunk = part({
+			Name = "Cactus",
+			Size = Vector3.new(2.2 * scale, 9 * scale, 2.2 * scale),
+			Position = pos + Vector3.new(0, 4.5 * scale, 0),
+			Color = green,
+			Material = Enum.Material.Grass,
+			CanCollide = true,
+			Parent = props,
+		})
+		part({
+			Name = "CactusBrazo",
+			Size = Vector3.new(1.4 * scale, 4 * scale, 1.4 * scale),
+			Position = pos + Vector3.new(1.7 * scale, 5.6 * scale, 0),
+			Color = green,
+			Material = Enum.Material.Grass,
+			CanCollide = true,
+			Parent = props,
+		})
+		return addSpot("arbusto", "Cactus", trunk, pos + Vector3.new(0, 1.6, 0), 4.6 * scale, 0.65)
+	end
+
+	-- Palmera (Costa)
+	local function makePalm(pos, scale)
+		scale = scale or rng:NextNumber(0.9, 1.3)
+		local height = rng:NextNumber(20, 28) * scale
+		part({
+			Name = "TroncoPalmera",
+			Size = Vector3.new(1.8 * scale, height, 1.8 * scale),
+			CFrame = CFrame.new(pos + Vector3.new(0, height * 0.5, 0)) * CFrame.Angles(rng:NextNumber(-0.06, 0.06), 0, rng:NextNumber(-0.06, 0.06)),
+			Color = zone.tree,
+			Material = Enum.Material.Wood,
+			CanCollide = true,
+			Parent = props,
+		})
+		local top = pos + Vector3.new(0, height, 0)
+		for i = 1, 5 do
+			local a = (i - 1) * (math.pi * 2 / 5) + rng:NextNumber(-0.2, 0.2)
+			part({
+				Name = "HojaPalmera",
+				Size = Vector3.new(12 * scale, 0.5, 2.6 * scale),
+				CFrame = CFrame.new(top + Vector3.new(math.cos(a) * 4.6 * scale, rng:NextNumber(-1.5, 0.6), math.sin(a) * 4.6 * scale))
+					* CFrame.Angles(0, -a, math.rad(-14)),
+				Color = Color3.fromRGB(64, 122, 66),
+				Material = Enum.Material.LeafyGrass,
+				CanCollide = false,
+				Parent = props,
+			})
+		end
+	end
+
+	-- Pino de nieve (Alpes)
+	local function makePine(pos, scale)
+		scale = scale or rng:NextNumber(0.9, 1.3)
+		local height = rng:NextNumber(24, 34) * scale
+		part({
+			Name = "TroncoPino",
+			Size = Vector3.new(2.4, height * 0.5, 2.4),
+			Position = pos + Vector3.new(0, height * 0.25, 0),
+			Color = zone.tree,
+			Material = Enum.Material.Wood,
+			CanCollide = true,
+			Parent = props,
+		})
+		for level = 1, 3 do
+			local width = (20 - level * 4) * scale
+			part({
+				Name = "CopaPino",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(width, width * 0.75, width),
+				Position = pos + Vector3.new(0, height * (0.38 + level * 0.16), 0),
+				Color = Color3.fromRGB(52 + level * 6, 88 + level * 6, 62),
+				Material = Enum.Material.LeafyGrass,
+				CanCollide = level == 1,
+				Parent = props,
+			})
+		end
+	end
+
+	-- Poste de luz (Ciudad)
+	local function makeLampPost(pos)
+		part({
+			Name = "Poste",
+			Size = Vector3.new(0.7, 16, 0.7),
+			Position = pos + Vector3.new(0, 8, 0),
+			Color = Color3.fromRGB(58, 60, 66),
+			Material = Enum.Material.Metal,
+			CanCollide = true,
+			Parent = props,
+		})
+		local lamp = part({
+			Name = "Farol",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(2.6, 2.6, 2.6),
+			Position = pos + Vector3.new(0, 16.6, 0),
+			Color = Color3.fromRGB(255, 232, 168),
+			Material = Enum.Material.Neon,
+			CanCollide = false,
+			Parent = props,
+		})
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 226, 158)
+		light.Range = 34
+		light.Brightness = 1.1
+		light.Parent = lamp
+	end
+
+	-- Banco de plaza (Ciudad)
+	local function makeBench(pos)
+		local base = CFrame.new(pos) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+		part({
+			Name = "BancoAsiento",
+			Size = Vector3.new(6, 0.6, 1.8),
+			CFrame = base * CFrame.new(0, 2.2, 0),
+			Color = Color3.fromRGB(126, 96, 62),
+			Material = Enum.Material.WoodPlanks,
+			CanCollide = true,
+			Parent = props,
+		})
+		for _, dx in ipairs({ -2.4, 2.4 }) do
+			part({
+				Name = "PatasBanco",
+				Size = Vector3.new(0.6, 2.2, 1.4),
+				CFrame = base * CFrame.new(dx, 1.1, 0),
+				Color = Color3.fromRGB(74, 76, 82),
+				Material = Enum.Material.Metal,
+				CanCollide = true,
+				Parent = props,
+			})
+		end
+	end
+
+	-- Torre mirador de la ciudad (estilo Sky Tower)
+	local function makeSkyTower(pos)
+		local shaft = part({
+			Name = "TorreFuste",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(120, 13, 13),
+			CFrame = CFrame.new(pos + Vector3.new(0, 60, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = Color3.fromRGB(206, 214, 222),
+			Material = Enum.Material.Concrete,
+			CanCollide = true,
+			Parent = props,
+		})
+		part({
+			Name = "TorreMirador",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(26, 26, 26),
+			Position = pos + Vector3.new(0, 108, 0),
+			Color = Color3.fromRGB(120, 150, 180),
+			Material = Enum.Material.Glass,
+			CanCollide = true,
+			Parent = props,
+		})
+		part({
+			Name = "TorreAguja",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(46, 2.2, 2.2),
+			CFrame = CFrame.new(pos + Vector3.new(0, 145, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = Color3.fromRGB(180, 190, 200),
+			Material = Enum.Material.Metal,
+			CanCollide = false,
+			Parent = props,
+		})
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 120, 110)
+		light.Range = 60
+		light.Brightness = 2
+		light.Parent = shaft
+	end
+
 	-- ===============================================================
 	-- Casas con interiores (escondites de verdad) y baules de armas
 	-- ===============================================================
 	local HOUSE_WOOD = Color3.fromRGB(122, 92, 62)
-	local HOUSE_WALL = Color3.fromRGB(204, 190, 166)
-	local HOUSE_ROOF = Color3.fromRGB(148, 76, 54)
-	local HOUSE_FLOOR = Color3.fromRGB(104, 84, 64)
+	local HOUSE_WALL = zone.wall or Color3.fromRGB(204, 190, 166)
+	local HOUSE_ROOF = zone.roof or Color3.fromRGB(148, 76, 54)
+	local HOUSE_FLOOR = zone.floor or Color3.fromRGB(104, 84, 64)
 
 	local function box(name, cf, size, color, material)
 		return part({
@@ -1652,35 +2153,66 @@ local function buildArena(index, zone, cfg, parent, rng)
 	local function makeHouse(pos, angle, variant)
 		local base = CFrame.new(pos) * CFrame.Angles(0, angle, 0)
 		local big = variant == "farm"
-		local W = big and 21 or 17
-		local D = big and 16 or 13
-		local wallH = 9
+		local W = big and 30 or 26
+		local D = big and 22 or 19
+		local floorH = 9.4
+		local totalH = floorH * 2
 		local wood = HOUSE_WOOD
 		local floorPart = box("PisoCasa", base * CFrame.new(0, 0.3, 0), Vector3.new(W + 1.6, 0.6, D + 1.6), HOUSE_FLOOR, Enum.Material.Slate)
 
-		local doorW = 4.6
+		-- Escalinata y toldo de entrada
+		box("EscalonEntrada", base * CFrame.new(0, 0.3, D * 0.5 + 1.5), Vector3.new(8, 0.6, 3), HOUSE_FLOOR, Enum.Material.Slate)
+		box("Toldo", base * CFrame.new(0, 7.9, D * 0.5 + 1.4), Vector3.new(9, 0.4, 3.0), wood, Enum.Material.WoodPlanks)
+
+		local doorW = 6.4
 		local sideW = (W - doorW) * 0.5
-		box("ParedFrenteA", base * CFrame.new(-(doorW * 0.5 + sideW * 0.5), wallH * 0.5 + 0.6, D * 0.5), Vector3.new(sideW, wallH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
-		box("ParedFrenteB", base * CFrame.new(doorW * 0.5 + sideW * 0.5, wallH * 0.5 + 0.6, D * 0.5), Vector3.new(sideW, wallH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
-		box("DintelFrente", base * CFrame.new(0, wallH - 1.1 + 0.6, D * 0.5), Vector3.new(doorW, 2.2, 0.8), HOUSE_WALL, Enum.Material.Concrete)
-		box("ParedFondo", base * CFrame.new(0, wallH * 0.5 + 0.6, -D * 0.5), Vector3.new(W, wallH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
-		box("ParedIzq", base * CFrame.new(-W * 0.5, wallH * 0.5 + 0.6, 0), Vector3.new(0.8, wallH, D), HOUSE_WALL, Enum.Material.Concrete)
-		box("ParedDer", base * CFrame.new(W * 0.5, wallH * 0.5 + 0.6, 0), Vector3.new(0.8, wallH, D), HOUSE_WALL, Enum.Material.Concrete)
+		box("ParedFrenteA", base * CFrame.new(-(doorW * 0.5 + sideW * 0.5), totalH * 0.5 + 0.6, D * 0.5), Vector3.new(sideW, totalH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
+		box("ParedFrenteB", base * CFrame.new(doorW * 0.5 + sideW * 0.5, totalH * 0.5 + 0.6, D * 0.5), Vector3.new(sideW, totalH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
+		box("DintelFrente", base * CFrame.new(0, floorH - 0.5, D * 0.5), Vector3.new(doorW, 2.2, 0.8), HOUSE_WALL, Enum.Material.Concrete)
+		box("ParedFrenteC", base * CFrame.new(0, floorH + 0.6 + floorH * 0.5, D * 0.5), Vector3.new(doorW, floorH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
+		box("ParedFondo", base * CFrame.new(0, totalH * 0.5 + 0.6, -D * 0.5), Vector3.new(W, totalH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
+		box("ParedIzq", base * CFrame.new(-W * 0.5, totalH * 0.5 + 0.6, 0), Vector3.new(0.8, totalH, D), HOUSE_WALL, Enum.Material.Concrete)
+		box("ParedDer", base * CFrame.new(W * 0.5, totalH * 0.5 + 0.6, 0), Vector3.new(0.8, totalH, D), HOUSE_WALL, Enum.Material.Concrete)
 
-		box("VentanaA", base * CFrame.new(-W * 0.5, 5.4, D * 0.16), Vector3.new(1.0, 3.0, 3.4), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
-		box("VentanaB", base * CFrame.new(W * 0.5, 5.4, -D * 0.16), Vector3.new(1.0, 3.0, 3.4), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
-		box("VentanaC", base * CFrame.new(W * 0.2, 5.4, -D * 0.5), Vector3.new(3.2, 3.0, 1.0), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
+		-- Ventanas en las dos plantas
+		box("VentanaA", base * CFrame.new(-W * 0.5, 5.4, D * 0.2), Vector3.new(1.0, 3.0, 3.4), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
+		box("VentanaB", base * CFrame.new(W * 0.5, 5.4, -D * 0.2), Vector3.new(1.0, 3.0, 3.4), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
+		box("VentanaC", base * CFrame.new(W * 0.22, 5.4, -D * 0.5), Vector3.new(3.2, 3.0, 1.0), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
+		box("VentanaAltaA", base * CFrame.new(-W * 0.5, floorH + 5.4, D * 0.2), Vector3.new(1.0, 3.0, 3.4), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
+		box("VentanaAltaB", base * CFrame.new(W * 0.5, floorH + 5.4, -D * 0.2), Vector3.new(1.0, 3.0, 3.4), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
+		box("VentanaAltaC", base * CFrame.new(W * 0.3, floorH + 5.4, D * 0.5), Vector3.new(3.2, 3.0, 1.0), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
 
-		box("MarcoIzq", base * CFrame.new(-doorW * 0.5 - 0.25, 3.6, D * 0.5), Vector3.new(0.5, 6.4, 1.1), wood, Enum.Material.Wood)
-		box("MarcoDer", base * CFrame.new(doorW * 0.5 + 0.25, 3.6, D * 0.5), Vector3.new(0.5, 6.4, 1.1), wood, Enum.Material.Wood)
+		box("MarcoIzq", base * CFrame.new(-doorW * 0.5 - 0.25, 3.9, D * 0.5), Vector3.new(0.5, 7.0, 1.1), wood, Enum.Material.Wood)
+		box("MarcoDer", base * CFrame.new(doorW * 0.5 + 0.25, 3.9, D * 0.5), Vector3.new(0.5, 7.0, 1.1), wood, Enum.Material.Wood)
 
-		box("TechoCasa", base * CFrame.new(0, wallH + 1.1, 0), Vector3.new(W + 1.8, 0.6, D + 1.8), wood, Enum.Material.WoodPlanks)
+		-- Piso del segundo piso con hueco para la escalera
+		local holeW = 5.8
+		local holeZEnd = -D * 0.5 + D * 0.62
+		local slabY = floorH + 0.55
+		box("PisoAltoDerecha", base * CFrame.new(holeW * 0.5, slabY, 0), Vector3.new(W - holeW, 0.5, D), wood, Enum.Material.WoodPlanks)
+		box("PisoAltoFrente", base * CFrame.new(-W * 0.5 + holeW * 0.5, slabY, (holeZEnd + D * 0.5) * 0.5), Vector3.new(holeW, 0.5, D * 0.5 - holeZEnd), wood, Enum.Material.WoodPlanks)
+		box("BarandaEscalera", base * CFrame.new(-W * 0.5 + holeW + 0.2, slabY + 1.6, (-3.0 + holeZEnd) * 0.5), Vector3.new(0.3, 2.6, holeZEnd + 3.0), wood, Enum.Material.Wood)
+		box("BarandaFrente", base * CFrame.new(-W * 0.5 + holeW * 0.5, slabY + 1.6, holeZEnd + 0.15), Vector3.new(holeW, 2.6, 0.3), wood, Enum.Material.Wood)
+
+		-- Escalera de 12 escalones contra la pared izquierda
+		local steps = 12
+		local stepRise = floorH / steps
+		local stepRun = (D - 5.5) / steps
+		local stairX = -W * 0.5 + 2.9
+		local stairZ0 = D * 0.5 - 2.5
+		for i = 1, steps do
+			box("Escalon", base * CFrame.new(stairX, 0.6 + i * stepRise - stepRise * 0.5, stairZ0 - (i - 1) * stepRun),
+				Vector3.new(5.0, stepRise, stepRun + 0.25), wood, Enum.Material.WoodPlanks)
+		end
+
+		box("TechoCasa", base * CFrame.new(0, totalH + 1.1, 0), Vector3.new(W + 1.8, 0.6, D + 1.8), wood, Enum.Material.WoodPlanks)
+		box("Chimenea", base * CFrame.new(W * 0.24, totalH + 3.6, -D * 0.18), Vector3.new(2.4, 6, 2.4), Color3.fromRGB(128, 84, 70), Enum.Material.Brick)
 		local slope = math.rad(26)
 		local slab = (W * 0.5 + 1.6) / math.cos(slope)
 		part({
 			Name = "TejadoA",
 			Size = Vector3.new(slab, 0.7, D + 2.6),
-			CFrame = base * CFrame.new(-W * 0.25 - 0.5, wallH + 2.4, 0) * CFrame.Angles(0, 0, slope),
+			CFrame = base * CFrame.new(-W * 0.25 - 0.5, totalH + 2.4, 0) * CFrame.Angles(0, 0, slope),
 			Color = HOUSE_ROOF,
 			Material = Enum.Material.Slate,
 			CanCollide = true,
@@ -1689,40 +2221,48 @@ local function buildArena(index, zone, cfg, parent, rng)
 		part({
 			Name = "TejadoB",
 			Size = Vector3.new(slab, 0.7, D + 2.6),
-			CFrame = base * CFrame.new(W * 0.25 + 0.5, wallH + 2.4, 0) * CFrame.Angles(0, 0, -slope),
+			CFrame = base * CFrame.new(W * 0.25 + 0.5, totalH + 2.4, 0) * CFrame.Angles(0, 0, -slope),
 			Color = HOUSE_ROOF,
 			Material = Enum.Material.Slate,
 			CanCollide = true,
 			Parent = props,
 		})
 
-		makeTable(base * CFrame.new(-W * 0.2, 0.6, 0), wood)
-		makeChair(base * CFrame.new(-W * 0.2, 0.6, 2.4), wood)
-		makeChair(base * CFrame.new(-W * 0.2, 0.6, -2.4), wood)
-		makeBed(base * CFrame.new(W * 0.24, 0.6, -D * 0.28), wood)
-		makeShelfProp(base * CFrame.new(-W * 0.36, 0.6, -D * 0.38), wood)
-		makeCrateProp(base * CFrame.new(W * 0.33, 0.6, D * 0.32), Vector3.new(4.4, 4.4, 4.4), wood)
+		-- Planta baja: comedor y living del lado derecho (la escalera usa la izquierda)
+		makeTable(base * CFrame.new(3, 0.6, -1), wood)
+		makeChair(base * CFrame.new(3, 0.6, 2), wood)
+		makeChair(base * CFrame.new(3, 0.6, -4), wood)
+		makeBed(base * CFrame.new(W * 0.3, 0.6, -D * 0.32), wood)
+		makeShelfProp(base * CFrame.new(8, 0.6, 0.5), wood)
+		makeCrateProp(base * CFrame.new(6.5, 0.6, D * 0.3), Vector3.new(4.4, 4.4, 4.4), wood)
 		if big then
-			makeShelfProp(base * CFrame.new(0, 0.6, -D * 0.44), wood)
-			makeCrateProp(base * CFrame.new(-W * 0.32, 0.6, D * 0.3), Vector3.new(4, 3.2, 4), wood)
-			makeBarrelHide(base * CFrame.new(W * 0.3, 0.6, -D * 0.05), "Barril")
-		else
-			makeShelfProp(base * CFrame.new(0, 0.6, -D * 0.44), wood)
+			makeCrateProp(base * CFrame.new(0.5, 0.6, -D * 0.36), Vector3.new(4, 3.2, 4), wood)
+			makeBarrelHide(base * CFrame.new(-4.5, 0.6, -D * 0.05), "Barril")
 		end
+		makeShelfProp(base * CFrame.new(-4, 0.6, -D * 0.4), wood)
+		makeCloset(base * CFrame.new(W * 0.36, 0.6, D * 0.1) * CFrame.Angles(0, math.rad(-90), 0), "Armario")
+		makeChestProp(base * CFrame.new(-4, 0.6, D * 0.36), "Baúl")
 
-		makeCloset(base * CFrame.new(W * 0.32, 0.6, D * 0.16) * CFrame.Angles(0, math.rad(-90), 0), "Armario")
-		makeChestProp(base * CFrame.new(-W * 0.05, 0.6, D * 0.34), "Baúl")
+		addSpot("casa", "Casa", floorPart, (base * CFrame.new(-3, 0, -D * 0.3)).Position, 2.8, 0.9)
+		addSpot("casa", "Casa", floorPart, (base * CFrame.new(5, 0, D * 0.05)).Position, 2.8, 0.9)
 
-		addSpot("casa", "Casa", floorPart, (base * CFrame.new(-W * 0.3, 0, -D * 0.3)).Position, 2.8, 0.9)
-		addSpot("casa", "Casa", floorPart, (base * CFrame.new(W * 0.1, 0, -D * 0.05)).Position, 2.8, 0.9)
-		addIndoor(base, Vector3.new(W - 2, wallH, D - 2))
+		-- Planta alta: dormitorio y baul propios. No hay escondite (armario)
+		-- aca arriba: el kiwi no sabe subir escaleras y seria una zona segura.
+		local upY = floorH + 0.8
+		makeBed(base * CFrame.new(W * 0.3, upY, -D * 0.3), wood)
+		makeShelfProp(base * CFrame.new(2, upY, -D * 0.42), wood)
+		makeCrateProp(base * CFrame.new(-3.5, upY, D * 0.3), Vector3.new(4, 3.6, 4), wood)
+		makeShelfProp(base * CFrame.new(W * 0.34, upY, D * 0.08), wood)
+		makeChestProp(base * CFrame.new(2.5, upY, D * 0.34), "Baúl del piso")
+
+		addIndoor(base, Vector3.new(W - 2, totalH, D - 2))
 	end
 
 	local function makeBarn(pos, angle)
 		local base = CFrame.new(pos) * CFrame.Angles(0, angle, 0)
 		local W, D, wallH = 23, 17, 11
 		local wood = HOUSE_WOOD
-		local barnRed = Color3.fromRGB(140, 62, 52)
+		local barnRed = zone.barn or (theme == "ciudad" and Color3.fromRGB(118, 110, 102) or Color3.fromRGB(140, 62, 52))
 		local floorPart = box("PisoGranero", base * CFrame.new(0, 0.3, 0), Vector3.new(W + 1.6, 0.6, D + 1.6), HOUSE_FLOOR, Enum.Material.Slate)
 
 		local doorW = 10
@@ -1754,6 +2294,33 @@ local function buildArena(index, zone, cfg, parent, rng)
 			CanCollide = true,
 			Parent = props,
 		})
+
+		-- Silos de metal al lado del granero
+		for _, side in ipairs({ -1, 1 }) do
+			if rng:NextNumber(0, 1) &lt; 0.6 then
+				local sPos = base * CFrame.new(side * (W * 0.5 + 9), 0, -D * 0.2)
+				part({
+					Name = "Silo",
+					Shape = Enum.PartType.Cylinder,
+					Size = Vector3.new(26, 15, 15),
+					CFrame = sPos * CFrame.new(0, 13, 0) * CFrame.Angles(0, 0, math.rad(90)),
+					Color = Color3.fromRGB(196, 190, 178),
+					Material = Enum.Material.Metal,
+					CanCollide = true,
+					Parent = props,
+				})
+				part({
+					Name = "SiloTecho",
+					Shape = Enum.PartType.Ball,
+					Size = Vector3.new(15.5, 8, 15.5),
+					CFrame = sPos * CFrame.new(0, 25.4, 0),
+					Color = Color3.fromRGB(150, 74, 58),
+					Material = Enum.Material.Metal,
+					CanCollide = true,
+					Parent = props,
+				})
+			end
+		end
 
 		makeHayProp(base * CFrame.new(-W * 0.24, 0.6, -D * 0.2), "Pajar")
 		makeHayProp(base * CFrame.new(W * 0.24, 0.6, -D * 0.22), "Pajar")
@@ -1794,52 +2361,187 @@ local function buildArena(index, zone, cfg, parent, rng)
 	-- Zona central despejada para que aparezca el kiwi
 	table.insert(occupied, center + Vector3.new(0, 0, 0))
 
-	for i = 1, 34 do
-		local p = freeSpot(22)
-		if p then
-			makeBush(p)
+	if theme == "bosque" then
+		for i = 1, 34 do
+			local p = freeSpot(22)
+			if p then
+				makeBush(p)
+			end
 		end
-	end
 
-	for i = 1, 16 do
-		local p = freeSpot(24)
-		if p then
-			makeFern(p)
+		for i = 1, 16 do
+			local p = freeSpot(24)
+			if p then
+				makeFern(p)
+			end
 		end
-	end
 
-	for i = 1, 12 do
-		local p = freeSpot(26)
-		if p then
-			makeLog(p)
+		for i = 1, 12 do
+			local p = freeSpot(26)
+			if p then
+				makeLog(p)
+			end
 		end
-	end
 
-	for i = 1, 15 do
-		local p = freeSpot(26)
-		if p then
-			makeRocks(p)
+		for i = 1, 15 do
+			local p = freeSpot(26)
+			if p then
+				makeRocks(p)
+			end
 		end
-	end
 
-	for i = 1, 12 do
-		local p = freeSpot(28)
-		if p then
-			makeBurrow(p)
+		for i = 1, 12 do
+			local p = freeSpot(28)
+			if p then
+				makeBurrow(p)
+			end
 		end
-	end
 
-	for i = 1, 18 do
-		local p = freeSpot(26)
-		if p then
-			makeGrassPatch(p)
+		for i = 1, 18 do
+			local p = freeSpot(26)
+			if p then
+				makeGrassPatch(p)
+			end
 		end
-	end
 
-	for i = 1, 40 do
-		local p = freeSpot(18)
-		if p then
-			makeTree(p)
+		for i = 1, 40 do
+			local p = freeSpot(18)
+			if p then
+				makeTree(p)
+			end
+		end
+	elseif theme == "dunas" then
+		for i = 1, 14 do
+			local p = freeSpot(24)
+			if p then
+				makeCactus(p)
+			end
+		end
+
+		for i = 1, 16 do
+			local p = freeSpot(26)
+			if p then
+				makeDuneMound(p)
+			end
+		end
+
+		for i = 1, 16 do
+			local p = freeSpot(24)
+			if p then
+				makeRocks(p)
+			end
+		end
+
+		for i = 1, 8 do
+			local p = freeSpot(28)
+			if p then
+				makeBurrow(p)
+			end
+		end
+
+		for i = 1, 6 do
+			local p = freeSpot(26)
+			if p then
+				makeGrassPatch(p)
+			end
+		end
+	elseif theme == "ciudad" then
+		for i = 1, 14 do
+			local p = freeSpot(22)
+			if p then
+				makeTree(p)
+			end
+		end
+
+		for i = 1, 8 do
+			local p = freeSpot(22)
+			if p then
+				makeBush(p)
+			end
+		end
+
+		for i = 1, 14 do
+			local p = freeSpot(20)
+			if p then
+				makeLampPost(p)
+			end
+		end
+
+		for i = 1, 8 do
+			local p = freeSpot(22)
+			if p then
+				makeBench(p)
+			end
+		end
+
+		for i = 1, 6 do
+			local p = freeSpot(26)
+			if p then
+				makeRocks(p)
+			end
+		end
+	elseif theme == "costa" then
+		for i = 1, 20 do
+			local p = freeSpot(22)
+			if p then
+				makePalm(p)
+			end
+		end
+
+		for i = 1, 10 do
+			local p = freeSpot(22)
+			if p then
+				makeBush(p)
+			end
+		end
+
+		for i = 1, 12 do
+			local p = freeSpot(26)
+			if p then
+				makeLog(p)
+			end
+		end
+
+		for i = 1, 10 do
+			local p = freeSpot(26)
+			if p then
+				makeRocks(p)
+			end
+		end
+
+		for i = 1, 10 do
+			local p = freeSpot(26)
+			if p then
+				makeGrassPatch(p)
+			end
+		end
+	elseif theme == "alpes" then
+		for i = 1, 30 do
+			local p = freeSpot(20)
+			if p then
+				makePine(p)
+			end
+		end
+
+		for i = 1, 12 do
+			local p = freeSpot(26)
+			if p then
+				makeRocks(p)
+			end
+		end
+
+		for i = 1, 8 do
+			local p = freeSpot(26)
+			if p then
+				makeLog(p)
+			end
+		end
+
+		for i = 1, 6 do
+			local p = freeSpot(28)
+			if p then
+				makeBurrow(p)
+			end
 		end
 	end
 
@@ -1881,21 +2583,32 @@ local function buildArena(index, zone, cfg, parent, rng)
 		end
 
 		-- La aldea: casa, casona y granero (con interiores y baules)
-		local anchor = freeSpotFallback(48, { 74, 52, 34, 20 })
+		local anchor = freeSpotFallback(56, { 78, 56, 36, 22 })
 		if anchor then
 			makeHouse(anchor, faceCenter(anchor), "cabin")
-			placeNear(anchor, { 36, 42, 48, 30 }, 34, function(cand)
+			placeNear(anchor, { 48, 54, 60, 40 }, 46, function(cand)
 				makeHouse(cand, faceCenter(cand), "farm")
 			end)
-			placeNear(anchor, { 40, 46, 52, 34 }, 34, function(cand)
+			placeNear(anchor, { 56, 60, 66, 48 }, 50, function(cand)
 				makeBarn(cand, faceCenter(cand))
 			end)
 		end
 
 		-- Una casa mas lejos para variar el mapa
-		local farHouse = freeSpotFallback(46, { 70, 50, 32, 18 })
+		local farHouse = freeSpotFallback(52, { 72, 52, 34, 20 })
 		if farHouse then
 			makeHouse(farHouse, faceCenter(farHouse), rng:NextNumber(0, 1) &lt; 0.5 and "cabin" or "farm")
+		end
+
+		-- La ciudad suma una casa mas y su torre mirador
+		if theme == "ciudad" and anchor then
+			placeNear(anchor, { 64, 74, 50, 36 }, 48, function(cand)
+				makeHouse(cand, faceCenter(cand), "farm")
+			end)
+			local skySpot = freeSpotFallback(54, { 82, 60, 40, 24 })
+			if skySpot then
+				makeSkyTower(skySpot)
+			end
 		end
 
 		-- Baules sueltos por el mapa
@@ -1906,10 +2619,12 @@ local function buildArena(index, zone, cfg, parent, rng)
 			end
 		end
 
-		-- Torre mirador
-		local towerPos = freeSpotFallback(40, { 70, 48, 30, 18 })
-		if towerPos then
-			makeTower(towerPos)
+		-- Torre mirador de madera (en la ciudad la reemplaza la torre alta)
+		if theme ~= "ciudad" then
+			local towerPos = freeSpotFallback(44, { 70, 48, 30, 18 })
+			if towerPos then
+				makeTower(towerPos)
+			end
 		end
 	end
 
@@ -1945,7 +2660,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 	local sign = part({
 		Name = "LetreroZona",
 		Size = Vector3.new(1, 12, 22),
-		CFrame = CFrame.new(center + Vector3.new(0, 6, -half + 14)),
+		CFrame = CFrame.new(center + Vector3.new(0, 6, -half + 26)),
 		Color = Color3.fromRGB(42, 38, 34),
 		Material = Enum.Material.WoodPlanks,
 		CanCollide = true,
@@ -2547,7 +3262,9 @@ end
 -- Movimiento
 -- ===============================================================
 function KiwiController:groundY(pos)
-	local origin = Vector3.new(pos.X, pos.Y + 18, pos.Z)
+	-- Rayo corto justo arriba del kiwi: si mira desde muy arriba "engancha"
+	-- techos o pisos altos (casas de dos pisos) y se teletransporta arriba.
+	local origin = Vector3.new(pos.X, pos.Y + 2.2, pos.Z)
 	local result = workspace:Raycast(origin, Vector3.new(0, -70, 0), self.moveParams)
 	if result then
 		self.lastGroundY = result.Position.Y
@@ -3850,12 +4567,10 @@ end
 	Disparan un proyectil con empujon; recarga y usos los controla
 	Actions.fireWeapon en el servidor.
 ]]
-local function buildLootTool(parent, id)
+-- Cada arma de baul tiene SU propio modelo (arco, revolver, sniper y
+-- lanzamisiles no se parecen entre si).
+local function prepareLootTool(id)
 	local cfg = Config.Weapons[id]
-	if not cfg then
-		return nil
-	end
-
 	local tool = Instance.new("Tool")
 	tool.Name = cfg.name
 	tool.ToolTip = "Arma de baúl: usos limitados"
@@ -3864,34 +4579,214 @@ local function buildLootTool(parent, id)
 	tool:SetAttribute("ToolId", id)
 	tool:SetAttribute("Loot", true)
 	tool:SetAttribute("Uses", Config.Loot.uses)
-	tool.Grip = CFrame.new(0, -0.35, 0.5) * CFrame.Angles(math.rad(-90), 0, 0)
+	return tool
+end
 
+local function buildRevolverTool(id)
+	local tool = prepareLootTool(id)
+	tool.Grip = CFrame.new(0, -0.2, 0.4) * CFrame.Angles(math.rad(-90), 0, 0)
 	local handle = newHandle({
-		Size = Vector3.new(0.4, 0.7, 2.2),
-		Color = Color3.fromRGB(58, 58, 66),
+		Size = Vector3.new(0.26, 0.95, 0.5),
+		Color = Color3.fromRGB(122, 86, 58),
 		Material = Enum.Material.Wood,
 		Parent = tool,
 	})
-
 	weldPiece(handle, {
 		Name = "Canon",
 		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(2.4, 0.32, 0.32),
-		CFrame = handle.CFrame * CFrame.new(0, 0.24, -0.5) * CFrame.Angles(0, math.rad(90), 0),
+		Size = Vector3.new(1.7, 0.2, 0.2),
+		CFrame = handle.CFrame * CFrame.new(0, 0.45, -0.75) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(184, 186, 200),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Tambor",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.44, 0.56, 0.56),
+		CFrame = handle.CFrame * CFrame.new(0, 0.42, -0.32) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(150, 152, 166),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Martillo",
+		Size = Vector3.new(0.14, 0.42, 0.3),
+		CFrame = handle.CFrame * CFrame.new(0, 0.68, 0.24),
+		Color = Color3.fromRGB(120, 122, 132),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	return tool
+end
+
+local function buildBowTool(id)
+	local tool = prepareLootTool(id)
+	tool.Grip = CFrame.new(0, -0.45, 0.35) * CFrame.Angles(math.rad(-90), 0, 0)
+	local handle = newHandle({
+		Size = Vector3.new(0.26, 1.0, 0.34),
+		Color = Color3.fromRGB(126, 90, 58),
+		Material = Enum.Material.Wood,
+		Parent = tool,
+	})
+	local wood = Color3.fromRGB(146, 106, 66)
+	weldPiece(handle, {
+		Name = "LimbA1",
+		Size = Vector3.new(0.18, 1.5, 0.26),
+		CFrame = handle.CFrame * CFrame.new(0, 0.95, -0.12) * CFrame.Angles(math.rad(-14), 0, 0),
+		Color = wood, Material = Enum.Material.Wood, Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "LimbA2",
+		Size = Vector3.new(0.18, 1.4, 0.26),
+		CFrame = handle.CFrame * CFrame.new(0, 1.9, -0.55) * CFrame.Angles(math.rad(-34), 0, 0),
+		Color = wood, Material = Enum.Material.Wood, Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "LimbB1",
+		Size = Vector3.new(0.18, 1.5, 0.26),
+		CFrame = handle.CFrame * CFrame.new(0, -0.95, -0.12) * CFrame.Angles(math.rad(14), 0, 0),
+		Color = wood, Material = Enum.Material.Wood, Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "LimbB2",
+		Size = Vector3.new(0.18, 1.4, 0.26),
+		CFrame = handle.CFrame * CFrame.new(0, -1.9, -0.55) * CFrame.Angles(math.rad(34), 0, 0),
+		Color = wood, Material = Enum.Material.Wood, Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Cuerda",
+		Size = Vector3.new(0.07, 4.9, 0.07),
+		CFrame = handle.CFrame * CFrame.new(0, 0, -0.94),
+		Color = Color3.fromRGB(238, 238, 226),
+		Material = Enum.Material.Fabric,
+		Parent = tool,
+	})
+	return tool
+end
+
+local function buildSniperTool(id)
+	local tool = prepareLootTool(id)
+	tool.Grip = CFrame.new(0, -0.2, 0.5) * CFrame.Angles(math.rad(-90), 0, 0)
+	local handle = newHandle({
+		Size = Vector3.new(0.34, 0.55, 1.5),
+		Color = Color3.fromRGB(52, 58, 52),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Culata",
+		Size = Vector3.new(0.3, 0.85, 1.1),
+		CFrame = handle.CFrame * CFrame.new(0, -0.45, 1.15) * CFrame.Angles(math.rad(14), 0, 0),
+		Color = Color3.fromRGB(92, 66, 46),
+		Material = Enum.Material.Wood,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "CanonLargo",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(4.6, 0.2, 0.2),
+		CFrame = handle.CFrame * CFrame.new(0, 0.28, -2.0) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(44, 48, 46),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "MiraTelescopica",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(1.25, 0.44, 0.44),
+		CFrame = handle.CFrame * CFrame.new(0, 0.68, -0.55) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(28, 30, 32),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Lente",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.4, 0.4, 0.4),
+		CFrame = handle.CFrame * CFrame.new(0, 0.68, -1.2),
+		Color = Color3.fromRGB(120, 190, 220),
+		Material = Enum.Material.Neon,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Pata",
+		Size = Vector3.new(0.1, 0.9, 0.1),
+		CFrame = handle.CFrame * CFrame.new(-0.2, -0.45, -2.6) * CFrame.Angles(math.rad(14), 0, math.rad(16)),
+		Color = Color3.fromRGB(44, 48, 46), Material = Enum.Material.Metal, Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "PataB",
+		Size = Vector3.new(0.1, 0.9, 0.1),
+		CFrame = handle.CFrame * CFrame.new(0.2, -0.45, -2.6) * CFrame.Angles(math.rad(14), 0, math.rad(-16)),
+		Color = Color3.fromRGB(44, 48, 46), Material = Enum.Material.Metal, Parent = tool,
+	})
+	return tool
+end
+
+local function buildRocketTool(id)
+	local cfg = Config.Weapons[id]
+	local tool = prepareLootTool(id)
+	tool.Grip = CFrame.new(0, -0.75, 0.55) * CFrame.Angles(math.rad(-90), 0, 0)
+	local handle = newHandle({
+		Size = Vector3.new(0.34, 0.95, 0.7),
+		Color = Color3.fromRGB(60, 62, 56),
+		Material = Enum.Material.Plastic,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Tubo",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(4.6, 1.05, 1.05),
+		CFrame = handle.CFrame * CFrame.new(0, 0.9, -1.6) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(96, 106, 74),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Escapes",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.7, 1.25, 1.25),
+		CFrame = handle.CFrame * CFrame.new(0, 0.9, 0.75) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(48, 50, 46),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Cabeza",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.95, 0.95, 0.95),
+		CFrame = handle.CFrame * CFrame.new(0, 0.9, -4.1),
 		Color = cfg.color,
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
-
 	weldPiece(handle, {
-		Name = "Nucleo",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(0.7, 0.7, 0.7),
-		CFrame = handle.CFrame * CFrame.new(0.12, -0.5, 0.55),
-		Color = cfg.color,
-		Material = Enum.Material.Neon,
+		Name = "MiraCohete",
+		Size = Vector3.new(0.22, 0.6, 0.7),
+		CFrame = handle.CFrame * CFrame.new(0, 1.6, -0.9),
+		Color = Color3.fromRGB(58, 60, 64),
+		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
+	return tool
+end
+
+local function buildLootTool(parent, id)
+	if not Config.Weapons[id] then
+		return nil
+	end
+
+	local tool
+	if id == "revolver" then
+		tool = buildRevolverTool(id)
+	elseif id == "arco" then
+		tool = buildBowTool(id)
+	elseif id == "sniper" then
+		tool = buildSniperTool(id)
+	else
+		tool = buildRocketTool(id)
+	end
 
 	tool.Parent = parent
 	return tool
@@ -4430,13 +5325,13 @@ function Actions.fireWeapon(session, player, weaponId, data)
 	session:event("dartshot", { pos = muzzle, dir = dir })
 end
 
-function Actions.weaponHit(session, dart, pos)
+function Actions.weaponHit(session, dart, pos, victim)
 	local cfg = Config.Weapons[dart.weaponId]
 	if not cfg then
 		return
 	end
 
-	-- El kiwi queda atontado (o muy lento) si le da directo o cerca
+	-- El kiwi NO recibe daño: solo queda relentizado si le da cerca
 	local kiwi = session.kiwi
 	if kiwi and not kiwi.defeated then
 		local reach = math.max(cfg.blast or 0, 8)
@@ -4447,7 +5342,14 @@ function Actions.weaponHit(session, dart, pos)
 		end
 	end
 
-	-- Los cazadores cerca salen volando un poquito (tambien el que disparo)
+	local damage = cfg.damage or 0
+
+	-- Golpe directo: el cazador alcanzado se lleva el daño completo
+	if victim and victim ~= dart.player and damage &gt; 0 then
+		session:damagePlayer(victim, dart.player, cfg.name, damage, pos)
+	end
+
+	-- Onda expansiva: empuja a todos (tambien al que disparo) y hiere un poco
 	if (cfg.blast or 0) &gt; 0 then
 		for _, other in ipairs(session.players) do
 			local _, otherRoot = getRoot(other)
@@ -4457,6 +5359,10 @@ function Actions.weaponHit(session, dart, pos)
 				if distance &lt;= cfg.blast and distance &gt; 0.05 then
 					local push = away.Unit * (cfg.knockback or 30)
 					otherRoot.AssemblyLinearVelocity = Vector3.new(push.X, 24, push.Z)
+					if damage &gt; 0 and other ~= dart.player and other ~= victim then
+						local falloff = math.clamp(1 - (distance / cfg.blast) * 0.65, 0.35, 1)
+						session:damagePlayer(other, dart.player, cfg.name, damage * falloff, pos)
+					end
 				end
 			end
 		end
@@ -4498,7 +5404,9 @@ function Actions.stepProjectiles(session, dt)
 					session:notify(dart.player, Config.Text.SlowMiss, Color3.fromRGB(200, 200, 200))
 				end
 			elseif dart.kind == "weapon" then
-				Actions.weaponHit(session, dart, hit.Position)
+				local character = hit.Instance:FindFirstAncestorOfClass("Model")
+				local victim = character and Players:GetPlayerFromCharacter(character)
+				Actions.weaponHit(session, dart, hit.Position, victim)
 			else
 				local kiwi = session.kiwi
 				if kiwi and not kiwi.defeated and hit.Instance:IsDescendantOf(kiwi.model) then
@@ -4899,6 +5807,7 @@ return Actions
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
 
 local Shared = require(script.Parent.Shared)
 local Config = require(Shared.Config)
@@ -4927,6 +5836,28 @@ local COLOR = {
 	info = Color3.fromRGB(200, 214, 226),
 	fx = Color3.fromRGB(160, 200, 255),
 }
+
+-- ===============================================================
+-- Iluminacion (cambia segun el mapa y se restaura al salir)
+-- ===============================================================
+local function applyLighting(preset)
+	if not preset then
+		return
+	end
+	Lighting.Ambient = preset.ambient
+	Lighting.OutdoorAmbient = preset.outdoor
+	Lighting.Brightness = preset.brightness
+	Lighting.FogColor = preset.fog
+	Lighting.FogStart = preset.fogStart
+	Lighting.FogEnd = preset.fogEnd
+	Lighting.ClockTime = preset.clock
+end
+
+local function applyZoneLighting(arena)
+	local zone = arena and arena.zone
+	local preset = zone and Config.ZoneLight[zone.theme or "bosque"]
+	applyLighting(preset or Config.LightDefault)
+end
 
 -- ===============================================================
 -- Utilidades de jugador
@@ -5038,6 +5969,10 @@ function Session.new(modeId, rng)
 	self.hidden = {}
 	self.hideSpot = {}
 	self.isColosal = modeId == "colosal"
+	self.mapVote = {}
+	self.chosenMap = nil
+	self.voteDone = false
+	self.knocked = {}
 
 	if modeId == "multi" then
 		self.isMulti = true
@@ -5046,8 +5981,9 @@ function Session.new(modeId, rng)
 		self.tag = Config.Multiplayer.tag
 		self.color = Config.Multiplayer.color
 		self.timeLimit = Config.Multiplayer.timeLimit
-		self.phase = "waiting"
-		self.phaseEnds = os.clock() + Config.Multiplayer.waitTime
+		-- La espera inicial es la votacion de mapa: votan todos y arranca.
+		self.phase = "vote"
+		self.phaseEnds = os.clock() + Config.Vote.multiTime
 	else
 		self.isMulti = false
 		self.diff = Config.Difficulties[modeId] or Config.Difficulties.normal
@@ -5055,10 +5991,9 @@ function Session.new(modeId, rng)
 		self.tag = self.diff.tag
 		self.color = self.diff.color
 		self.timeLimit = self.diff.round.timeLimit
-		-- Arranca en "waiting" pero con el tiempo ya cumplido: el paso
-		-- siguiente le asigna arena y empieza la cuenta regresiva.
-		self.phase = "waiting"
-		self.phaseEnds = os.clock()
+		-- Modo solo: elige el mapa el jugador y arranca enseguida.
+		self.phase = "vote"
+		self.phaseEnds = os.clock() + Config.Vote.soloTime
 	end
 
 	return self
@@ -5180,7 +6115,10 @@ function Session:giantCatch(player)
 		self.eaten[player] = nil
 		if self.stats[player] then
 			setFrozen(player, false)
-			self:removePlayer(player)
+			self:removePlayer(player, true)
+			-- De vuelta al lobby con el menu a la vista: asi elige otro modo facil
+			Net.get("SessionUpdate"):FireClient(player, { active = false })
+			Net.get("Notify"):FireClient(player, Config.Text.EatenMenu, Util.colorToTable(COLOR.info), 5)
 		end
 	end)
 end
@@ -5207,6 +6145,72 @@ function Session:trapCatch(bait)
 	end
 end
 
+-- ---------------- daño entre cazadores ----------------
+-- Las armas de baul hieren a los jugadores. Al kiwi SOLO lo relentizan.
+function Session:damagePlayer(victim, attacker, weaponName, amount, pos)
+	if not self.stats[victim] or self.phase ~= "playing" then
+		return
+	end
+	if self.knocked[victim] then
+		return
+	end
+
+	local data = self.stats[victim]
+	amount = math.max(1, math.floor(amount + 0.5))
+	data.hp = math.max(0, (data.hp or Config.Player.maxHealth) - amount)
+	data.lastHurt = os.clock()
+
+	local attackerName = "el mapa"
+	if attacker and attacker ~= victim then
+		attackerName = attacker.DisplayName ~= "" and attacker.DisplayName or attacker.Name
+	end
+	self:notify(victim, string.format(Config.Text.HurtMsg, attackerName, weaponName, amount), COLOR.bad, 3)
+	self:event("hurt", { pos = pos, userId = victim.UserId, amount = amount })
+	self:sendUpdate(victim)
+
+	if data.hp &lt;= 0 then
+		self:knockout(victim, attacker)
+	end
+end
+
+function Session:knockout(victim, attacker)
+	if self.knocked[victim] or not self.stats[victim] then
+		return
+	end
+	self.knocked[victim] = true
+
+	local vname = victim.DisplayName ~= "" and victim.DisplayName or victim.Name
+	local aname = "la reserva"
+	if attacker and attacker ~= victim then
+		aname = attacker.DisplayName ~= "" and attacker.DisplayName or attacker.Name
+	end
+	self:notifyAll(string.format(Config.Text.KoedAll, aname, vname), COLOR.warn, 5)
+	self:event("ko", { userId = victim.UserId })
+	setFrozen(victim, true)
+
+	task.delay(Config.Round.KoHold, function()
+		self.knocked[victim] = nil
+		if self.stats[victim] then
+			setFrozen(victim, false)
+			self:removePlayer(victim, true)
+			-- Igual que cuando te come el kiwi: al lobby con el menu listo
+			Net.get("SessionUpdate"):FireClient(victim, { active = false })
+			Net.get("Notify"):FireClient(victim, Config.Text.KoMenu, Util.colorToTable(COLOR.info), 5)
+		end
+	end)
+end
+
+function Session:stepHealth(dt)
+	local max = Config.Player.maxHealth
+	local now = os.clock()
+	for _, player in ipairs(self.players) do
+		local data = self.stats[player]
+		if data and data.hp and data.hp &lt; max and now - (data.lastHurt or 0) &gt;= Config.Player.regenDelay then
+			data.hp = math.min(max, data.hp + Config.Player.regen * dt)
+		end
+	end
+end
+
 -- ---------------- jugadores ----------------
 function Session:isFull()
 	if not self.isMulti then
@@ -5220,18 +6224,22 @@ function Session:addPlayer(player)
 		return
 	end
 
-	self.stats[player] = { caught = 0 }
+	self.stats[player] = { caught = 0, hp = Config.Player.maxHealth }
 	table.insert(self.players, player)
 	playerSession[player] = self
 	ToolService.reset(player)
 
-	if self.phase == "waiting" then
-		local seconds = math.floor(self.phaseEnds - os.clock())
-		if seconds &gt; 1 then
-			self:notify(player, string.format("Entraste a la partida. Comienza en %d s", seconds), COLOR.good)
+	if self.phase == "vote" then
+		if self.voteDone then
+			self:notify(player, "Entraste a la partida. Está por comenzar...", COLOR.good, 5)
 		else
-			self:notify(player, "Preparando la reserva...", COLOR.good)
+			self:notify(player, "Entraste a la partida. Vota el mapa para arrancar.", COLOR.good, 6)
 		end
+	elseif self.phase == "countdown" then
+		local seconds = math.floor(self.phaseEnds - os.clock())
+		self:notify(player, string.format("Entraste a la partida. Comienza en %d s", math.max(0, seconds)), COLOR.good)
+		self:teleportToArena(player)
+		self:giveTools(player)
 	elseif self.phase ~= "ended" then
 		self:teleportToArena(player)
 		self:giveTools(player)
@@ -5293,6 +6301,11 @@ function Session:removePlayer(player, silent)
 			self:endRound(nil, "timeout")
 		end
 	end
+
+	-- Votacion: si se fue un jugador y ya votaron todos, arranca la partida
+	if self.phase == "vote" and not self.voteDone and #self.players &gt; 0 and self:allVoted() then
+		self:pickVoteWinner()
+	end
 end
 
 function Session:prunePlayers()
@@ -5304,17 +6317,104 @@ function Session:prunePlayers()
 	end
 end
 
+-- ---------------- votacion de mapa ----------------
+local function zoneById(id)
+	for _, zone in ipairs(Config.Zones) do
+		if zone.id == id then
+			return zone
+		end
+	end
+	return nil
+end
+
+function Session:allVoted()
+	if #self.players == 0 then
+		return false
+	end
+	for _, player in ipairs(self.players) do
+		if not self.mapVote[player] then
+			return false
+		end
+	end
+	return true
+end
+
+function Session:castVote(player, mapId)
+	if self.phase ~= "vote" or self.voteDone or not self.stats[player] then
+		return
+	end
+	if mapId ~= "random" and not zoneById(mapId) then
+		return
+	end
+	self.mapVote[player] = mapId
+	self:sendUpdate(player)
+	if self:allVoted() then
+		self:pickVoteWinner()
+	end
+end
+
+function Session:pickVoteWinner()
+	if self.voteDone then
+		return
+	end
+	self.voteDone = true
+
+	local counts = {}
+	local leader, leaderCount = nil, 0
+	for _, player in ipairs(self.players) do
+		local pick = self.mapVote[player]
+		if pick then
+			counts[pick] = (counts[pick] or 0) + 1
+			if counts[pick] &gt; leaderCount then
+				leader, leaderCount = pick, counts[pick]
+			end
+		end
+	end
+
+	-- Empate: se decide al azar entre los mas votados
+	if leader then
+		local top = {}
+		for id, count in pairs(counts) do
+			if count == leaderCount then
+				table.insert(top, id)
+			end
+		end
+		leader = top[self.rng:NextInteger(1, #top)]
+	end
+
+	local zone = zoneById(leader)
+	if not zone then
+		zone = Config.Zones[self.rng:NextInteger(1, #Config.Zones)]
+	end
+
+	self.chosenMap = zone.id
+	self.phaseEnds = os.clock() + Config.Vote.revealTime
+	self:notifyAll(string.format(Config.Text.MapPickNotify, zone.name), COLOR.good, 4)
+	self:sendUpdates(true)
+end
+
 -- ---------------- arenas ----------------
-function Session:allocateArena()
+function Session:allocateArena(mapId)
 	if self.arena then
 		return true
 	end
+	local fallback
 	for _, arena in ipairs(world.arenas) do
 		if not arena.busy then
-			arena.busy = true
-			self.arena = arena
-			return true
+			if not fallback then
+				fallback = arena
+			end
+			if not mapId or arena.mapId == mapId then
+				arena.busy = true
+				self.arena = arena
+				return true
+			end
 		end
+	end
+	if fallback then
+		fallback.busy = true
+		self.arena = fallback
+		return true
 	end
 	return false
 end
@@ -5373,6 +6473,7 @@ function Session:startPlaying()
 	self.phase = "playing"
 	self.startedAt = os.clock()
 	self.safeAttract = 0
+	applyZoneLighting(self.arena)
 	local enterList = self.arena and self.arena.enterList
 	if enterList then
 		for _, spot in ipairs(enterList) do
@@ -5547,7 +6648,7 @@ end
 function Session:remainingSeconds()
 	if self.phase == "playing" then
 		return math.max(0, self.startedAt + self.timeLimit - os.clock())
-	elseif self.phase == "waiting" or self.phase == "countdown" or self.phase == "ended" then
+	elseif self.phase == "vote" or self.phase == "countdown" or self.phase == "ended" then
 		return math.max(0, self.phaseEnds - os.clock())
 	end
 	return 0
@@ -5558,6 +6659,7 @@ function Session:finish()
 		return
 	end
 	self.finished = true
+	applyLighting(Config.LightDefault)
 
 	if self.kiwi then
 		self.kiwi:destroy()
@@ -5977,13 +7079,20 @@ function Session:step(dt)
 		return
 	end
 
-	if self.phase == "waiting" then
-		if now &gt;= self.phaseEnds then
-			if not self:allocateArena() then
-				self.phaseEnds = now + 8
-				self:notifyAll(Config.Text.NoArena, COLOR.warn, 5)
-			else
+	if self.phase == "vote" then
+		if not self.voteDone then
+			if self:allVoted() or now &gt;= self.phaseEnds then
+				self:pickVoteWinner()
+			end
+		elseif now &gt;= self.phaseEnds then
+			if self:allocateArena(self.chosenMap) then
+				if self.chosenMap and self.arena.mapId ~= self.chosenMap then
+					self:notifyAll(string.format(Config.Text.MapFallback, self.arena.name), COLOR.warn, 5)
+				end
 				self:startCountdown()
+			else
+				self.phaseEnds = now + 6
+				self:notifyAll(Config.Text.NoArena, COLOR.warn, 5)
 			end
 		end
 	elseif self.phase == "countdown" then
@@ -5995,6 +7104,7 @@ function Session:step(dt)
 			self:notifyAll("¡Se acabó el tiempo!", COLOR.bad)
 			self:endRound(nil, "timeout")
 		else
+			self:stepHealth(dt)
 			if self.isColosal then
 				self:stepSafeZone(dt)
 			end
@@ -6031,7 +7141,15 @@ function Session:sendUpdate(player)
 	local quota = self.isMulti and 1 or self.diff.round.quota
 	local objective
 	local progressText
-	if self.isMulti then
+	if self.phase == "vote" then
+		if self.isMulti then
+			objective = "¡Voten el mapa de la partida!"
+		else
+			objective = "¡Elige el mapa de la partida!"
+		end
+		progressText = self.voteDone and "¡Arrancando!" or string.format("Votación: %d s",
+			math.max(0, math.ceil(self.phaseEnds - os.clock())))
+	elseif self.isMulti then
 		objective = "Sobrevive al kiwi gigante: gana el último en pie"
 		local kiwi = self.kiwi
 		local root = getRoot(player)
@@ -6074,6 +7192,17 @@ function Session:sendUpdate(player)
 		progressText = "Escondido: pulsa E para salir"
 	end
 
+	local voteCounts = nil
+	if self.phase == "vote" then
+		voteCounts = {}
+		for _, other in ipairs(self.players) do
+			local pick = self.mapVote[other]
+			if pick then
+				voteCounts[pick] = (voteCounts[pick] or 0) + 1
+			end
+		end
+	end
+
 	local ranking = {}
 	for _, other in ipairs(self.players) do
 		local otherStats = self.stats[other]
@@ -6106,7 +7235,17 @@ function Session:sendUpdate(player)
 		players = ranking,
 		playerCount = #self.players,
 		isMulti = self.isMulti,
-		waiting = self.isMulti and self.phase == "waiting",
+		waiting = self.phase == "vote",
+		vote = self.phase == "vote" and {
+			done = self.voteDone or false,
+			chosen = self.chosenMap,
+			mine = self.mapVote[player],
+			total = #self.players,
+			left = math.max(0, math.ceil(self.phaseEnds - os.clock())),
+			counts = voteCounts,
+		} or nil,
+		hp = math.floor(data.hp or Config.Player.maxHealth),
+		maxHp = Config.Player.maxHealth,
 		progressText = progressText,
 		hidden = self.hidden[player] == true or nil,
 		hideSpot = self.hideSpot[player] or nil,
@@ -6166,6 +7305,13 @@ function GameManager.init()
 			session:sendUpdate(player)
 		else
 			Net.get("SessionUpdate"):FireClient(player, { active = false })
+		end
+	end)
+
+	Net.get("VoteMap").OnServerEvent:Connect(function(player, mapId)
+		local session = playerSession[player]
+		if session and type(mapId) == "string" then
+			session:castVote(player, mapId)
 		end
 	end)
 
@@ -6318,7 +7464,7 @@ function GameManager.requestLeave(player)
 	if not session then
 		return
 	end
-	session:removePlayer(player)
+	session:removePlayer(player, true)
 	Net.get("SessionUpdate"):FireClient(player, { active = false })
 end
 
@@ -6615,7 +7761,8 @@ local function setScope(enabled)
 
 	local camera = workspace.CurrentCamera
 	if camera then
-		local goal = scoped and Config.Scope.fov or 70
+		local zoom = (Config.Scope.weapons and Config.Scope.weapons[equippedId]) or Config.Scope.fov
+		local goal = scoped and zoom or 70
 		TweenService:Create(camera, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			FieldOfView = goal,
 		}):Play()
@@ -6642,7 +7789,7 @@ local function refreshEquipped()
 	end
 	equippedId = found
 	if equippedId ~= "rifle" and equippedId ~= "pintura" and equippedId ~= "relente"
-		and equippedId ~= "revolver" and equippedId ~= "arco" then
+		and equippedId ~= "revolver" and equippedId ~= "arco" and equippedId ~= "sniper" then
 		setScope(false)
 	end
 	setWeaponHidden(scoped)
@@ -6771,7 +7918,8 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		-- Clic derecho: mira (rifle tranquilizante y rifle de pintura)
 		if (equippedId == "rifle" or equippedId == "pintura" or equippedId == "relente"
-			or equippedId == "revolver" or equippedId == "arco") and state.active and state.phase == "playing" then
+			or equippedId == "revolver" or equippedId == "arco" or equippedId == "sniper")
+			and state.active and state.phase == "playing" then
 			setScope(not scoped)
 		end
 		return
@@ -6815,6 +7963,7 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 		sneaking = false
 		setScope(false)
 		HUD.hideResult()
+		HUD.hideVote()
 		HUD.setMenuVisible(true)
 		HUD.setMenuStatus("")
 		HUD.fade(false, 0.5)
@@ -6828,6 +7977,11 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 	state.diff = diffFor(newState.modeId)
 	state.hidden = newState.hidden == true
 	state.hideSpot = newState.hideSpot
+	if newState.vote then
+		HUD.showVote(newState.vote)
+	else
+		HUD.hideVote()
+	end
 	applyCameraMode()
 	if state.hidden ~= hiddenNow then
 		hiddenNow = state.hidden
@@ -6846,7 +8000,10 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 	HUD.setMenuStatus("")
 
 	if not wasActive or previousPhase ~= newState.phase then
-		if newState.phase == "countdown" then
+		if newState.phase == "vote" then
+			HUD.hideResult()
+			HUD.fade(false, 0.4)
+		elseif newState.phase == "countdown" then
 			HUD.hideResult()
 			HUD.fade(true, 0.25)
 			task.delay(0.6, function()
@@ -7079,6 +8236,23 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 				end
 			end)
 		end
+	elseif kind == "hurt" then
+		if data.userId == player.UserId then
+			HUD.hurt(data.amount)
+			sound2D(Config.Sounds.paintHit, 0.5, 0.8)
+		elseif position and distanceToLocal(position) &lt; 60 then
+			soundAt(Config.Sounds.dartHit, position, 0.35, 1.4)
+		end
+	elseif kind == "ko" then
+		if position then
+			burst(position, Color3.fromRGB(232, 108, 100), 30)
+		end
+		if data.userId == player.UserId then
+			setScope(false)
+			firstPerson = false
+			sound2D(Config.Sounds.lose, 0.8)
+			HUD.death("¡TE NOQUEARON!", "Vuelves al lobby...")
+		end
 	end
 end)
 
@@ -7088,8 +8262,12 @@ end)
 HUD.init(player:WaitForChild("PlayerGui"), {
 	onJoin = function(modeId)
 		sound2D(Config.Sounds.ui, 0.6)
-		HUD.setMenuStatus("Buscando una arena libre...", Color3.fromRGB(238, 196, 92))
+		HUD.setMenuStatus("Entrando a la partida...", Color3.fromRGB(238, 196, 92))
 		remotes.RequestJoin:FireServer(modeId)
+	end,
+	onVote = function(mapId)
+		sound2D(Config.Sounds.ui, 0.5)
+		remotes.VoteMap:FireServer(mapId)
 	end,
 	onLeave = function()
 		sound2D(Config.Sounds.ui, 0.5)
@@ -7469,6 +8647,36 @@ local function buildSessionHud(parent)
 		Text = "",
 	}, top)
 	parts.arenaLabel = arenaLabel
+
+	-- Vida del cazador (las armas de baul de los baules hacen daño)
+	local hpBack = new("Frame", {
+		Name = "Vida",
+		Position = UDim2.new(0, 16, 0, 52),
+		Size = UDim2.new(0, 240, 0, 10),
+		BackgroundColor3 = Color3.fromRGB(52, 58, 66),
+		BackgroundTransparency = 0.25,
+		BorderSizePixel = 0,
+	}, top)
+	corner(5, hpBack)
+	local hpFill = new("Frame", {
+		Name = "Relleno",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.fromRGB(102, 209, 130),
+		BorderSizePixel = 0,
+	}, hpBack)
+	corner(5, hpFill)
+	parts.hpFill = hpFill
+	parts.hpText = new("TextLabel", {
+		Name = "VidaTexto",
+		Position = UDim2.new(0, 264, 0, 47),
+		Size = UDim2.new(0, 60, 0, 16),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = COLOR.muted,
+		Text = "100",
+	}, top)
 
 	local objective = new("TextLabel", {
 		Name = "Objetivo",
@@ -7920,6 +9128,214 @@ local function buildResult(parent)
 end
 
 -- ===============================================================
+-- VOTACION DE MAPA
+-- ===============================================================
+local function buildVote(parent)
+	local vote = new("Frame", {
+		Name = "Voto",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.52),
+		Size = UDim2.new(0, 720, 0, 500),
+		BackgroundColor3 = COLOR.panel,
+		BackgroundTransparency = 0.06,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 30,
+	}, parent)
+	corner(18, vote)
+	stroke(COLOR.accent, 1.5, 0.4, vote)
+	padding(20, vote)
+	parts.votePanel = vote
+
+	parts.voteTitle = new("TextLabel", {
+		Name = "Titulo",
+		Size = UDim2.new(1, 0, 0, 34),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBlack,
+		TextScaled = true,
+		TextColor3 = COLOR.text,
+		Text = "¡ELIGE EL MAPA!",
+		ZIndex = 31,
+	}, vote)
+
+	parts.voteStatus = new("TextLabel", {
+		Name = "Estado",
+		Position = UDim2.new(0, 0, 0, 38),
+		Size = UDim2.new(1, 0, 0, 20),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 14,
+		TextColor3 = COLOR.accent,
+		Text = "",
+		ZIndex = 31,
+	}, vote)
+
+	local grid = new("Frame", {
+		Name = "Mapas",
+		Position = UDim2.new(0, 0, 0, 66),
+		Size = UDim2.new(1, 0, 1, -116),
+		BackgroundTransparency = 1,
+		ZIndex = 31,
+	}, vote)
+	new("UIGridLayout", {
+		CellSize = UDim2.new(0.485, 0, 0, 116),
+		CellPadding = UDim2.new(0.03, 0, 0, 10),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, grid)
+
+	parts.voteButtons = {}
+	for index, zone in ipairs(Config.Zones) do
+		local button = new("TextButton", {
+			Name = zone.id,
+			LayoutOrder = index,
+			BackgroundColor3 = COLOR.panelSoft,
+			BackgroundTransparency = 0.05,
+			BorderSizePixel = 0,
+			AutoButtonColor = false,
+			Text = "",
+			ZIndex = 32,
+		}, grid)
+		corner(12, button)
+		local border = stroke(zone.grass, 1.5, 0.4, button)
+
+		new("TextLabel", {
+			Name = "Nombre",
+			Position = UDim2.new(0, 14, 0, 8),
+			Size = UDim2.new(1, -78, 0, 22),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamBold,
+			TextSize = 17,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextColor3 = zone.grass,
+			Text = zone.name,
+			ZIndex = 33,
+		}, button)
+
+		new("TextLabel", {
+			Name = "Pista",
+			Position = UDim2.new(0, 14, 0, 32),
+			Size = UDim2.new(1, -78, 0, 34),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.Gotham,
+			TextSize = 13,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			TextColor3 = COLOR.muted,
+			Text = zone.hint or "",
+			ZIndex = 33,
+		}, button)
+
+		local votes = new("TextLabel", {
+			Name = "Votos",
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -12, 0, 6),
+			Size = UDim2.new(0, 56, 0, 32),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamBlack,
+			TextSize = 26,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			TextColor3 = COLOR.text,
+			Text = "0",
+			ZIndex = 33,
+		}, button)
+
+		local mine = new("TextLabel", {
+			Name = "Mio",
+			Position = UDim2.new(0, 14, 1, -26),
+			Size = UDim2.new(1, -28, 0, 18),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamBold,
+			TextSize = 12,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextColor3 = COLOR.accent,
+			Text = "",
+			ZIndex = 33,
+		}, button)
+
+		button.MouseButton1Click:Connect(function()
+			if callbacks.onVote then
+				callbacks.onVote(zone.id)
+			end
+		end)
+		button.MouseEnter:Connect(function()
+			TweenService:Create(button, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(40, 46, 54) }):Play()
+		end)
+		button.MouseLeave:Connect(function()
+			TweenService:Create(button, TweenInfo.new(0.15), { BackgroundColor3 = COLOR.panelSoft }):Play()
+		end)
+
+		parts.voteButtons[zone.id] = { button = button, border = border, votes = votes, mine = mine }
+	end
+
+	local randomBtn = new("TextButton", {
+		Name = "AlAzar",
+		Position = UDim2.new(0, 0, 1, -44),
+		Size = UDim2.new(1, 0, 0, 34),
+		BackgroundColor3 = Color3.fromRGB(44, 48, 56),
+		BorderSizePixel = 0,
+		AutoButtonColor = true,
+		Font = Enum.Font.GothamBold,
+		TextSize = 14,
+		TextColor3 = COLOR.muted,
+		Text = "AL AZAR (que lo elija el juego)",
+		ZIndex = 32,
+	}, vote)
+	corner(10, randomBtn)
+	randomBtn.MouseButton1Click:Connect(function()
+		if callbacks.onVote then
+			callbacks.onVote("random")
+		end
+	end)
+	parts.voteRandom = randomBtn
+end
+
+function HUD.showVote(vote)
+	if not parts.votePanel then
+		return
+	end
+	parts.votePanel.Visible = true
+
+	local chosenName = nil
+	for _, zone in ipairs(Config.Zones) do
+		if zone.id == (vote.chosen or "") then
+			chosenName = zone.name
+		end
+	end
+	if vote.done then
+		parts.voteTitle.Text = chosenName and ("MAPA: " .. string.upper(chosenName)) or "¡MAPA ELEGIDO!"
+		parts.voteStatus.Text = "¡Arrancando!"
+	else
+		parts.voteTitle.Text = (vote.total or 1) &gt; 1 and "¡VOTEN EL MAPA!" or "¡ELIGE EL MAPA!"
+		parts.voteStatus.Text = string.format("Tiempo: %d s  ·  El mapa más votado gana", vote.left or 0)
+	end
+
+	for _, zone in ipairs(Config.Zones) do
+		local chip = parts.voteButtons[zone.id]
+		if chip then
+			local mine = vote.mine == zone.id
+			chip.votes.Text = tostring((vote.counts and vote.counts[zone.id]) or 0)
+			chip.mine.Text = mine and "TU ELECCIÓN" or ""
+			chip.border.Color = mine and COLOR.accent or zone.grass
+			chip.border.Transparency = mine and 0.05 or 0.45
+			if vote.done then
+				chip.button.BackgroundColor3 = (vote.chosen == zone.id) and Color3.fromRGB(46, 62, 50) or COLOR.panelSoft
+			end
+		end
+	end
+	if parts.voteRandom then
+		parts.voteRandom.Visible = not vote.done
+		parts.voteRandom.TextColor3 = (vote.mine == "random") and COLOR.accent or COLOR.muted
+	end
+end
+
+function HUD.hideVote()
+	if parts.votePanel then
+		parts.votePanel.Visible = false
+	end
+end
+
+-- ===============================================================
 -- API
 -- ===============================================================
 function HUD.init(playerGui, handlers)
@@ -7941,6 +9357,17 @@ function HUD.init(playerGui, handlers)
 	buildNotices(screen)
 	buildResult(screen)
 	buildScope(screen)
+	buildVote(screen)
+
+	local hurt = new("Frame", {
+		Name = "Dolor",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.fromRGB(160, 24, 24),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ZIndex = 38,
+	}, screen)
+	parts.hurt = hurt
 
 	local fade = new("Frame", {
 		Name = "Fade",
@@ -7964,7 +9391,31 @@ function HUD.setMenuVisible(visible)
 	end
 	if visible then
 		HUD.clearTracker()
+		HUD.hideVote()
 	end
+end
+
+function HUD.setHealth(hp, maxHp)
+	maxHp = maxHp or 100
+	local ratio = math.clamp((hp or maxHp) / maxHp, 0, 1)
+	if parts.hpFill then
+		parts.hpFill.Size = UDim2.fromScale(ratio, 1)
+		parts.hpFill.BackgroundColor3 = ratio &gt; 0.55 and Color3.fromRGB(102, 209, 130)
+			or (ratio &gt; 0.25 and Color3.fromRGB(238, 196, 92) or Color3.fromRGB(232, 108, 100))
+	end
+	if parts.hpText then
+		parts.hpText.Text = tostring(math.floor(hp or maxHp))
+	end
+end
+
+function HUD.hurt()
+	if not parts.hurt then
+		return
+	end
+	parts.hurt.BackgroundTransparency = 0.55
+	TweenService:Create(parts.hurt, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 1,
+	}):Play()
 end
 
 function HUD.setMenuStatus(text, color)
@@ -8026,6 +9477,7 @@ function HUD.updateState(state)
 	end
 
 	HUD.setMenuVisible(false)
+	HUD.setHealth(state.hp, state.maxHp)
 
 	local accent = Util.colorFromTable(state.modeColor)
 	if parts.modeLabel then
@@ -8033,8 +9485,9 @@ function HUD.updateState(state)
 		parts.modeLabel.TextColor3 = accent
 	end
 	if parts.arenaLabel then
-		if state.waiting then
-			parts.arenaLabel.Text = string.format("Esperando jugadores... (%d)", state.playerCount or 1)
+		if state.vote then
+			parts.arenaLabel.Text = state.vote.done and "Mapa listo"
+				or string.format("Votación de mapa (%d jugadores)", state.playerCount or 1)
 		else
 			parts.arenaLabel.Text = "Reserva: " .. (state.arenaName or "?")
 		end
@@ -8068,8 +9521,8 @@ function HUD.updateState(state)
 	end
 
 	if parts.progress then
-		if state.phase == "waiting" then
-			parts.progress.Text = "Preparando la cacería"
+		if state.phase == "vote" then
+			parts.progress.Text = state.progressText or "Elige el mapa"
 		elseif state.phase == "countdown" then
 			parts.progress.Text = "Preparados..."
 		elseif state.progressText then

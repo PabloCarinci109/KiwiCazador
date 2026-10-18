@@ -294,13 +294,13 @@ function Actions.fireWeapon(session, player, weaponId, data)
 	session:event("dartshot", { pos = muzzle, dir = dir })
 end
 
-function Actions.weaponHit(session, dart, pos)
+function Actions.weaponHit(session, dart, pos, victim)
 	local cfg = Config.Weapons[dart.weaponId]
 	if not cfg then
 		return
 	end
 
-	-- El kiwi queda atontado (o muy lento) si le da directo o cerca
+	-- El kiwi NO recibe daño: solo queda relentizado si le da cerca
 	local kiwi = session.kiwi
 	if kiwi and not kiwi.defeated then
 		local reach = math.max(cfg.blast or 0, 8)
@@ -311,7 +311,14 @@ function Actions.weaponHit(session, dart, pos)
 		end
 	end
 
-	-- Los cazadores cerca salen volando un poquito (tambien el que disparo)
+	local damage = cfg.damage or 0
+
+	-- Golpe directo: el cazador alcanzado se lleva el daño completo
+	if victim and victim ~= dart.player and damage > 0 then
+		session:damagePlayer(victim, dart.player, cfg.name, damage, pos)
+	end
+
+	-- Onda expansiva: empuja a todos (tambien al que disparo) y hiere un poco
 	if (cfg.blast or 0) > 0 then
 		for _, other in ipairs(session.players) do
 			local _, otherRoot = getRoot(other)
@@ -321,6 +328,10 @@ function Actions.weaponHit(session, dart, pos)
 				if distance <= cfg.blast and distance > 0.05 then
 					local push = away.Unit * (cfg.knockback or 30)
 					otherRoot.AssemblyLinearVelocity = Vector3.new(push.X, 24, push.Z)
+					if damage > 0 and other ~= dart.player and other ~= victim then
+						local falloff = math.clamp(1 - (distance / cfg.blast) * 0.65, 0.35, 1)
+						session:damagePlayer(other, dart.player, cfg.name, damage * falloff, pos)
+					end
 				end
 			end
 		end
@@ -362,7 +373,9 @@ function Actions.stepProjectiles(session, dt)
 					session:notify(dart.player, Config.Text.SlowMiss, Color3.fromRGB(200, 200, 200))
 				end
 			elseif dart.kind == "weapon" then
-				Actions.weaponHit(session, dart, hit.Position)
+				local character = hit.Instance:FindFirstAncestorOfClass("Model")
+				local victim = character and Players:GetPlayerFromCharacter(character)
+				Actions.weaponHit(session, dart, hit.Position, victim)
 			else
 				local kiwi = session.kiwi
 				if kiwi and not kiwi.defeated and hit.Instance:IsDescendantOf(kiwi.model) then

@@ -24,6 +24,21 @@ En los modos de un jugador hay que atrapar **3 kiwis** antes de que se acabe el 
 El juego corre hasta **5 partidas a la vez** (una por arena); si todas están ocupadas, aparece
 un aviso y puedes intentarlo de nuevo en unos segundos.
 
+### Mapas y votación (nuevo en 1.3.0)
+
+- Al elegir un modo **se vota el mapa**: 5 lugares inspirados en Nueva Zelanda —
+  **Bosque de Kauri**, **Dunas de Te Paki**, **Ciudad de Auckland**, **Costa de Totara** y
+  **Alpes del Sur** — más la opción **AL AZAR**. Con un solo jugador elige igual; si hay varios,
+  gana el más votado (empate se decide al azar) y todos ven el resultado en el HUD.
+- Cada mapa se construye distinto: **tema, materiales, props e iluminación propios**. Dunas con
+  **cactus y médanos**, Costa con **palmeras**, Alpes con **pinos nevados**, Ciudad con
+  **postes de luz, bancos y la Sky Tower**. La **hora, la niebla y la luz** cambian en cada mapa.
+- **No se puede salir del mapa:** la Ciudad cierra con **murallones de edificio** (fachadas con
+  ventanas, cornisas, torres en las esquinas y skyline de fondo); las zonas de naturaleza y dunas
+  cierran con **montañas de roca** alrededor (y el Bosque suma una línea de **kauris gigantes**).
+- Las **casas ahora son de dos pisos** (con escalera, planta alta decorada y un **baúl extra**
+  arriba) y el granero tiene **silos** de metal al lado. Se puede subir a mirar el mapa desde arriba.
+
 ---
 
 ## Cómo se juega
@@ -67,7 +82,7 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
   **mira**. Sus agujas **no duermen** al gigante: lo dejan **lento 8 segundos** con un tinte frío,
   ojos celestes y un cartel **"¡RALENTIZADO!"** que se ve entre paredes. Tu ventana para escapar.
 
-### Escondites y baúles (nuevo en 1.2.0)
+### Escondites y baúles (1.2.0, ampliados en 1.3.0)
 
 - **Casas de verdad:** cada arena tiene una **aldea** con casa, casona y **granero**, con **interiores completos**:
   mesa, sillas, cama, estantes, cajas... y **escondites adentro**: **armario** (la puerta se abre),
@@ -81,10 +96,16 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
   enfrente y **husmea 3,2 segundos** (cabeceo, sonidos y partículas). Si te quedas, **te encuentra y te
   come**. Si **sales a mitad**, te llevas **+3 monedas de escape**... pero el kiwi te persigue
   **al instante**. Ese es el momento "casi" del escondite. El mismo sitio no lo vuelve a husmear ~35 s.
-- **Baúles de armas:** cada baúl da **un arma aleatoria con 3 usos**: **Lanzamisiles** 💥 (explosión con
-  empujón y aturdimiento en área), **Revólver** 🔫 (tiro rápido) y **Arco y flecha** 🏹 (silencioso,
-  frena al kiwi más tiempo). Solo puedes llevar **un arma de baúl a la vez** (abrir otro baúl la cambia),
-  aparece en tu mochila con su **tecla automática** y los baúles **se recargan cada ronda**.
+- **Baúles de armas (4 armas, modelos distintos):** cada baúl da **un arma aleatoria con 3 usos**:
+  **Lanzamisiles** 💥 (tubo RPG, explosión en área), **Revólver** 🔫 (tiro rápido), **Arco y flecha** 🏹
+  (arco real con cuerda, silencioso) y **Rifle francotirador** 🎯 (mira telescópica, el más dañino).
+  Solo puedes llevar **un arma de baúl a la vez** (abrir otro baúl la cambia), aparece en tu mochila
+  con su **tecla automática** y los baúles **se recargan cada ronda**.
+- **Duelo entre cazadores (nuevo en 1.3.0):** todos los jugadores tienen **100 de vida** con
+  **regeneración** (4/s tras 6 s sin recibir golpes). Las armas de baúl ahora **hacen daño a otros
+  jugadores**: cohete **40** (en área, con empujón), revólver **20**, arco **26**, francotirador **48**.
+  Si te quedas sin vida quedas **KO** y vuelves al menú de modos. **Al kiwi las armas no le hacen daño:
+  solo lo frenan** (y el lanzamisiles lo empuja), perfecto para escapar o ganar la zona segura.
 - Las armas de baúl **empujan a los jugadores** (también a ti si disparas de muy cerca) y **frenan al
   kiwi gigante**: perfectas para ganar la zona segura o sobrevivir en multijugador.
 
@@ -225,7 +246,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.1.4 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.3.0 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):
@@ -246,6 +267,9 @@ Casi todo lo interesante se toca en `Config.lua`, sección por sección:
 | Tamaño / separación de arenas | `Config.World.ArenaSize` y `ArenaSpacing` |
 | Cuántas partidas a la vez | `Config.World.ArenaCount` |
 | Nombres/colores de las zonas | `Config.Zones` |
+| Votación de mapa (tiempos) | `Config.Vote` |
+| Iluminación y niebla por mapa | `Config.ZoneLight` y `Config.LightDefault` |
+| Vida de jugadores y regeneración | `Config.Player` (hp, regen) |
 | Velocidad de jugadores (correr/sigilo) | `Config.Player` |
 | Kiwi más fácil o más listo | `Config.Difficulties.facil/normal/dificil.kiwi` |
 | Red y rifle (alcance, enfriamiento, probabilidad) | `Config.Difficulties.*.red` y `*.rifle` |
@@ -256,7 +280,7 @@ Casi todo lo interesante se toca en `Config.lua`, sección por sección:
 | Kiwi gigante (velocidad, detección, tamaño) | `Config.Difficulties.colosal.kiwi` |
 | Escondites (distancia, olor indoor, tiempo de husmeo, monedas de escape) | `Config.Hide` |
 | Baúles (usos por arma, lista y probabilidad) | `Config.Loot` |
-| Armas de baúl (velocidad, freno, empujón, enfriamiento) | `Config.Weapons` |
+| Armas de baúl (velocidad, freno, empujón, daño PvP, enfriamiento) | `Config.Weapons` |
 | Multijugador (jugadores, espera, tiempo) | `Config.Multiplayer` |
 | Cuenta atrás, pantalla de resultados | `Config.Round` |
 | Todos los mensajes que ve el jugador | `Config.Text` |

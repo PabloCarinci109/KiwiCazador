@@ -12,6 +12,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
 
 local Shared = require(script.Parent.Shared)
 local Config = require(Shared.Config)
@@ -40,6 +41,28 @@ local COLOR = {
 	info = Color3.fromRGB(200, 214, 226),
 	fx = Color3.fromRGB(160, 200, 255),
 }
+
+-- ===============================================================
+-- Iluminacion (cambia segun el mapa y se restaura al salir)
+-- ===============================================================
+local function applyLighting(preset)
+	if not preset then
+		return
+	end
+	Lighting.Ambient = preset.ambient
+	Lighting.OutdoorAmbient = preset.outdoor
+	Lighting.Brightness = preset.brightness
+	Lighting.FogColor = preset.fog
+	Lighting.FogStart = preset.fogStart
+	Lighting.FogEnd = preset.fogEnd
+	Lighting.ClockTime = preset.clock
+end
+
+local function applyZoneLighting(arena)
+	local zone = arena and arena.zone
+	local preset = zone and Config.ZoneLight[zone.theme or "bosque"]
+	applyLighting(preset or Config.LightDefault)
+end
 
 -- ===============================================================
 -- Utilidades de jugador
@@ -151,6 +174,10 @@ function Session.new(modeId, rng)
 	self.hidden = {}
 	self.hideSpot = {}
 	self.isColosal = modeId == "colosal"
+	self.mapVote = {}
+	self.chosenMap = nil
+	self.voteDone = false
+	self.knocked = {}
 
 	if modeId == "multi" then
 		self.isMulti = true
@@ -159,8 +186,9 @@ function Session.new(modeId, rng)
 		self.tag = Config.Multiplayer.tag
 		self.color = Config.Multiplayer.color
 		self.timeLimit = Config.Multiplayer.timeLimit
-		self.phase = "waiting"
-		self.phaseEnds = os.clock() + Config.Multiplayer.waitTime
+		-- La espera inicial es la votacion de mapa: votan todos y arranca.
+		self.phase = "vote"
+		self.phaseEnds = os.clock() + Config.Vote.multiTime
 	else
 		self.isMulti = false
 		self.diff = Config.Difficulties[modeId] or Config.Difficulties.normal
@@ -168,10 +196,9 @@ function Session.new(modeId, rng)
 		self.tag = self.diff.tag
 		self.color = self.diff.color
 		self.timeLimit = self.diff.round.timeLimit
-		-- Arranca en "waiting" pero con el tiempo ya cumplido: el paso
-		-- siguiente le asigna arena y empieza la cuenta regresiva.
-		self.phase = "waiting"
-		self.phaseEnds = os.clock()
+		-- Modo solo: elige el mapa el jugador y arranca enseguida.
+		self.phase = "vote"
+		self.phaseEnds = os.clock() + Config.Vote.soloTime
 	end
 
 	return self
@@ -293,7 +320,10 @@ function Session:giantCatch(player)
 		self.eaten[player] = nil
 		if self.stats[player] then
 			setFrozen(player, false)
-			self:removePlayer(player)
+			self:removePlayer(player, true)
+			-- De vuelta al lobby con el menu a la vista: asi elige otro modo facil
+			Net.get("SessionUpdate"):FireClient(player, { active = false })
+			Net.get("Notify"):FireClient(player, Config.Text.EatenMenu, Util.colorToTable(COLOR.info), 5)
 		end
 	end)
 end
@@ -320,6 +350,72 @@ function Session:trapCatch(bait)
 	end
 end
 
+-- ---------------- daño entre cazadores ----------------
+-- Las armas de baul hieren a los jugadores. Al kiwi SOLO lo relentizan.
+function Session:damagePlayer(victim, attacker, weaponName, amount, pos)
+	if not self.stats[victim] or self.phase ~= "playing" then
+		return
+	end
+	if self.knocked[victim] then
+		return
+	end
+
+	local data = self.stats[victim]
+	amount = math.max(1, math.floor(amount + 0.5))
+	data.hp = math.max(0, (data.hp or Config.Player.maxHealth) - amount)
+	data.lastHurt = os.clock()
+
+	local attackerName = "el mapa"
+	if attacker and attacker ~= victim then
+		attackerName = attacker.DisplayName ~= "" and attacker.DisplayName or attacker.Name
+	end
+	self:notify(victim, string.format(Config.Text.HurtMsg, attackerName, weaponName, amount), COLOR.bad, 3)
+	self:event("hurt", { pos = pos, userId = victim.UserId, amount = amount })
+	self:sendUpdate(victim)
+
+	if data.hp <= 0 then
+		self:knockout(victim, attacker)
+	end
+end
+
+function Session:knockout(victim, attacker)
+	if self.knocked[victim] or not self.stats[victim] then
+		return
+	end
+	self.knocked[victim] = true
+
+	local vname = victim.DisplayName ~= "" and victim.DisplayName or victim.Name
+	local aname = "la reserva"
+	if attacker and attacker ~= victim then
+		aname = attacker.DisplayName ~= "" and attacker.DisplayName or attacker.Name
+	end
+	self:notifyAll(string.format(Config.Text.KoedAll, aname, vname), COLOR.warn, 5)
+	self:event("ko", { userId = victim.UserId })
+	setFrozen(victim, true)
+
+	task.delay(Config.Round.KoHold, function()
+		self.knocked[victim] = nil
+		if self.stats[victim] then
+			setFrozen(victim, false)
+			self:removePlayer(victim, true)
+			-- Igual que cuando te come el kiwi: al lobby con el menu listo
+			Net.get("SessionUpdate"):FireClient(victim, { active = false })
+			Net.get("Notify"):FireClient(victim, Config.Text.KoMenu, Util.colorToTable(COLOR.info), 5)
+		end
+	end)
+end
+
+function Session:stepHealth(dt)
+	local max = Config.Player.maxHealth
+	local now = os.clock()
+	for _, player in ipairs(self.players) do
+		local data = self.stats[player]
+		if data and data.hp and data.hp < max and now - (data.lastHurt or 0) >= Config.Player.regenDelay then
+			data.hp = math.min(max, data.hp + Config.Player.regen * dt)
+		end
+	end
+end
+
 -- ---------------- jugadores ----------------
 function Session:isFull()
 	if not self.isMulti then
@@ -333,18 +429,22 @@ function Session:addPlayer(player)
 		return
 	end
 
-	self.stats[player] = { caught = 0 }
+	self.stats[player] = { caught = 0, hp = Config.Player.maxHealth }
 	table.insert(self.players, player)
 	playerSession[player] = self
 	ToolService.reset(player)
 
-	if self.phase == "waiting" then
-		local seconds = math.floor(self.phaseEnds - os.clock())
-		if seconds > 1 then
-			self:notify(player, string.format("Entraste a la partida. Comienza en %d s", seconds), COLOR.good)
+	if self.phase == "vote" then
+		if self.voteDone then
+			self:notify(player, "Entraste a la partida. Está por comenzar...", COLOR.good, 5)
 		else
-			self:notify(player, "Preparando la reserva...", COLOR.good)
+			self:notify(player, "Entraste a la partida. Vota el mapa para arrancar.", COLOR.good, 6)
 		end
+	elseif self.phase == "countdown" then
+		local seconds = math.floor(self.phaseEnds - os.clock())
+		self:notify(player, string.format("Entraste a la partida. Comienza en %d s", math.max(0, seconds)), COLOR.good)
+		self:teleportToArena(player)
+		self:giveTools(player)
 	elseif self.phase ~= "ended" then
 		self:teleportToArena(player)
 		self:giveTools(player)
@@ -406,6 +506,11 @@ function Session:removePlayer(player, silent)
 			self:endRound(nil, "timeout")
 		end
 	end
+
+	-- Votacion: si se fue un jugador y ya votaron todos, arranca la partida
+	if self.phase == "vote" and not self.voteDone and #self.players > 0 and self:allVoted() then
+		self:pickVoteWinner()
+	end
 end
 
 function Session:prunePlayers()
@@ -417,17 +522,104 @@ function Session:prunePlayers()
 	end
 end
 
+-- ---------------- votacion de mapa ----------------
+local function zoneById(id)
+	for _, zone in ipairs(Config.Zones) do
+		if zone.id == id then
+			return zone
+		end
+	end
+	return nil
+end
+
+function Session:allVoted()
+	if #self.players == 0 then
+		return false
+	end
+	for _, player in ipairs(self.players) do
+		if not self.mapVote[player] then
+			return false
+		end
+	end
+	return true
+end
+
+function Session:castVote(player, mapId)
+	if self.phase ~= "vote" or self.voteDone or not self.stats[player] then
+		return
+	end
+	if mapId ~= "random" and not zoneById(mapId) then
+		return
+	end
+	self.mapVote[player] = mapId
+	self:sendUpdate(player)
+	if self:allVoted() then
+		self:pickVoteWinner()
+	end
+end
+
+function Session:pickVoteWinner()
+	if self.voteDone then
+		return
+	end
+	self.voteDone = true
+
+	local counts = {}
+	local leader, leaderCount = nil, 0
+	for _, player in ipairs(self.players) do
+		local pick = self.mapVote[player]
+		if pick then
+			counts[pick] = (counts[pick] or 0) + 1
+			if counts[pick] > leaderCount then
+				leader, leaderCount = pick, counts[pick]
+			end
+		end
+	end
+
+	-- Empate: se decide al azar entre los mas votados
+	if leader then
+		local top = {}
+		for id, count in pairs(counts) do
+			if count == leaderCount then
+				table.insert(top, id)
+			end
+		end
+		leader = top[self.rng:NextInteger(1, #top)]
+	end
+
+	local zone = zoneById(leader)
+	if not zone then
+		zone = Config.Zones[self.rng:NextInteger(1, #Config.Zones)]
+	end
+
+	self.chosenMap = zone.id
+	self.phaseEnds = os.clock() + Config.Vote.revealTime
+	self:notifyAll(string.format(Config.Text.MapPickNotify, zone.name), COLOR.good, 4)
+	self:sendUpdates(true)
+end
+
 -- ---------------- arenas ----------------
-function Session:allocateArena()
+function Session:allocateArena(mapId)
 	if self.arena then
 		return true
 	end
+	local fallback
 	for _, arena in ipairs(world.arenas) do
 		if not arena.busy then
-			arena.busy = true
-			self.arena = arena
-			return true
+			if not fallback then
+				fallback = arena
+			end
+			if not mapId or arena.mapId == mapId then
+				arena.busy = true
+				self.arena = arena
+				return true
+			end
 		end
+	end
+	if fallback then
+		fallback.busy = true
+		self.arena = fallback
+		return true
 	end
 	return false
 end
@@ -486,6 +678,7 @@ function Session:startPlaying()
 	self.phase = "playing"
 	self.startedAt = os.clock()
 	self.safeAttract = 0
+	applyZoneLighting(self.arena)
 	local enterList = self.arena and self.arena.enterList
 	if enterList then
 		for _, spot in ipairs(enterList) do
@@ -660,7 +853,7 @@ end
 function Session:remainingSeconds()
 	if self.phase == "playing" then
 		return math.max(0, self.startedAt + self.timeLimit - os.clock())
-	elseif self.phase == "waiting" or self.phase == "countdown" or self.phase == "ended" then
+	elseif self.phase == "vote" or self.phase == "countdown" or self.phase == "ended" then
 		return math.max(0, self.phaseEnds - os.clock())
 	end
 	return 0
@@ -671,6 +864,7 @@ function Session:finish()
 		return
 	end
 	self.finished = true
+	applyLighting(Config.LightDefault)
 
 	if self.kiwi then
 		self.kiwi:destroy()
@@ -1090,13 +1284,20 @@ function Session:step(dt)
 		return
 	end
 
-	if self.phase == "waiting" then
-		if now >= self.phaseEnds then
-			if not self:allocateArena() then
-				self.phaseEnds = now + 8
-				self:notifyAll(Config.Text.NoArena, COLOR.warn, 5)
-			else
+	if self.phase == "vote" then
+		if not self.voteDone then
+			if self:allVoted() or now >= self.phaseEnds then
+				self:pickVoteWinner()
+			end
+		elseif now >= self.phaseEnds then
+			if self:allocateArena(self.chosenMap) then
+				if self.chosenMap and self.arena.mapId ~= self.chosenMap then
+					self:notifyAll(string.format(Config.Text.MapFallback, self.arena.name), COLOR.warn, 5)
+				end
 				self:startCountdown()
+			else
+				self.phaseEnds = now + 6
+				self:notifyAll(Config.Text.NoArena, COLOR.warn, 5)
 			end
 		end
 	elseif self.phase == "countdown" then
@@ -1108,6 +1309,7 @@ function Session:step(dt)
 			self:notifyAll("¡Se acabó el tiempo!", COLOR.bad)
 			self:endRound(nil, "timeout")
 		else
+			self:stepHealth(dt)
 			if self.isColosal then
 				self:stepSafeZone(dt)
 			end
@@ -1144,7 +1346,15 @@ function Session:sendUpdate(player)
 	local quota = self.isMulti and 1 or self.diff.round.quota
 	local objective
 	local progressText
-	if self.isMulti then
+	if self.phase == "vote" then
+		if self.isMulti then
+			objective = "¡Voten el mapa de la partida!"
+		else
+			objective = "¡Elige el mapa de la partida!"
+		end
+		progressText = self.voteDone and "¡Arrancando!" or string.format("Votación: %d s",
+			math.max(0, math.ceil(self.phaseEnds - os.clock())))
+	elseif self.isMulti then
 		objective = "Sobrevive al kiwi gigante: gana el último en pie"
 		local kiwi = self.kiwi
 		local root = getRoot(player)
@@ -1187,6 +1397,17 @@ function Session:sendUpdate(player)
 		progressText = "Escondido: pulsa E para salir"
 	end
 
+	local voteCounts = nil
+	if self.phase == "vote" then
+		voteCounts = {}
+		for _, other in ipairs(self.players) do
+			local pick = self.mapVote[other]
+			if pick then
+				voteCounts[pick] = (voteCounts[pick] or 0) + 1
+			end
+		end
+	end
+
 	local ranking = {}
 	for _, other in ipairs(self.players) do
 		local otherStats = self.stats[other]
@@ -1219,7 +1440,17 @@ function Session:sendUpdate(player)
 		players = ranking,
 		playerCount = #self.players,
 		isMulti = self.isMulti,
-		waiting = self.isMulti and self.phase == "waiting",
+		waiting = self.phase == "vote",
+		vote = self.phase == "vote" and {
+			done = self.voteDone or false,
+			chosen = self.chosenMap,
+			mine = self.mapVote[player],
+			total = #self.players,
+			left = math.max(0, math.ceil(self.phaseEnds - os.clock())),
+			counts = voteCounts,
+		} or nil,
+		hp = math.floor(data.hp or Config.Player.maxHealth),
+		maxHp = Config.Player.maxHealth,
 		progressText = progressText,
 		hidden = self.hidden[player] == true or nil,
 		hideSpot = self.hideSpot[player] or nil,
@@ -1279,6 +1510,13 @@ function GameManager.init()
 			session:sendUpdate(player)
 		else
 			Net.get("SessionUpdate"):FireClient(player, { active = false })
+		end
+	end)
+
+	Net.get("VoteMap").OnServerEvent:Connect(function(player, mapId)
+		local session = playerSession[player]
+		if session and type(mapId) == "string" then
+			session:castVote(player, mapId)
 		end
 	end)
 
@@ -1431,7 +1669,7 @@ function GameManager.requestLeave(player)
 	if not session then
 		return
 	end
-	session:removePlayer(player)
+	session:removePlayer(player, true)
 	Net.get("SessionUpdate"):FireClient(player, { active = false })
 end
 

@@ -233,7 +233,8 @@ local function setScope(enabled)
 
 	local camera = workspace.CurrentCamera
 	if camera then
-		local goal = scoped and Config.Scope.fov or 70
+		local zoom = (Config.Scope.weapons and Config.Scope.weapons[equippedId]) or Config.Scope.fov
+		local goal = scoped and zoom or 70
 		TweenService:Create(camera, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			FieldOfView = goal,
 		}):Play()
@@ -260,7 +261,7 @@ local function refreshEquipped()
 	end
 	equippedId = found
 	if equippedId ~= "rifle" and equippedId ~= "pintura" and equippedId ~= "relente"
-		and equippedId ~= "revolver" and equippedId ~= "arco" then
+		and equippedId ~= "revolver" and equippedId ~= "arco" and equippedId ~= "sniper" then
 		setScope(false)
 	end
 	setWeaponHidden(scoped)
@@ -389,7 +390,8 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		-- Clic derecho: mira (rifle tranquilizante y rifle de pintura)
 		if (equippedId == "rifle" or equippedId == "pintura" or equippedId == "relente"
-			or equippedId == "revolver" or equippedId == "arco") and state.active and state.phase == "playing" then
+			or equippedId == "revolver" or equippedId == "arco" or equippedId == "sniper")
+			and state.active and state.phase == "playing" then
 			setScope(not scoped)
 		end
 		return
@@ -433,6 +435,7 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 		sneaking = false
 		setScope(false)
 		HUD.hideResult()
+		HUD.hideVote()
 		HUD.setMenuVisible(true)
 		HUD.setMenuStatus("")
 		HUD.fade(false, 0.5)
@@ -446,6 +449,11 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 	state.diff = diffFor(newState.modeId)
 	state.hidden = newState.hidden == true
 	state.hideSpot = newState.hideSpot
+	if newState.vote then
+		HUD.showVote(newState.vote)
+	else
+		HUD.hideVote()
+	end
 	applyCameraMode()
 	if state.hidden ~= hiddenNow then
 		hiddenNow = state.hidden
@@ -464,7 +472,10 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 	HUD.setMenuStatus("")
 
 	if not wasActive or previousPhase ~= newState.phase then
-		if newState.phase == "countdown" then
+		if newState.phase == "vote" then
+			HUD.hideResult()
+			HUD.fade(false, 0.4)
+		elseif newState.phase == "countdown" then
 			HUD.hideResult()
 			HUD.fade(true, 0.25)
 			task.delay(0.6, function()
@@ -697,6 +708,23 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 				end
 			end)
 		end
+	elseif kind == "hurt" then
+		if data.userId == player.UserId then
+			HUD.hurt(data.amount)
+			sound2D(Config.Sounds.paintHit, 0.5, 0.8)
+		elseif position and distanceToLocal(position) < 60 then
+			soundAt(Config.Sounds.dartHit, position, 0.35, 1.4)
+		end
+	elseif kind == "ko" then
+		if position then
+			burst(position, Color3.fromRGB(232, 108, 100), 30)
+		end
+		if data.userId == player.UserId then
+			setScope(false)
+			firstPerson = false
+			sound2D(Config.Sounds.lose, 0.8)
+			HUD.death("¡TE NOQUEARON!", "Vuelves al lobby...")
+		end
 	end
 end)
 
@@ -706,8 +734,12 @@ end)
 HUD.init(player:WaitForChild("PlayerGui"), {
 	onJoin = function(modeId)
 		sound2D(Config.Sounds.ui, 0.6)
-		HUD.setMenuStatus("Buscando una arena libre...", Color3.fromRGB(238, 196, 92))
+		HUD.setMenuStatus("Entrando a la partida...", Color3.fromRGB(238, 196, 92))
 		remotes.RequestJoin:FireServer(modeId)
+	end,
+	onVote = function(mapId)
+		sound2D(Config.Sounds.ui, 0.5)
+		remotes.VoteMap:FireServer(mapId)
 	end,
 	onLeave = function()
 		sound2D(Config.Sounds.ui, 0.5)

@@ -17,6 +17,7 @@ local REMOTE_NAMES = {
 	"RequestLeave",    -- ()
 	"RequestState",    -- ()
 	"ToolAction",      -- (toolId, data)
+	"VoteMap",         -- (mapId)
 	-- Servidor -> Cliente
 	"SessionUpdate",   -- (state)
 	"SessionEnd",      -- (result)

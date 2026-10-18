@@ -248,6 +248,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 	local self = setmetatable({}, Arena)
 	self.index = index
 	self.name = zone.name
+	self.mapId = zone.id or ("map" .. index)
 	self.zone = zone
 	self.center = Vector3.new(index * cfg.World.ArenaSpacing, cfg.World.FloorY, 0)
 	self.halfSize = cfg.World.ArenaSize * 0.5
@@ -283,7 +284,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 		Size = Vector3.new(half * 2, 10, half * 2),
 		Position = center + Vector3.new(0, -5, 0),
 		Color = zone.grass,
-		Material = Enum.Material.LeafyGrass,
+		Material = zone.ground or Enum.Material.LeafyGrass,
 		CanCollide = true,
 		Parent = folder,
 	})
@@ -303,60 +304,267 @@ local function buildArena(index, zone, cfg, parent, rng)
 		})
 	end
 
-	-- ---------------- Cerco decorativo ----------------
-	local fenceColor = Color3.fromRGB(96, 74, 52)
-	for i = 0, 3 do
-		part({
-			Name = "Cerco",
-			Size = Vector3.new(half * 2, 5, 1.2),
-			CFrame = CFrame.new(center + Vector3.new(0, 2, 0))
-				* CFrame.Angles(0, i * math.pi * 0.5, 0)
-				* CFrame.new(0, 0, -half + 6),
-			Color = fenceColor,
-			Material = Enum.Material.WoodPlanks,
-			CanCollide = true,
-			Parent = props,
-		})
+	-- ---------------- Limites del mapa (no se puede salir) ----------------
+	-- Ciudad: murallones tipo edificio. Duna/naturaleza: montañas y arboles.
+	local theme = zone.theme or "bosque"
+
+	if theme == "ciudad" then
+		-- Muralla de edificio alrededor de toda la manzana
+		local wallH = 48
+		local wallCol = Color3.fromRGB(148, 148, 152)
+		local wallTrim = Color3.fromRGB(110, 112, 118)
+		local glassCol = Color3.fromRGB(96, 132, 148)
+		for i = 0, 3 do
+			local side = CFrame.new(center) * CFrame.Angles(0, i * math.pi * 0.5, 0)
+			part({
+				Name = "MuroCiudad",
+				Size = Vector3.new(half * 2 + 10, wallH, 5),
+				CFrame = side * CFrame.new(0, wallH * 0.5, -half + 4),
+				Color = wallCol,
+				Material = Enum.Material.Concrete,
+				CanCollide = true,
+				Parent = props,
+			})
+			part({
+				Name = "CornisaCiudad",
+				Size = Vector3.new(half * 2 + 12, 2.4, 6.6),
+				CFrame = side * CFrame.new(0, wallH + 1, -half + 4),
+				Color = wallTrim,
+				Material = Enum.Material.Concrete,
+				CanCollide = true,
+				Parent = props,
+			})
+			-- Tiras de ventanas (dos pisos de oficinas)
+			for row = 0, 1 do
+				for w = -6, 6 do
+					local wx = w * 40
+					if math.abs(wx) < half - 20 then
+						part({
+							Name = "VentanaCiudad",
+							Size = Vector3.new(26, 9, 0.6),
+							CFrame = side * CFrame.new(wx, 14 + row * 17, -half + 6.6),
+							Color = glassCol,
+							Material = Enum.Material.Glass,
+							CanCollide = false,
+							Parent = props,
+						})
+					end
+				end
+			end
+		end
+		-- Torres en las esquinas
+		for sx = -1, 1, 2 do
+			for sz = -1, 1, 2 do
+				part({
+					Name = "TorreEsquina",
+					Size = Vector3.new(18, 62, 18),
+					CFrame = CFrame.new(center + Vector3.new(sx * (half - 8), 31, sz * (half - 8))),
+					Color = wallTrim,
+					Material = Enum.Material.Concrete,
+					CanCollide = true,
+					Parent = props,
+				})
+			end
+		end
+		-- Skyline: edificios de fondo (afuera del area jugable)
+		for i = 1, 16 do
+			local a = (i / 16) * math.pi * 2
+			local dist = half + rng:NextNumber(55, 130)
+			local h = rng:NextNumber(70, 170)
+			local w = rng:NextNumber(30, 56)
+			part({
+				Name = "Skyline",
+				Size = Vector3.new(w, h, w),
+				CFrame = CFrame.new(center + Vector3.new(math.cos(a) * dist, h * 0.5 - 6, math.sin(a) * dist)),
+				Color = i % 3 == 0 and Color3.fromRGB(96, 102, 116) or Color3.fromRGB(74, 78, 90),
+				Material = Enum.Material.Concrete,
+				CanCollide = false,
+				Parent = props,
+			})
+		end
+	else
+		-- Montañas de roca que cierran el mapa
+		local palettes = {
+			bosque = { Color3.fromRGB(92, 100, 84), Color3.fromRGB(112, 116, 98), Color3.fromRGB(74, 118, 72), Enum.Material.LeafyGrass },
+			dunas = { Color3.fromRGB(188, 156, 106), Color3.fromRGB(208, 178, 128), Color3.fromRGB(226, 200, 148), Enum.Material.Sand },
+			costa = { Color3.fromRGB(108, 98, 86), Color3.fromRGB(130, 118, 102), Color3.fromRGB(104, 122, 92), Enum.Material.Ground },
+			alpes = { Color3.fromRGB(112, 120, 132), Color3.fromRGB(138, 148, 160), Color3.fromRGB(238, 244, 252), Enum.Material.Snow },
+		}
+		local pal = palettes[theme] or palettes.bosque
+		local snowy = theme == "alpes"
+		local sideLen = half * 2
+		local count = math.floor(sideLen / 26)
+		local ringDist = half - 9
+		for side = 0, 3 do
+			local sideCF = CFrame.new(center) * CFrame.Angles(0, side * math.pi * 0.5, 0)
+			for i = 1, count do
+				local x = -half + (i - 0.5) * (sideLen / count) + rng:NextNumber(-3, 3)
+				local base = sideCF * CFrame.new(x, 0, -(ringDist + rng:NextNumber(-2, 4)))
+				local h = rng:NextNumber(22, 48)
+				local w = rng:NextNumber(26, 42)
+				local d = rng:NextNumber(14, 22)
+				part({
+					Name = "Montana",
+					Size = Vector3.new(w, h, d),
+					CFrame = base * CFrame.new(0, h * 0.5 - 2, 0)
+						* CFrame.Angles(rng:NextNumber(-0.08, 0.08), rng:NextNumber(-0.12, 0.12), rng:NextNumber(-0.08, 0.08)),
+					Color = i % 2 == 0 and pal[1] or pal[2],
+					Material = Enum.Material.Rock,
+					CanCollide = true,
+					Parent = props,
+				})
+				if snowy and i % 2 == 0 then
+					part({
+						Name = "NieveMontana",
+						Size = Vector3.new(w * 0.68, h * 0.3, d * 0.68),
+						CFrame = base * CFrame.new(0, h - h * 0.12 - 2, 0),
+						Color = Color3.fromRGB(240, 246, 252),
+						Material = Enum.Material.Snow,
+						CanCollide = false,
+						Parent = props,
+					})
+				end
+			end
+		end
+		-- Esquinas montañosas (sin huecos)
+		for sx = -1, 1, 2 do
+			for sz = -1, 1, 2 do
+				part({
+					Name = "MontanaEsquina",
+					Size = Vector3.new(44, 48, 44),
+					CFrame = CFrame.new(center + Vector3.new(sx * (half - 8), 21, sz * (half - 8))),
+					Color = pal[2],
+					Material = Enum.Material.Rock,
+					CanCollide = true,
+					Parent = props,
+				})
+			end
+		end
+		-- Picos de fondo (paisaje)
+		for i = 1, 14 do
+			local a = (i / 14) * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
+			local dist = half + rng:NextNumber(50, 140)
+			local size = rng:NextNumber(110, 210)
+			part({
+				Name = "PicoFondo",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(size, size * rng:NextNumber(0.8, 1.2), size),
+				Position = center + Vector3.new(math.cos(a) * dist, -size * 0.28, math.sin(a) * dist),
+				Color = pal[3],
+				Material = pal[4],
+				CanCollide = false,
+				Parent = props,
+			})
+		end
+		-- En el bosque ademas hay una linea de kauris gigantes
+		if theme == "bosque" then
+			for i = 1, 26 do
+				local a = (i / 26) * math.pi * 2 + rng:NextNumber(-0.06, 0.06)
+				local dist = half - 22 + rng:NextNumber(-6, 6)
+				local pos = center + Vector3.new(math.cos(a) * dist, 0, math.sin(a) * dist)
+				local hh = rng:NextNumber(40, 62)
+				part({
+					Name = "KauriGigante",
+					Size = Vector3.new(4.4, hh, 4.4),
+					Position = pos + Vector3.new(0, hh * 0.5, 0),
+					Color = zone.tree,
+					Material = Enum.Material.Wood,
+					CanCollide = true,
+					Parent = props,
+				})
+				part({
+					Name = "CopaKauri",
+					Shape = Enum.PartType.Ball,
+					Size = Vector3.new(26, 20, 26),
+					Position = pos + Vector3.new(0, hh + 6, 0),
+					Color = Color3.fromRGB(58, 104, 60),
+					Material = Enum.Material.LeafyGrass,
+					CanCollide = false,
+					Parent = props,
+				})
+			end
+		end
 	end
 
-	-- ---------------- Colinas suaves ----------------
-	for i = 1, 3 do
-		local angle = rng:NextNumber(0, math.pi * 2)
-		local radius = rng:NextNumber(half * 0.35, half * 0.7)
-		local hillSize = rng:NextNumber(70, 110)
-		part({
-			Name = "Colina",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(hillSize, hillSize * 0.9, hillSize),
-			Position = center + Vector3.new(math.cos(angle) * radius, -hillSize * 0.32, math.sin(angle) * radius),
-			Color = Color3.fromRGB(zone.grass.R * 240, zone.grass.G * 240, zone.grass.B * 240),
-			Material = Enum.Material.Ground,
-			Parent = props,
-		})
+	-- ---------------- Colinas suaves (arena, nieve y medanos) ----------------
+	if zone.theme ~= "ciudad" then
+		for i = 1, 3 do
+			local angle = rng:NextNumber(0, math.pi * 2)
+			local radius = rng:NextNumber(half * 0.35, half * 0.7)
+			local hillSize = rng:NextNumber(70, 110)
+			part({
+				Name = "Colina",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(hillSize, hillSize * 0.9, hillSize),
+				Position = center + Vector3.new(math.cos(angle) * radius, -hillSize * 0.32, math.sin(angle) * radius),
+				Color = Color3.fromRGB(zone.grass.R * 240, zone.grass.G * 240, zone.grass.B * 240),
+				Material = zone.ground or Enum.Material.Ground,
+				Parent = props,
+			})
+		end
 	end
 
-	-- ---------------- Estanque ----------------
-	do
+	-- ---------------- Agua del mapa (con fondo y borde de piedra) ----------------
+	local pondCfg = zone.pond
+	if pondCfg ~= false then
+		local water = pondCfg or {}
+		local scale = water.scale or 1
 		local angle = rng:NextNumber(0, math.pi * 2)
 		local radius = rng:NextNumber(half * 0.25, half * 0.55)
 		local pondPos = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+		local pondR = 26 * scale
+		local icy = zone.theme == "alpes"
+
+		-- Fondo (para que no se vea el pasto a traves del agua)
+		part({
+			Name = "FondoEstanque",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.5, pondR * 2 - 1.2, pondR * 2 - 1.2),
+			CFrame = CFrame.new(pondPos + Vector3.new(0, 0.06, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = icy and Color3.fromRGB(178, 200, 214) or Color3.fromRGB(56, 66, 70),
+			Material = icy and Enum.Material.Ice or Enum.Material.Slate,
+			CanCollide = false,
+			Parent = props,
+		})
+
+		-- Espejo de agua finito (antes era un cilindro grueso que parecia flotar)
 		local pond = part({
 			Name = "Estanque",
 			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(2, 52, 52),
-			CFrame = CFrame.new(pondPos + Vector3.new(0, 1.1, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-			Color = Color3.fromRGB(64, 122, 150),
-			Material = Enum.Material.Water,
+			Size = Vector3.new(0.6, pondR * 2, pondR * 2),
+			CFrame = CFrame.new(pondPos + Vector3.new(0, 0.42, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = water.color or Color3.fromRGB(64, 122, 150),
+			Material = water.material or Enum.Material.Water,
 			Transparency = 0.25,
 			CanCollide = false,
 			Parent = props,
 		})
+
+		-- Borde de piedras: contiene el agua y se ve natural
+		local rimColor = icy and Color3.fromRGB(212, 226, 236) or Color3.fromRGB(122, 118, 110)
+		local rimMaterial = icy and Enum.Material.Ice or Enum.Material.Rock
+		local rimCount = math.clamp(math.floor(pondR / 3), 10, 22)
+		for i = 1, rimCount do
+			local a = (i - 1) / rimCount * math.pi * 2 + rng:NextNumber(-0.08, 0.08)
+			local size = rng:NextNumber(2.6, 4.8)
+			part({
+				Name = "BordeEstanque",
+				Size = Vector3.new(size, rng:NextNumber(1.4, 2.6), size),
+				CFrame = CFrame.new(pondPos + Vector3.new(math.cos(a) * (pondR - 1.4), 0.5, math.sin(a) * (pondR - 1.4)))
+					* CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0),
+				Color = rimColor,
+				Material = rimMaterial,
+				CanCollide = true,
+				Parent = props,
+			})
+		end
+
 		for i = 1, 10 do
 			local a = rng:NextNumber(0, math.pi * 2)
 			part({
 				Name = "Junco",
 				Size = Vector3.new(0.5, rng:NextNumber(4, 7), 0.5),
-				Position = pondPos + Vector3.new(math.cos(a) * 26, 2.5, math.sin(a) * 26),
+				Position = pondPos + Vector3.new(math.cos(a) * (pondR + 2.5), 2.5, math.sin(a) * (pondR + 2.5)),
 				Color = Color3.fromRGB(110, 132, 74),
 				Material = Enum.Material.Grass,
 				Parent = props,
@@ -707,13 +915,205 @@ local function buildArena(index, zone, cfg, parent, rng)
 		end
 	end
 
+	-- Medano de arena (Dunas): limita la vista y da volumen
+	local function makeDuneMound(pos, scale)
+		scale = scale or rng:NextNumber(0.9, 1.5)
+		for i = 1, 3 do
+			local s = rng:NextNumber(16, 26) * scale
+			part({
+				Name = "Medano",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(s, s * 0.42, s),
+				Position = pos + Vector3.new(rng:NextNumber(-7, 7), -s * 0.22 + rng:NextNumber(0, 2), rng:NextNumber(-7, 7)),
+				Color = Color3.fromRGB(224, 200, 150),
+				Material = Enum.Material.Sand,
+				CanCollide = false,
+				Parent = props,
+			})
+		end
+	end
+
+	-- Cactus (Dunas): escondite chico
+	local function makeCactus(pos, scale)
+		scale = scale or rng:NextNumber(0.85, 1.35)
+		local green = Color3.fromRGB(96, 138, 84)
+		local trunk = part({
+			Name = "Cactus",
+			Size = Vector3.new(2.2 * scale, 9 * scale, 2.2 * scale),
+			Position = pos + Vector3.new(0, 4.5 * scale, 0),
+			Color = green,
+			Material = Enum.Material.Grass,
+			CanCollide = true,
+			Parent = props,
+		})
+		part({
+			Name = "CactusBrazo",
+			Size = Vector3.new(1.4 * scale, 4 * scale, 1.4 * scale),
+			Position = pos + Vector3.new(1.7 * scale, 5.6 * scale, 0),
+			Color = green,
+			Material = Enum.Material.Grass,
+			CanCollide = true,
+			Parent = props,
+		})
+		return addSpot("arbusto", "Cactus", trunk, pos + Vector3.new(0, 1.6, 0), 4.6 * scale, 0.65)
+	end
+
+	-- Palmera (Costa)
+	local function makePalm(pos, scale)
+		scale = scale or rng:NextNumber(0.9, 1.3)
+		local height = rng:NextNumber(20, 28) * scale
+		part({
+			Name = "TroncoPalmera",
+			Size = Vector3.new(1.8 * scale, height, 1.8 * scale),
+			CFrame = CFrame.new(pos + Vector3.new(0, height * 0.5, 0)) * CFrame.Angles(rng:NextNumber(-0.06, 0.06), 0, rng:NextNumber(-0.06, 0.06)),
+			Color = zone.tree,
+			Material = Enum.Material.Wood,
+			CanCollide = true,
+			Parent = props,
+		})
+		local top = pos + Vector3.new(0, height, 0)
+		for i = 1, 5 do
+			local a = (i - 1) * (math.pi * 2 / 5) + rng:NextNumber(-0.2, 0.2)
+			part({
+				Name = "HojaPalmera",
+				Size = Vector3.new(12 * scale, 0.5, 2.6 * scale),
+				CFrame = CFrame.new(top + Vector3.new(math.cos(a) * 4.6 * scale, rng:NextNumber(-1.5, 0.6), math.sin(a) * 4.6 * scale))
+					* CFrame.Angles(0, -a, math.rad(-14)),
+				Color = Color3.fromRGB(64, 122, 66),
+				Material = Enum.Material.LeafyGrass,
+				CanCollide = false,
+				Parent = props,
+			})
+		end
+	end
+
+	-- Pino de nieve (Alpes)
+	local function makePine(pos, scale)
+		scale = scale or rng:NextNumber(0.9, 1.3)
+		local height = rng:NextNumber(24, 34) * scale
+		part({
+			Name = "TroncoPino",
+			Size = Vector3.new(2.4, height * 0.5, 2.4),
+			Position = pos + Vector3.new(0, height * 0.25, 0),
+			Color = zone.tree,
+			Material = Enum.Material.Wood,
+			CanCollide = true,
+			Parent = props,
+		})
+		for level = 1, 3 do
+			local width = (20 - level * 4) * scale
+			part({
+				Name = "CopaPino",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(width, width * 0.75, width),
+				Position = pos + Vector3.new(0, height * (0.38 + level * 0.16), 0),
+				Color = Color3.fromRGB(52 + level * 6, 88 + level * 6, 62),
+				Material = Enum.Material.LeafyGrass,
+				CanCollide = level == 1,
+				Parent = props,
+			})
+		end
+	end
+
+	-- Poste de luz (Ciudad)
+	local function makeLampPost(pos)
+		part({
+			Name = "Poste",
+			Size = Vector3.new(0.7, 16, 0.7),
+			Position = pos + Vector3.new(0, 8, 0),
+			Color = Color3.fromRGB(58, 60, 66),
+			Material = Enum.Material.Metal,
+			CanCollide = true,
+			Parent = props,
+		})
+		local lamp = part({
+			Name = "Farol",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(2.6, 2.6, 2.6),
+			Position = pos + Vector3.new(0, 16.6, 0),
+			Color = Color3.fromRGB(255, 232, 168),
+			Material = Enum.Material.Neon,
+			CanCollide = false,
+			Parent = props,
+		})
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 226, 158)
+		light.Range = 34
+		light.Brightness = 1.1
+		light.Parent = lamp
+	end
+
+	-- Banco de plaza (Ciudad)
+	local function makeBench(pos)
+		local base = CFrame.new(pos) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+		part({
+			Name = "BancoAsiento",
+			Size = Vector3.new(6, 0.6, 1.8),
+			CFrame = base * CFrame.new(0, 2.2, 0),
+			Color = Color3.fromRGB(126, 96, 62),
+			Material = Enum.Material.WoodPlanks,
+			CanCollide = true,
+			Parent = props,
+		})
+		for _, dx in ipairs({ -2.4, 2.4 }) do
+			part({
+				Name = "PatasBanco",
+				Size = Vector3.new(0.6, 2.2, 1.4),
+				CFrame = base * CFrame.new(dx, 1.1, 0),
+				Color = Color3.fromRGB(74, 76, 82),
+				Material = Enum.Material.Metal,
+				CanCollide = true,
+				Parent = props,
+			})
+		end
+	end
+
+	-- Torre mirador de la ciudad (estilo Sky Tower)
+	local function makeSkyTower(pos)
+		local shaft = part({
+			Name = "TorreFuste",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(120, 13, 13),
+			CFrame = CFrame.new(pos + Vector3.new(0, 60, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = Color3.fromRGB(206, 214, 222),
+			Material = Enum.Material.Concrete,
+			CanCollide = true,
+			Parent = props,
+		})
+		part({
+			Name = "TorreMirador",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(26, 26, 26),
+			Position = pos + Vector3.new(0, 108, 0),
+			Color = Color3.fromRGB(120, 150, 180),
+			Material = Enum.Material.Glass,
+			CanCollide = true,
+			Parent = props,
+		})
+		part({
+			Name = "TorreAguja",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(46, 2.2, 2.2),
+			CFrame = CFrame.new(pos + Vector3.new(0, 145, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = Color3.fromRGB(180, 190, 200),
+			Material = Enum.Material.Metal,
+			CanCollide = false,
+			Parent = props,
+		})
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 120, 110)
+		light.Range = 60
+		light.Brightness = 2
+		light.Parent = shaft
+	end
+
 	-- ===============================================================
 	-- Casas con interiores (escondites de verdad) y baules de armas
 	-- ===============================================================
 	local HOUSE_WOOD = Color3.fromRGB(122, 92, 62)
-	local HOUSE_WALL = Color3.fromRGB(204, 190, 166)
-	local HOUSE_ROOF = Color3.fromRGB(148, 76, 54)
-	local HOUSE_FLOOR = Color3.fromRGB(104, 84, 64)
+	local HOUSE_WALL = zone.wall or Color3.fromRGB(204, 190, 166)
+	local HOUSE_ROOF = zone.roof or Color3.fromRGB(148, 76, 54)
+	local HOUSE_FLOOR = zone.floor or Color3.fromRGB(104, 84, 64)
 
 	local function box(name, cf, size, color, material)
 		return part({
@@ -882,35 +1282,66 @@ local function buildArena(index, zone, cfg, parent, rng)
 	local function makeHouse(pos, angle, variant)
 		local base = CFrame.new(pos) * CFrame.Angles(0, angle, 0)
 		local big = variant == "farm"
-		local W = big and 21 or 17
-		local D = big and 16 or 13
-		local wallH = 9
+		local W = big and 30 or 26
+		local D = big and 22 or 19
+		local floorH = 9.4
+		local totalH = floorH * 2
 		local wood = HOUSE_WOOD
 		local floorPart = box("PisoCasa", base * CFrame.new(0, 0.3, 0), Vector3.new(W + 1.6, 0.6, D + 1.6), HOUSE_FLOOR, Enum.Material.Slate)
 
-		local doorW = 4.6
+		-- Escalinata y toldo de entrada
+		box("EscalonEntrada", base * CFrame.new(0, 0.3, D * 0.5 + 1.5), Vector3.new(8, 0.6, 3), HOUSE_FLOOR, Enum.Material.Slate)
+		box("Toldo", base * CFrame.new(0, 7.9, D * 0.5 + 1.4), Vector3.new(9, 0.4, 3.0), wood, Enum.Material.WoodPlanks)
+
+		local doorW = 6.4
 		local sideW = (W - doorW) * 0.5
-		box("ParedFrenteA", base * CFrame.new(-(doorW * 0.5 + sideW * 0.5), wallH * 0.5 + 0.6, D * 0.5), Vector3.new(sideW, wallH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
-		box("ParedFrenteB", base * CFrame.new(doorW * 0.5 + sideW * 0.5, wallH * 0.5 + 0.6, D * 0.5), Vector3.new(sideW, wallH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
-		box("DintelFrente", base * CFrame.new(0, wallH - 1.1 + 0.6, D * 0.5), Vector3.new(doorW, 2.2, 0.8), HOUSE_WALL, Enum.Material.Concrete)
-		box("ParedFondo", base * CFrame.new(0, wallH * 0.5 + 0.6, -D * 0.5), Vector3.new(W, wallH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
-		box("ParedIzq", base * CFrame.new(-W * 0.5, wallH * 0.5 + 0.6, 0), Vector3.new(0.8, wallH, D), HOUSE_WALL, Enum.Material.Concrete)
-		box("ParedDer", base * CFrame.new(W * 0.5, wallH * 0.5 + 0.6, 0), Vector3.new(0.8, wallH, D), HOUSE_WALL, Enum.Material.Concrete)
+		box("ParedFrenteA", base * CFrame.new(-(doorW * 0.5 + sideW * 0.5), totalH * 0.5 + 0.6, D * 0.5), Vector3.new(sideW, totalH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
+		box("ParedFrenteB", base * CFrame.new(doorW * 0.5 + sideW * 0.5, totalH * 0.5 + 0.6, D * 0.5), Vector3.new(sideW, totalH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
+		box("DintelFrente", base * CFrame.new(0, floorH - 0.5, D * 0.5), Vector3.new(doorW, 2.2, 0.8), HOUSE_WALL, Enum.Material.Concrete)
+		box("ParedFrenteC", base * CFrame.new(0, floorH + 0.6 + floorH * 0.5, D * 0.5), Vector3.new(doorW, floorH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
+		box("ParedFondo", base * CFrame.new(0, totalH * 0.5 + 0.6, -D * 0.5), Vector3.new(W, totalH, 0.8), HOUSE_WALL, Enum.Material.Concrete)
+		box("ParedIzq", base * CFrame.new(-W * 0.5, totalH * 0.5 + 0.6, 0), Vector3.new(0.8, totalH, D), HOUSE_WALL, Enum.Material.Concrete)
+		box("ParedDer", base * CFrame.new(W * 0.5, totalH * 0.5 + 0.6, 0), Vector3.new(0.8, totalH, D), HOUSE_WALL, Enum.Material.Concrete)
 
-		box("VentanaA", base * CFrame.new(-W * 0.5, 5.4, D * 0.16), Vector3.new(1.0, 3.0, 3.4), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
-		box("VentanaB", base * CFrame.new(W * 0.5, 5.4, -D * 0.16), Vector3.new(1.0, 3.0, 3.4), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
-		box("VentanaC", base * CFrame.new(W * 0.2, 5.4, -D * 0.5), Vector3.new(3.2, 3.0, 1.0), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
+		-- Ventanas en las dos plantas
+		box("VentanaA", base * CFrame.new(-W * 0.5, 5.4, D * 0.2), Vector3.new(1.0, 3.0, 3.4), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
+		box("VentanaB", base * CFrame.new(W * 0.5, 5.4, -D * 0.2), Vector3.new(1.0, 3.0, 3.4), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
+		box("VentanaC", base * CFrame.new(W * 0.22, 5.4, -D * 0.5), Vector3.new(3.2, 3.0, 1.0), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
+		box("VentanaAltaA", base * CFrame.new(-W * 0.5, floorH + 5.4, D * 0.2), Vector3.new(1.0, 3.0, 3.4), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
+		box("VentanaAltaB", base * CFrame.new(W * 0.5, floorH + 5.4, -D * 0.2), Vector3.new(1.0, 3.0, 3.4), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
+		box("VentanaAltaC", base * CFrame.new(W * 0.3, floorH + 5.4, D * 0.5), Vector3.new(3.2, 3.0, 1.0), Color3.fromRGB(88, 116, 128), Enum.Material.Glass)
 
-		box("MarcoIzq", base * CFrame.new(-doorW * 0.5 - 0.25, 3.6, D * 0.5), Vector3.new(0.5, 6.4, 1.1), wood, Enum.Material.Wood)
-		box("MarcoDer", base * CFrame.new(doorW * 0.5 + 0.25, 3.6, D * 0.5), Vector3.new(0.5, 6.4, 1.1), wood, Enum.Material.Wood)
+		box("MarcoIzq", base * CFrame.new(-doorW * 0.5 - 0.25, 3.9, D * 0.5), Vector3.new(0.5, 7.0, 1.1), wood, Enum.Material.Wood)
+		box("MarcoDer", base * CFrame.new(doorW * 0.5 + 0.25, 3.9, D * 0.5), Vector3.new(0.5, 7.0, 1.1), wood, Enum.Material.Wood)
 
-		box("TechoCasa", base * CFrame.new(0, wallH + 1.1, 0), Vector3.new(W + 1.8, 0.6, D + 1.8), wood, Enum.Material.WoodPlanks)
+		-- Piso del segundo piso con hueco para la escalera
+		local holeW = 5.8
+		local holeZEnd = -D * 0.5 + D * 0.62
+		local slabY = floorH + 0.55
+		box("PisoAltoDerecha", base * CFrame.new(holeW * 0.5, slabY, 0), Vector3.new(W - holeW, 0.5, D), wood, Enum.Material.WoodPlanks)
+		box("PisoAltoFrente", base * CFrame.new(-W * 0.5 + holeW * 0.5, slabY, (holeZEnd + D * 0.5) * 0.5), Vector3.new(holeW, 0.5, D * 0.5 - holeZEnd), wood, Enum.Material.WoodPlanks)
+		box("BarandaEscalera", base * CFrame.new(-W * 0.5 + holeW + 0.2, slabY + 1.6, (-3.0 + holeZEnd) * 0.5), Vector3.new(0.3, 2.6, holeZEnd + 3.0), wood, Enum.Material.Wood)
+		box("BarandaFrente", base * CFrame.new(-W * 0.5 + holeW * 0.5, slabY + 1.6, holeZEnd + 0.15), Vector3.new(holeW, 2.6, 0.3), wood, Enum.Material.Wood)
+
+		-- Escalera de 12 escalones contra la pared izquierda
+		local steps = 12
+		local stepRise = floorH / steps
+		local stepRun = (D - 5.5) / steps
+		local stairX = -W * 0.5 + 2.9
+		local stairZ0 = D * 0.5 - 2.5
+		for i = 1, steps do
+			box("Escalon", base * CFrame.new(stairX, 0.6 + i * stepRise - stepRise * 0.5, stairZ0 - (i - 1) * stepRun),
+				Vector3.new(5.0, stepRise, stepRun + 0.25), wood, Enum.Material.WoodPlanks)
+		end
+
+		box("TechoCasa", base * CFrame.new(0, totalH + 1.1, 0), Vector3.new(W + 1.8, 0.6, D + 1.8), wood, Enum.Material.WoodPlanks)
+		box("Chimenea", base * CFrame.new(W * 0.24, totalH + 3.6, -D * 0.18), Vector3.new(2.4, 6, 2.4), Color3.fromRGB(128, 84, 70), Enum.Material.Brick)
 		local slope = math.rad(26)
 		local slab = (W * 0.5 + 1.6) / math.cos(slope)
 		part({
 			Name = "TejadoA",
 			Size = Vector3.new(slab, 0.7, D + 2.6),
-			CFrame = base * CFrame.new(-W * 0.25 - 0.5, wallH + 2.4, 0) * CFrame.Angles(0, 0, slope),
+			CFrame = base * CFrame.new(-W * 0.25 - 0.5, totalH + 2.4, 0) * CFrame.Angles(0, 0, slope),
 			Color = HOUSE_ROOF,
 			Material = Enum.Material.Slate,
 			CanCollide = true,
@@ -919,40 +1350,48 @@ local function buildArena(index, zone, cfg, parent, rng)
 		part({
 			Name = "TejadoB",
 			Size = Vector3.new(slab, 0.7, D + 2.6),
-			CFrame = base * CFrame.new(W * 0.25 + 0.5, wallH + 2.4, 0) * CFrame.Angles(0, 0, -slope),
+			CFrame = base * CFrame.new(W * 0.25 + 0.5, totalH + 2.4, 0) * CFrame.Angles(0, 0, -slope),
 			Color = HOUSE_ROOF,
 			Material = Enum.Material.Slate,
 			CanCollide = true,
 			Parent = props,
 		})
 
-		makeTable(base * CFrame.new(-W * 0.2, 0.6, 0), wood)
-		makeChair(base * CFrame.new(-W * 0.2, 0.6, 2.4), wood)
-		makeChair(base * CFrame.new(-W * 0.2, 0.6, -2.4), wood)
-		makeBed(base * CFrame.new(W * 0.24, 0.6, -D * 0.28), wood)
-		makeShelfProp(base * CFrame.new(-W * 0.36, 0.6, -D * 0.38), wood)
-		makeCrateProp(base * CFrame.new(W * 0.33, 0.6, D * 0.32), Vector3.new(4.4, 4.4, 4.4), wood)
+		-- Planta baja: comedor y living del lado derecho (la escalera usa la izquierda)
+		makeTable(base * CFrame.new(3, 0.6, -1), wood)
+		makeChair(base * CFrame.new(3, 0.6, 2), wood)
+		makeChair(base * CFrame.new(3, 0.6, -4), wood)
+		makeBed(base * CFrame.new(W * 0.3, 0.6, -D * 0.32), wood)
+		makeShelfProp(base * CFrame.new(8, 0.6, 0.5), wood)
+		makeCrateProp(base * CFrame.new(6.5, 0.6, D * 0.3), Vector3.new(4.4, 4.4, 4.4), wood)
 		if big then
-			makeShelfProp(base * CFrame.new(0, 0.6, -D * 0.44), wood)
-			makeCrateProp(base * CFrame.new(-W * 0.32, 0.6, D * 0.3), Vector3.new(4, 3.2, 4), wood)
-			makeBarrelHide(base * CFrame.new(W * 0.3, 0.6, -D * 0.05), "Barril")
-		else
-			makeShelfProp(base * CFrame.new(0, 0.6, -D * 0.44), wood)
+			makeCrateProp(base * CFrame.new(0.5, 0.6, -D * 0.36), Vector3.new(4, 3.2, 4), wood)
+			makeBarrelHide(base * CFrame.new(-4.5, 0.6, -D * 0.05), "Barril")
 		end
+		makeShelfProp(base * CFrame.new(-4, 0.6, -D * 0.4), wood)
+		makeCloset(base * CFrame.new(W * 0.36, 0.6, D * 0.1) * CFrame.Angles(0, math.rad(-90), 0), "Armario")
+		makeChestProp(base * CFrame.new(-4, 0.6, D * 0.36), "Baúl")
 
-		makeCloset(base * CFrame.new(W * 0.32, 0.6, D * 0.16) * CFrame.Angles(0, math.rad(-90), 0), "Armario")
-		makeChestProp(base * CFrame.new(-W * 0.05, 0.6, D * 0.34), "Baúl")
+		addSpot("casa", "Casa", floorPart, (base * CFrame.new(-3, 0, -D * 0.3)).Position, 2.8, 0.9)
+		addSpot("casa", "Casa", floorPart, (base * CFrame.new(5, 0, D * 0.05)).Position, 2.8, 0.9)
 
-		addSpot("casa", "Casa", floorPart, (base * CFrame.new(-W * 0.3, 0, -D * 0.3)).Position, 2.8, 0.9)
-		addSpot("casa", "Casa", floorPart, (base * CFrame.new(W * 0.1, 0, -D * 0.05)).Position, 2.8, 0.9)
-		addIndoor(base, Vector3.new(W - 2, wallH, D - 2))
+		-- Planta alta: dormitorio y baul propios. No hay escondite (armario)
+		-- aca arriba: el kiwi no sabe subir escaleras y seria una zona segura.
+		local upY = floorH + 0.8
+		makeBed(base * CFrame.new(W * 0.3, upY, -D * 0.3), wood)
+		makeShelfProp(base * CFrame.new(2, upY, -D * 0.42), wood)
+		makeCrateProp(base * CFrame.new(-3.5, upY, D * 0.3), Vector3.new(4, 3.6, 4), wood)
+		makeShelfProp(base * CFrame.new(W * 0.34, upY, D * 0.08), wood)
+		makeChestProp(base * CFrame.new(2.5, upY, D * 0.34), "Baúl del piso")
+
+		addIndoor(base, Vector3.new(W - 2, totalH, D - 2))
 	end
 
 	local function makeBarn(pos, angle)
 		local base = CFrame.new(pos) * CFrame.Angles(0, angle, 0)
 		local W, D, wallH = 23, 17, 11
 		local wood = HOUSE_WOOD
-		local barnRed = Color3.fromRGB(140, 62, 52)
+		local barnRed = zone.barn or (theme == "ciudad" and Color3.fromRGB(118, 110, 102) or Color3.fromRGB(140, 62, 52))
 		local floorPart = box("PisoGranero", base * CFrame.new(0, 0.3, 0), Vector3.new(W + 1.6, 0.6, D + 1.6), HOUSE_FLOOR, Enum.Material.Slate)
 
 		local doorW = 10
@@ -984,6 +1423,33 @@ local function buildArena(index, zone, cfg, parent, rng)
 			CanCollide = true,
 			Parent = props,
 		})
+
+		-- Silos de metal al lado del granero
+		for _, side in ipairs({ -1, 1 }) do
+			if rng:NextNumber(0, 1) < 0.6 then
+				local sPos = base * CFrame.new(side * (W * 0.5 + 9), 0, -D * 0.2)
+				part({
+					Name = "Silo",
+					Shape = Enum.PartType.Cylinder,
+					Size = Vector3.new(26, 15, 15),
+					CFrame = sPos * CFrame.new(0, 13, 0) * CFrame.Angles(0, 0, math.rad(90)),
+					Color = Color3.fromRGB(196, 190, 178),
+					Material = Enum.Material.Metal,
+					CanCollide = true,
+					Parent = props,
+				})
+				part({
+					Name = "SiloTecho",
+					Shape = Enum.PartType.Ball,
+					Size = Vector3.new(15.5, 8, 15.5),
+					CFrame = sPos * CFrame.new(0, 25.4, 0),
+					Color = Color3.fromRGB(150, 74, 58),
+					Material = Enum.Material.Metal,
+					CanCollide = true,
+					Parent = props,
+				})
+			end
+		end
 
 		makeHayProp(base * CFrame.new(-W * 0.24, 0.6, -D * 0.2), "Pajar")
 		makeHayProp(base * CFrame.new(W * 0.24, 0.6, -D * 0.22), "Pajar")
@@ -1024,52 +1490,187 @@ local function buildArena(index, zone, cfg, parent, rng)
 	-- Zona central despejada para que aparezca el kiwi
 	table.insert(occupied, center + Vector3.new(0, 0, 0))
 
-	for i = 1, 34 do
-		local p = freeSpot(22)
-		if p then
-			makeBush(p)
+	if theme == "bosque" then
+		for i = 1, 34 do
+			local p = freeSpot(22)
+			if p then
+				makeBush(p)
+			end
 		end
-	end
 
-	for i = 1, 16 do
-		local p = freeSpot(24)
-		if p then
-			makeFern(p)
+		for i = 1, 16 do
+			local p = freeSpot(24)
+			if p then
+				makeFern(p)
+			end
 		end
-	end
 
-	for i = 1, 12 do
-		local p = freeSpot(26)
-		if p then
-			makeLog(p)
+		for i = 1, 12 do
+			local p = freeSpot(26)
+			if p then
+				makeLog(p)
+			end
 		end
-	end
 
-	for i = 1, 15 do
-		local p = freeSpot(26)
-		if p then
-			makeRocks(p)
+		for i = 1, 15 do
+			local p = freeSpot(26)
+			if p then
+				makeRocks(p)
+			end
 		end
-	end
 
-	for i = 1, 12 do
-		local p = freeSpot(28)
-		if p then
-			makeBurrow(p)
+		for i = 1, 12 do
+			local p = freeSpot(28)
+			if p then
+				makeBurrow(p)
+			end
 		end
-	end
 
-	for i = 1, 18 do
-		local p = freeSpot(26)
-		if p then
-			makeGrassPatch(p)
+		for i = 1, 18 do
+			local p = freeSpot(26)
+			if p then
+				makeGrassPatch(p)
+			end
 		end
-	end
 
-	for i = 1, 40 do
-		local p = freeSpot(18)
-		if p then
-			makeTree(p)
+		for i = 1, 40 do
+			local p = freeSpot(18)
+			if p then
+				makeTree(p)
+			end
+		end
+	elseif theme == "dunas" then
+		for i = 1, 14 do
+			local p = freeSpot(24)
+			if p then
+				makeCactus(p)
+			end
+		end
+
+		for i = 1, 16 do
+			local p = freeSpot(26)
+			if p then
+				makeDuneMound(p)
+			end
+		end
+
+		for i = 1, 16 do
+			local p = freeSpot(24)
+			if p then
+				makeRocks(p)
+			end
+		end
+
+		for i = 1, 8 do
+			local p = freeSpot(28)
+			if p then
+				makeBurrow(p)
+			end
+		end
+
+		for i = 1, 6 do
+			local p = freeSpot(26)
+			if p then
+				makeGrassPatch(p)
+			end
+		end
+	elseif theme == "ciudad" then
+		for i = 1, 14 do
+			local p = freeSpot(22)
+			if p then
+				makeTree(p)
+			end
+		end
+
+		for i = 1, 8 do
+			local p = freeSpot(22)
+			if p then
+				makeBush(p)
+			end
+		end
+
+		for i = 1, 14 do
+			local p = freeSpot(20)
+			if p then
+				makeLampPost(p)
+			end
+		end
+
+		for i = 1, 8 do
+			local p = freeSpot(22)
+			if p then
+				makeBench(p)
+			end
+		end
+
+		for i = 1, 6 do
+			local p = freeSpot(26)
+			if p then
+				makeRocks(p)
+			end
+		end
+	elseif theme == "costa" then
+		for i = 1, 20 do
+			local p = freeSpot(22)
+			if p then
+				makePalm(p)
+			end
+		end
+
+		for i = 1, 10 do
+			local p = freeSpot(22)
+			if p then
+				makeBush(p)
+			end
+		end
+
+		for i = 1, 12 do
+			local p = freeSpot(26)
+			if p then
+				makeLog(p)
+			end
+		end
+
+		for i = 1, 10 do
+			local p = freeSpot(26)
+			if p then
+				makeRocks(p)
+			end
+		end
+
+		for i = 1, 10 do
+			local p = freeSpot(26)
+			if p then
+				makeGrassPatch(p)
+			end
+		end
+	elseif theme == "alpes" then
+		for i = 1, 30 do
+			local p = freeSpot(20)
+			if p then
+				makePine(p)
+			end
+		end
+
+		for i = 1, 12 do
+			local p = freeSpot(26)
+			if p then
+				makeRocks(p)
+			end
+		end
+
+		for i = 1, 8 do
+			local p = freeSpot(26)
+			if p then
+				makeLog(p)
+			end
+		end
+
+		for i = 1, 6 do
+			local p = freeSpot(28)
+			if p then
+				makeBurrow(p)
+			end
 		end
 	end
 
@@ -1111,21 +1712,32 @@ local function buildArena(index, zone, cfg, parent, rng)
 		end
 
 		-- La aldea: casa, casona y granero (con interiores y baules)
-		local anchor = freeSpotFallback(48, { 74, 52, 34, 20 })
+		local anchor = freeSpotFallback(56, { 78, 56, 36, 22 })
 		if anchor then
 			makeHouse(anchor, faceCenter(anchor), "cabin")
-			placeNear(anchor, { 36, 42, 48, 30 }, 34, function(cand)
+			placeNear(anchor, { 48, 54, 60, 40 }, 46, function(cand)
 				makeHouse(cand, faceCenter(cand), "farm")
 			end)
-			placeNear(anchor, { 40, 46, 52, 34 }, 34, function(cand)
+			placeNear(anchor, { 56, 60, 66, 48 }, 50, function(cand)
 				makeBarn(cand, faceCenter(cand))
 			end)
 		end
 
 		-- Una casa mas lejos para variar el mapa
-		local farHouse = freeSpotFallback(46, { 70, 50, 32, 18 })
+		local farHouse = freeSpotFallback(52, { 72, 52, 34, 20 })
 		if farHouse then
 			makeHouse(farHouse, faceCenter(farHouse), rng:NextNumber(0, 1) < 0.5 and "cabin" or "farm")
+		end
+
+		-- La ciudad suma una casa mas y su torre mirador
+		if theme == "ciudad" and anchor then
+			placeNear(anchor, { 64, 74, 50, 36 }, 48, function(cand)
+				makeHouse(cand, faceCenter(cand), "farm")
+			end)
+			local skySpot = freeSpotFallback(54, { 82, 60, 40, 24 })
+			if skySpot then
+				makeSkyTower(skySpot)
+			end
 		end
 
 		-- Baules sueltos por el mapa
@@ -1136,10 +1748,12 @@ local function buildArena(index, zone, cfg, parent, rng)
 			end
 		end
 
-		-- Torre mirador
-		local towerPos = freeSpotFallback(40, { 70, 48, 30, 18 })
-		if towerPos then
-			makeTower(towerPos)
+		-- Torre mirador de madera (en la ciudad la reemplaza la torre alta)
+		if theme ~= "ciudad" then
+			local towerPos = freeSpotFallback(44, { 70, 48, 30, 18 })
+			if towerPos then
+				makeTower(towerPos)
+			end
 		end
 	end
 
@@ -1175,7 +1789,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 	local sign = part({
 		Name = "LetreroZona",
 		Size = Vector3.new(1, 12, 22),
-		CFrame = CFrame.new(center + Vector3.new(0, 6, -half + 14)),
+		CFrame = CFrame.new(center + Vector3.new(0, 6, -half + 26)),
 		Color = Color3.fromRGB(42, 38, 34),
 		Material = Enum.Material.WoodPlanks,
 		CanCollide = true,

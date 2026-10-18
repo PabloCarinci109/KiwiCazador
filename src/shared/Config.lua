@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.2.0"
+Config.Version = "1.3.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -33,13 +33,82 @@ Config.Lobby = {
 	SpawnOffset = Vector3.new(0, 5, 34),
 }
 
--- Zonas decorativas: cada arena recibe una (5 temas distintos)
+-- Mapas jugables: cada arena es un mapa distinto y se eligen por votacion.
+-- id: se usa en la votacion; theme: como se construye el mapa.
 Config.Zones = {
-	{ name = "Bosque de Kauri",   grass = Color3.fromRGB(74, 118, 72),  tree = Color3.fromRGB(88, 62, 44) },
-	{ name = "Humedal de Punga",  grass = Color3.fromRGB(86, 122, 92),  tree = Color3.fromRGB(74, 58, 46) },
-	{ name = "Pradera de Manuka", grass = Color3.fromRGB(122, 132, 78), tree = Color3.fromRGB(96, 74, 52) },
-	{ name = "Costa de Totara",   grass = Color3.fromRGB(120, 138, 94), tree = Color3.fromRGB(118, 74, 52) },
-	{ name = "Valle de Helechos", grass = Color3.fromRGB(62, 106, 78),  tree = Color3.fromRGB(66, 54, 46) },
+	{
+		id = "bosque", name = "Bosque de Kauri", theme = "bosque",
+		hint = "Arboles gigantes y helechos",
+		grass = Color3.fromRGB(74, 118, 72), ground = Enum.Material.LeafyGrass,
+		tree = Color3.fromRGB(88, 62, 44),
+		wall = Color3.fromRGB(204, 190, 166), roof = Color3.fromRGB(148, 76, 54), floor = Color3.fromRGB(104, 84, 64),
+		fence = Color3.fromRGB(96, 74, 52),
+		pond = { color = Color3.fromRGB(64, 122, 150), material = Enum.Material.Water, scale = 1 },
+	},
+	{
+		id = "dunas", name = "Dunas de Te Paki", theme = "dunas",
+		hint = "Arena, cactus y medanos",
+		grass = Color3.fromRGB(214, 188, 136), ground = Enum.Material.Sand,
+		tree = Color3.fromRGB(122, 138, 82),
+		wall = Color3.fromRGB(198, 172, 128), roof = Color3.fromRGB(150, 108, 72), floor = Color3.fromRGB(166, 138, 100),
+		fence = Color3.fromRGB(158, 128, 88),
+		pond = { color = Color3.fromRGB(74, 168, 160), material = Enum.Material.Water, scale = 0.7 },
+	},
+	{
+		id = "ciudad", name = "Ciudad de Auckland", theme = "ciudad",
+		hint = "Calles, plazas y torre mirador",
+		grass = Color3.fromRGB(118, 120, 124), ground = Enum.Material.Concrete,
+		tree = Color3.fromRGB(86, 96, 72),
+		wall = Color3.fromRGB(196, 190, 182), roof = Color3.fromRGB(72, 76, 84), floor = Color3.fromRGB(96, 96, 100),
+		fence = Color3.fromRGB(124, 126, 132),
+		pond = false,
+	},
+	{
+		id = "costa", name = "Costa de Totara", theme = "costa",
+		hint = "Playa, palmeras y mar",
+		grass = Color3.fromRGB(224, 204, 156), ground = Enum.Material.Sand,
+		tree = Color3.fromRGB(118, 88, 58),
+		wall = Color3.fromRGB(206, 196, 176), roof = Color3.fromRGB(96, 132, 140), floor = Color3.fromRGB(150, 126, 96),
+		fence = Color3.fromRGB(120, 96, 66),
+		pond = { color = Color3.fromRGB(38, 108, 158), material = Enum.Material.Water, scale = 1.7 },
+	},
+	{
+		id = "alpes", name = "Alpes del Sur", theme = "alpes",
+		hint = "Nieve, pinos y lago congelado",
+		grass = Color3.fromRGB(238, 242, 248), ground = Enum.Material.Snow,
+		tree = Color3.fromRGB(70, 56, 46),
+		wall = Color3.fromRGB(160, 130, 96), roof = Color3.fromRGB(110, 78, 58), floor = Color3.fromRGB(104, 84, 66),
+		fence = Color3.fromRGB(122, 98, 74),
+		pond = { color = Color3.fromRGB(176, 214, 232), material = Enum.Material.Ice, scale = 1 },
+	},
+}
+
+-- Votacion de mapa: al entrar a una partida cada jugador elige el mapa.
+-- Con un solo jugador (o si todos ya votaron) arranca al instante.
+Config.Vote = {
+	multiTime = 18,    -- tiempo de votacion en Multijugador
+	soloTime = 20,     -- tiempo maximo si el jugador no elige en modos solo
+	revealTime = 1.2,  -- pausa despues del voto antes de la cuenta regresiva
+}
+
+-- Iluminacion por mapa: se aplica al arrancar la ronda y se restaura al salir.
+-- ambient/outdoor/brightness: colores de luz; fog: niebla; clock: hora del dia.
+Config.LightDefault = {
+	ambient = Color3.fromRGB(70, 70, 70),
+	outdoor = Color3.fromRGB(128, 128, 128),
+	brightness = 2,
+	fog = Color3.fromRGB(192, 192, 192),
+	fogStart = 0,
+	fogEnd = 100000,
+	clock = 14,
+}
+
+Config.ZoneLight = {
+	bosque = { ambient = Color3.fromRGB(74, 80, 70), outdoor = Color3.fromRGB(120, 130, 118), brightness = 2, fog = Color3.fromRGB(168, 188, 178), fogStart = 220, fogEnd = 950, clock = 15.2 },
+	dunas = { ambient = Color3.fromRGB(118, 104, 84), outdoor = Color3.fromRGB(176, 154, 122), brightness = 2.6, fog = Color3.fromRGB(226, 202, 158), fogStart = 180, fogEnd = 850, clock = 14 },
+	ciudad = { ambient = Color3.fromRGB(94, 98, 106), outdoor = Color3.fromRGB(132, 138, 148), brightness = 1.9, fog = Color3.fromRGB(176, 184, 196), fogStart = 200, fogEnd = 900, clock = 16.2 },
+	costa = { ambient = Color3.fromRGB(108, 118, 130), outdoor = Color3.fromRGB(158, 172, 188), brightness = 2.4, fog = Color3.fromRGB(198, 218, 234), fogStart = 260, fogEnd = 1150, clock = 13.2 },
+	alpes = { ambient = Color3.fromRGB(150, 160, 176), outdoor = Color3.fromRGB(202, 212, 226), brightness = 2.8, fog = Color3.fromRGB(224, 234, 246), fogStart = 200, fogEnd = 1000, clock = 12 },
 }
 
 -- ===============================================================
@@ -91,9 +160,14 @@ Config.Tracker = {
 	range = 900,       -- distancia maxima para dar la pista
 }
 
--- Mira del rifle tranquilizante (clic derecho para apuntar)
+-- Mira (clic derecho para apuntar). Cada arma puede tener su zoom.
 Config.Scope = {
 	fov = 30,          -- campo de vision mientras apuntas (mas chico = mas zoom)
+	weapons = {
+		sniper = 16,   -- el francotirador tiene el zoom mas fuerte
+		revolver = 34,
+		arco = 28,
+	},
 }
 
 -- Trampa de fruta: el kiwi hambriento va solo hacia la fruta...
@@ -150,9 +224,10 @@ Config.Loot = {
 	uses = 3,             -- usos por arma encontrada
 	pickupRange = 12,     -- distancia para abrir el baul
 	weapons = {
-		{ id = "cohete", weight = 3 },
+		{ id = "cohete", weight = 4 },
 		{ id = "revolver", weight = 3 },
 		{ id = "arco", weight = 3 },
+		{ id = "sniper", weight = 3 },
 	},
 }
 
@@ -164,6 +239,7 @@ Config.Weapons = {
 		speed = 92,
 		life = 5,
 		blast = 16,
+		damage = 40,    -- daño a otros cazadores (al kiwi solo lo relentiza)
 		knockback = 92,
 		slowFactor = 0.12,
 		slowTime = 2.6,
@@ -176,6 +252,7 @@ Config.Weapons = {
 		speed = 230,
 		life = 1.6,
 		blast = 0,
+		damage = 20,
 		knockback = 38,
 		slowFactor = 0.55,
 		slowTime = 1.6,
@@ -188,10 +265,24 @@ Config.Weapons = {
 		speed = 165,
 		life = 2.6,
 		blast = 9,
+		damage = 26,
 		knockback = 24,
 		slowFactor = 0.35,
 		slowTime = 3.2,
 		size = Vector3.new(0.22, 0.22, 2.0),
+	},
+	sniper = {
+		name = "Francotirador",
+		color = Color3.fromRGB(150, 220, 190),
+		cooldown = 2.8,
+		speed = 420,
+		life = 5,
+		blast = 0,
+		damage = 48,    -- el golpe mas fuerte contra otros cazadores
+		knockback = 58,
+		slowFactor = 0.30,
+		slowTime = 2.0,
+		size = Vector3.new(0.22, 0.22, 2.6),
 	},
 }
 
@@ -199,6 +290,9 @@ Config.Player = {
 	walkSpeed = 16,
 	sprintSpeed = 24,
 	sneakSpeed = 7,
+	maxHealth = 100,   -- vida de los cazadores (las armas de baul hieren)
+	regen = 4,         -- vida por segundo fuera de combate
+	regenDelay = 6,    -- segundos sin recibir daño para regenerar
 }
 
 -- ===============================================================
@@ -343,7 +437,6 @@ Config.Multiplayer = {
 	blurb = "El kiwi gigante va comiendo cazadores: gana el último que quede vivo.",
 	tools = { "rastreador", "relente", "pintura" },
 	baseDifficulty = "normal",
-	waitTime = 12,          -- tiempo de espera antes de empezar la ronda
 	maxPlayers = 12,
 	timeLimit = 300,
 	scoreboardSize = 8,     -- cuantas filas ve el jugador
@@ -361,6 +454,7 @@ Config.Round = {
 	UpdateInterval = 0.5,    -- cada cuanto se refresca el HUD
 	KiwiRespawnDelay = 1.0,  -- espera entre capturas (modo solo)
 	EatHold = 2.6,           -- cuanto dura "comerse" a un cazador (modo Colosal)
+	KoHold = 1.8,            -- cuanto dura un noqueado antes de volver al lobby
 	HubReturn = true,        -- devolver al lobby al terminar
 }
 
@@ -403,6 +497,12 @@ Config.Text = {
 	BoomShout = "¡%s disparó el %s!",
 	BoomHit = "¡Le diste con el %s!",
 	SniffCaught = "¡El kiwi encontró a %s escondido y se lo comió!",
+	EatenMenu = "El kiwi te comió. Elige otro modo para volver a jugar.",
+	MapPickNotify = "¡Mapa elegido: %s!",
+	MapFallback = "Ese mapa estaba ocupado: esta partida va en %s.",
+	HurtMsg = "¡%s te dio con %s! (-%d de vida)",
+	KoedAll = "¡%s dejó fuera a %s de un disparo!",
+	KoMenu = "Te noquearon a tiros. Elige otro modo para volver a jugar.",
 	DeathTitle = "¡TE COMIÓ EL KIWI!",
 	DeathSubtitle = "Vuelves al lobby... la reserva no perdona.",
 	SlowHit = "¡Diste al kiwi gigante! Va más lento por %d segundos.",

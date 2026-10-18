@@ -260,7 +260,9 @@ end
 -- Movimiento
 -- ===============================================================
 function KiwiController:groundY(pos)
-	local origin = Vector3.new(pos.X, pos.Y + 18, pos.Z)
+	-- Rayo corto justo arriba del kiwi: si mira desde muy arriba "engancha"
+	-- techos o pisos altos (casas de dos pisos) y se teletransporta arriba.
+	local origin = Vector3.new(pos.X, pos.Y + 2.2, pos.Z)
 	local result = workspace:Raycast(origin, Vector3.new(0, -70, 0), self.moveParams)
 	if result then
 		self.lastGroundY = result.Position.Y
