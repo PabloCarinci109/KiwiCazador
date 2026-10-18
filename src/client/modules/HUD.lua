@@ -353,15 +353,13 @@ local function buildSessionHud(parent)
 		Text = "VIDA",
 	}, top)
 
-	-- Punto de mira estilo Counter: se abre al moverse o disparar
+	-- Cruz estilo Counter: cuatro rayitas que se abren con la dispersion
 	local cross = new("Frame", {
 		Name = "PuntoMira",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0, 3, 0, 3),
-		BackgroundColor3 = Color3.fromRGB(120, 255, 150),
-		BackgroundTransparency = 0.1,
-		BorderSizePixel = 0,
+		Size = UDim2.new(0, 2, 0, 2),
+		BackgroundTransparency = 1,
 		Visible = false,
 		ZIndex = 20,
 	}, top)
@@ -384,6 +382,23 @@ local function buildSessionHud(parent)
 		}, cross)
 		table.insert(parts.crossLines, { line = line, axis = spec.axis })
 	end
+
+	-- Punto de mira central: la referencia fina que se ve SIEMPRE con el
+	-- arma en mano (a la cadera y tambien al apuntar, estilo Counter)
+	local aimDot = new("Frame", {
+		Name = "PuntoCentral",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0, 4, 0, 4),
+		BackgroundColor3 = Color3.fromRGB(170, 255, 185),
+		BackgroundTransparency = 0.02,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 30,
+	}, top)
+	corner(99, aimDot)
+	stroke(Color3.fromRGB(10, 14, 12), 1.5, 0.35, aimDot)
+	parts.aimDot = aimDot
 
 	-- Marcador de equipos (solo modo Asedio 5 vs 5)
 	local teamBar = new("Frame", {
@@ -1338,35 +1353,53 @@ function HUD.setTeams(team, score, round, toWin, modeName)
 end
 
 -- Punto de mira: visible al jugar, se abre segun la dispersion.
--- Con dotOnly queda solo el puntito central (al apuntar, estilo Counter).
+-- Con dotOnly quedan las rayitas apagadas y manda el punto central (al
+-- apuntar, estilo Counter). Cache para no escribir propiedades cada frame.
+local crossCache = { gap = nil, length = nil, lines = nil }
 function HUD.setCrosshair(visible, gap, length, dotOnly)
 	if not parts.crosshair then
 		return
 	end
 	parts.crosshair.Visible = visible and true or false
-	for _, item in ipairs(parts.crossLines or {}) do
-		item.line.Visible = (visible and not dotOnly) and true or false
+	local wantLines = (visible and not dotOnly) and true or false
+	if crossCache.lines ~= wantLines then
+		crossCache.lines = wantLines
+		for _, item in ipairs(parts.crossLines or {}) do
+			item.line.Visible = wantLines
+		end
 	end
 	if not visible then
 		return
 	end
-	gap = math.clamp(gap or 4, 0, 40)
-	length = math.clamp(length or 5, 3, 14)
+	local g = math.clamp(gap or 4, 0, 40)
+	local l = math.clamp(length or 5, 3, 14)
+	if crossCache.gap == g and crossCache.length == l then
+		return
+	end
+	crossCache.gap = g
+	crossCache.length = l
 	for _, item in ipairs(parts.crossLines or {}) do
 		local line = item.line
 		if item.axis == "up" then
-			line.Position = UDim2.new(0.5, 0, 0.5, -gap)
-			line.Size = UDim2.new(0, 1, 0, length)
+			line.Position = UDim2.new(0.5, 0, 0.5, -g)
+			line.Size = UDim2.new(0, 1, 0, l)
 		elseif item.axis == "down" then
-			line.Position = UDim2.new(0.5, 0, 0.5, gap)
-			line.Size = UDim2.new(0, 1, 0, length)
+			line.Position = UDim2.new(0.5, 0, 0.5, g)
+			line.Size = UDim2.new(0, 1, 0, l)
 		elseif item.axis == "left" then
-			line.Position = UDim2.new(0.5, -gap, 0.5, 0)
-			line.Size = UDim2.new(0, length, 0, 1)
+			line.Position = UDim2.new(0.5, -g, 0.5, 0)
+			line.Size = UDim2.new(0, l, 0, 1)
 		else
-			line.Position = UDim2.new(0.5, gap, 0.5, 0)
-			line.Size = UDim2.new(0, length, 0, 1)
+			line.Position = UDim2.new(0.5, g, 0.5, 0)
+			line.Size = UDim2.new(0, l, 0, 1)
 		end
+	end
+end
+
+-- Punto de mira central: se ve siempre que tengas un arma en mano
+function HUD.setAimDot(visible)
+	if parts.aimDot then
+		parts.aimDot.Visible = visible and true or false
 	end
 end
 
@@ -1605,16 +1638,28 @@ function HUD.setCooldowns(remaining)
 		local total = chip.total or 1
 		local ratio = left > 0.05 and math.clamp(left / total, 0, 1) or 0
 
+		-- Solo tocar el texto cuando cambia lo que se ve (menos trabajo por frame)
+		local text, color, nameT
 		if left > 0.05 then
-			chip.state.Text = string.format("%.1fs", left)
-			chip.state.TextColor3 = Color3.fromRGB(232, 108, 100)
-			chip.name.TextTransparency = 0.5
+			text = string.format("%.1fs", left)
+			color = Color3.fromRGB(232, 108, 100)
+			nameT = 0.5
 		else
-			chip.state.Text = "Listo"
-			chip.state.TextColor3 = COLOR.muted
-			chip.name.TextTransparency = 0
+			text = "Listo"
+			color = COLOR.muted
+			nameT = 0
 		end
-		chip.fill.Size = UDim2.new(ratio, 0, 0, 3)
+		if chip.lastText ~= text then
+			chip.lastText = text
+			chip.state.Text = text
+			chip.state.TextColor3 = color
+			chip.name.TextTransparency = nameT
+		end
+		local r = math.floor(ratio * 100 + 0.5) / 100
+		if chip.lastFill ~= r then
+			chip.lastFill = r
+			chip.fill.Size = UDim2.new(r, 0, 0, 3)
+		end
 	end
 end
 

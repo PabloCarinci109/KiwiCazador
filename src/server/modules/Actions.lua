@@ -239,7 +239,7 @@ function Actions.rifle(session, player, data)
 	end
 
 	ToolService.startCooldown(player, "rifle", cfg.cooldown)
-	session:event("dartshot", { pos = muzzle, dir = dir, tracer = true })
+	session:event("dartshot", { pos = muzzle, dir = dir, tracer = true, weapon = "rifle" })
 end
 
 --[[
@@ -287,7 +287,7 @@ function Actions.relente(session, player, data)
 
 	table.insert(session.projectiles, dart)
 	ToolService.startCooldown(player, "relente", cfg.cooldown)
-	session:event("dartshot", { pos = muzzle, dir = dir })
+	session:event("dartshot", { pos = muzzle, dir = dir, weapon = "relente" })
 end
 
 -- ===============================================================
@@ -381,7 +381,7 @@ function Actions.fireWeapon(session, player, weaponId, data)
 
 	ToolService.startCooldown(player, weaponId, cfg.cooldown)
 	ToolService.consumeLoot(player, weaponId)
-	session:event("dartshot", { pos = muzzle, dir = dir })
+	session:event("dartshot", { pos = muzzle, dir = dir, weapon = weaponId })
 	session:event("weaponfx", { weapon = weaponId, pos = muzzle, dir = dir })
 end
 
@@ -463,6 +463,7 @@ function Actions.sniperShot(session, player, cfg, muzzle, dir, data)
 		session:event("dartmiss", { pos = pos, normal = hit.Normal })
 	end
 
+	session:event("dartshot", { pos = muzzle, dir = dir, weapon = "sniper" })
 	session:event("weaponfx", { weapon = "sniper", pos = muzzle, dir = dir, hit = victim ~= nil or hitKiwi })
 end
 

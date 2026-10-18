@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.5.1"
+Config.Version = "1.6.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -777,6 +777,11 @@ Config.Sounds = {
 	netHit = "rbxasset://sounds/snap.wav",
 	dartShot = "rbxasset://sounds/unsheath.mp3",
 	dartHit = "rbxasset://sounds/impact_explosion_03.mp3",
+	-- Disparos por capas (no hay sonidos de bala en Roblox): golpe grave
+	-- distorsionado + chasquido seco + cola corta del estampido
+	gunBoom = "rbxasset://sounds/collide.wav",
+	gunCrack = "rbxasset://sounds/snap.wav",
+	gunTail = "rbxasset://sounds/impact_explosion_03.mp3",
 	flush = "rbxasset://sounds/swordlunge.wav",
 	rustle = "rbxasset://sounds/action_footsteps_plastic.mp3",
 	win = "rbxasset://sounds/electronicpingshort.wav",

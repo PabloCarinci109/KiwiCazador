@@ -90,6 +90,82 @@ local function sound2D(soundId, volume, pitch)
 	Debris:AddItem(sound, 5)
 end
 
+-- ===============================================================
+-- Disparos armados por capas (los sonidos de Roblox no traen balas)
+-- Cada estilo mezcla un golpe grave distorsionado (boom), un chasquido
+-- seco (crack) y una cola corta del estampido. Los Sound se reutilizan
+-- de un pool para no crear instancias en cada rafaga automatica.
+-- ===============================================================
+local GUN_SHOT = {
+	-- estilo = { { sonido, volumen, tono, distorsion }, ... }
+	pistol = { { "gunBoom", 0.50, 1.15, 0.30 }, { "gunCrack", 0.45, 1.55, 0.50 }, { "gunTail", 0.15, 1.65, 0.00 } },
+	smg = { { "gunBoom", 0.45, 1.25, 0.30 }, { "gunCrack", 0.42, 1.65, 0.45 }, { "gunTail", 0.13, 1.75, 0.00 } },
+	rifle = { { "gunBoom", 0.62, 0.95, 0.45 }, { "gunCrack", 0.50, 1.30, 0.55 }, { "gunTail", 0.26, 1.40, 0.00 } },
+	heavy = { { "gunBoom", 0.72, 0.85, 0.50 }, { "gunCrack", 0.54, 1.20, 0.60 }, { "gunTail", 0.36, 1.30, 0.05 } },
+	shotgun = { { "gunBoom", 0.80, 0.72, 0.55 }, { "gunCrack", 0.50, 1.05, 0.60 }, { "gunTail", 0.50, 1.05, 0.10 } },
+	sniper = { { "gunBoom", 0.82, 0.82, 0.50 }, { "gunCrack", 0.62, 1.15, 0.65 }, { "gunTail", 0.45, 1.15, 0.15 } },
+	dart = { { "gunCrack", 0.30, 1.45, 0.15 }, { "dartShot", 0.30, 1.30, 0.00 } },
+	rocket = { { "gunBoom", 0.70, 0.60, 0.25 }, { "gunCrack", 0.25, 0.85, 0.10 }, { "dartShot", 0.35, 0.55, 0.00 } },
+}
+
+-- Arma -> estilo de sonido
+local GUN_STYLE = {
+	revolver = "pistol", glock = "pistol",
+	mp5 = "smg",
+	ak = "rifle", m4 = "rifle",
+	rifle = "dart", pintura = "dart", relente = "dart",
+	escopeta = "shotgun",
+	sniper = "sniper",
+	cohete = "rocket",
+}
+
+local GUN_POOL_SIZE = 16
+local gunPool = {}
+local gunPoolIndex = 0
+
+local function gunPlay(soundId, volume, pitch, distortion)
+	local slot = (gunPoolIndex % GUN_POOL_SIZE) + 1
+	gunPoolIndex = gunPoolIndex + 1
+	local entry = gunPool[slot]
+	if not entry then
+		local sound = Instance.new("Sound")
+		sound.Parent = player:FindFirstChildOfClass("PlayerGui") or workspace
+		local dist = Instance.new("DistortionSoundEffect")
+		dist.Level = distortion or 0
+		dist.Parent = sound
+		local eq = Instance.new("EqualizerSoundEffect")
+		eq.LowGain = 5
+		eq.MidGain = -2
+		eq.HighGain = 2
+		eq.Parent = sound
+		entry = { sound = sound, dist = dist, lastId = nil }
+		gunPool[slot] = entry
+	end
+	local sound = entry.sound
+	if entry.lastId ~= soundId then
+		sound.SoundId = soundId
+		entry.lastId = soundId
+	end
+	sound.Volume = volume
+	sound.PlaybackSpeed = pitch or 1
+	entry.dist.Level = distortion or 0
+	sound.TimePosition = 0
+	sound:Play()
+end
+
+local function gunshot(style)
+	local layers = GUN_SHOT[style]
+	if not layers then
+		return
+	end
+	for _, layer in ipairs(layers) do
+		local id = Config.Sounds[layer[1]]
+		if id then
+			gunPlay(id, layer[2], layer[3], layer[4])
+		end
+	end
+end
+
 local function burst(position, color, count)
 	local holder = Instance.new("Part")
 	holder.Name = "FxParticulas"
@@ -403,32 +479,19 @@ local function fireTool(toolId)
 		cooldown.left = total
 	end
 
-	if toolId == "red" then
+	-- Sonido del arma: capas de boom + chasquido + cola segun el estilo
+	if GUN_STYLE[toolId] then
+		gunshot(GUN_STYLE[toolId])
+	elseif toolId == "red" then
 		sound2D(Config.Sounds.netSwing, 0.8)
-	elseif toolId == "rifle" then
-		sound2D(Config.Sounds.dartShot, 0.8)
 	elseif toolId == "trampa" then
 		sound2D(Config.Sounds.trapSet, 0.6, 0.8)
-	elseif toolId == "pintura" then
-		sound2D(Config.Sounds.paintShot, 0.7)
-	elseif toolId == "relente" then
-		sound2D(Config.Sounds.dartShot, 0.8, 1.2)
-	elseif toolId == "cohete" then
-		sound2D(Config.Sounds.dartShot, 1, 0.55)
-	elseif toolId == "revolver" then
-		sound2D(Config.Sounds.dartHit, 0.5, 1.6)
 	elseif toolId == "arco" then
 		sound2D(Config.Sounds.netSwing, 0.6, 1.4)
-	elseif toolId == "sniper" then
-		sound2D(Config.Sounds.dartShot, 0.95, 0.72)
 	elseif toolId == "cuchillo" then
 		sound2D(Config.Sounds.netSwing, 0.55, 1.3)
 	elseif toolId == "lanzallamas" then
-		sound2D(Config.Sounds.dartShot, 0.7, 0.55)
-	elseif toolId == "ak" or toolId == "m4" or toolId == "mp5" or toolId == "glock" then
-		sound2D(Config.Sounds.dartShot, 0.62, 1.45)
-	elseif toolId == "escopeta" then
-		sound2D(Config.Sounds.dartShot, 0.95, 0.5)
+		sound2D(Config.Sounds.dartShot, 0.6, 0.5)
 	end
 
 	-- Patada del arma (estilo Counter)
@@ -612,6 +675,7 @@ local function spreadErrorLocal(weaponId)
 end
 
 local lastCross = nil
+local lastDot = nil
 RunService.RenderStepped:Connect(function(dt)
 	shotBloom = math.max(0, shotBloom - dt * 30)
 	-- La telescopica del francotirador tapa la pantalla: ahi no va la cruz
@@ -625,9 +689,14 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 	if show then
 		local grados = spreadErrorLocal(equippedId)
-		-- Apuntando queda solo el puntito central (estilo Counter)
+		-- Apuntando quedan las rayitas apagadas: manda el punto central
 		HUD.setCrosshair(true, 3 + math.min(grados * 2.2, 12) + shotBloom * 0.35,
 			4 + math.min(grados * 0.8, 4), scoped)
+	end
+	-- El punto central se ve siempre que tengas un arma en mano
+	if show ~= lastDot then
+		lastDot = show
+		HUD.setAimDot(show)
 	end
 end)
 
@@ -765,7 +834,19 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 			soundAt(Config.Sounds.netSwing, position, 0.7)
 		end
 	elseif kind == "dartshot" then
-		soundAt(Config.Sounds.dartShot, position or Vector3.new(), 0.9)
+		if position then
+			-- Sonido segun el arma: rifles graves, pistolas secas, dardos suaves
+			local style = GUN_STYLE[data.weapon] or "rifle"
+			if style == "dart" then
+				soundAt(Config.Sounds.dartShot, position, 0.8, 1.15)
+			elseif style == "shotgun" or style == "sniper" or style == "rocket" then
+				soundAt(Config.Sounds.gunBoom, position, 0.9,
+					style == "shotgun" and 0.78 or (style == "sniper" and 0.95 or 0.6))
+			else
+				soundAt(Config.Sounds.gunCrack, position, 0.8,
+					style == "pistol" and 1.45 or (style == "smg" and 1.6 or 1.15))
+			end
+		end
 		if position and data.tracer and data.dir then
 			-- Estilo Counter: bala instantanea = trazadora, no proyectil
 			tracer(position, data.dir, 240, Color3.fromRGB(255, 240, 190), 0.1)
@@ -880,7 +961,8 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 	elseif kind == "boom" then
 		if position then
 			local cfg = data.weapon and Config.Weapons[data.weapon]
-			soundAt(Config.Sounds.dartHit, position, 1, 0.6)
+			soundAt(Config.Sounds.gunBoom, position, 1, 0.5)
+			soundAt(Config.Sounds.dartHit, position, 0.85, 0.75)
 			burst(position, (cfg and cfg.color) or Color3.fromRGB(255, 186, 120), 46)
 			if distanceToLocal(position) < 70 then
 				sound2D(Config.Sounds.roar, 0.5, 0.7)
@@ -1019,6 +1101,8 @@ HUD.init(player:WaitForChild("PlayerGui"), {
 -- ===============================================================
 -- Bucle del cliente
 -- ===============================================================
+-- Tabla reutilizada: no crear basura nueva cada frame
+local remainingCooldowns = {}
 RunService.Heartbeat:Connect(function(dt)
 	-- Si te esta comiendo el kiwi: camara de cine en tercera persona
 	if eatCam then
@@ -1067,7 +1151,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 
-	local remaining = {}
+	local remaining = remainingCooldowns
 	for toolId, data in pairs(cooldowns) do
 		data.left = math.max(0, data.left - dt)
 		remaining[toolId] = data.left

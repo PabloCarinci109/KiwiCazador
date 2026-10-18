@@ -539,6 +539,31 @@ local function buildRocketTool(id)
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
+	weldPiece(handle, {
+		Name = "Punta",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.55, 0.5, 0.5),
+		CFrame = handle.CFrame * CFrame.new(0, 0.9, -4.7) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(198, 72, 52),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Hombro",
+		Size = Vector3.new(0.34, 0.75, 0.55),
+		CFrame = handle.CFrame * CFrame.new(0, 0.75, 1.35),
+		Color = Color3.fromRGB(60, 62, 56),
+		Material = Enum.Material.Plastic,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Empunadura",
+		Size = Vector3.new(0.22, 0.5, 0.3),
+		CFrame = handle.CFrame * CFrame.new(0, 0.28, -2.15) * CFrame.Angles(math.rad(-12), 0, 0),
+		Color = Color3.fromRGB(74, 60, 40),
+		Material = Enum.Material.Wood,
+		Parent = tool,
+	})
 	return tool
 end
 

@@ -31,6 +31,7 @@ local recoil = 0       -- patada: se va sola
 local recoilRoll = 0   -- volcado al azar de la patada (estilo Counter)
 local camKick = Vector2.new(0, 0) -- patada de camara (radianes)
 local flashTimer = 0   -- fogonazo del canon
+local reparentDirty = true -- hay que reacomodar piezas (arma/visibilidad)
 
 -- Posicion del arma respecto de la camara (estilo Counter Blox: al costado,
 -- bien abajo a la derecha y con una leve inclinacion, para no tapar la vista)
@@ -73,6 +74,9 @@ local function buildRifle(tint, accent)
 	piece(model, Vector3.new(0.42, 0.95, 0.75), CFrame.new(0, -0.85, -0.55) * CFrame.Angles(math.rad(14), 0, 0), Color3.fromRGB(44, 47, 54))
 	piece(model, Vector3.new(0.4, 0.95, 0.6), CFrame.new(0, -0.9, 0.8) * CFrame.Angles(math.rad(-12), 0, 0), Color3.fromRGB(40, 42, 48))
 	piece(model, Vector3.new(0.3, 0.28, 1.15), CFrame.new(0, 0.6, -0.7), accent or Color3.fromRGB(58, 62, 70))
+	-- Mira de hierro: punto delantero y alza trasera
+	piece(model, Vector3.new(0.09, 0.32, 0.09), CFrame.new(0, 0.32, -3.8), Color3.fromRGB(28, 30, 34))
+	piece(model, Vector3.new(0.2, 0.2, 0.1), CFrame.new(0, 0.8, -0.22), Color3.fromRGB(28, 30, 34))
 	model.muzzle = Vector3.new(0, 0.06, -4.15)
 	return model
 end
@@ -149,17 +153,37 @@ local function buildLanzallamas()
 	return model
 end
 
+-- Lanzamisiles estilo RPG: tubo grueso con el cohete asomando, empuñaduras
+-- de madera y hombrera. Se tiene que ver GRANDE, nada de pistola.
 local function buildCohete()
 	local model = { pieces = {} }
-	piece(model, Vector3.new(0.85, 0.85, 3.6), CFrame.new(0, 0.15, -1.1) * CFrame.Angles(0, math.rad(90), 0),
-		Color3.fromRGB(70, 84, 66), nil, Enum.PartType.Cylinder)
-	piece(model, Vector3.new(0.95, 0.95, 0.4), CFrame.new(0, 0.15, -2.85) * CFrame.Angles(0, math.rad(90), 0),
-		Color3.fromRGB(48, 52, 48), nil, Enum.PartType.Cylinder)
-	piece(model, Vector3.new(0.4, 0.9, 0.6), CFrame.new(0, -0.5, -0.5) * CFrame.Angles(math.rad(-10), 0, 0),
-		Color3.fromRGB(52, 56, 52))
-	piece(model, Vector3.new(0.3, 0.3, 0.7), CFrame.new(0, 0.8, -1.2), Color3.fromRGB(40, 44, 40))
-	piece(model, Vector3.new(0.16, 0.16, 0.16), CFrame.new(0, 0.95, -1.5), Color3.fromRGB(200, 80, 60), Enum.Material.Neon)
-	model.muzzle = Vector3.new(0, 0.15, -3.2)
+	-- Tubo principal
+	piece(model, Vector3.new(3.7, 0.72, 0.72), CFrame.new(0, 0.55, -1.0) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(88, 98, 68), nil, Enum.PartType.Cylinder)
+	-- Campana trasera y refuerzo delantero
+	piece(model, Vector3.new(0.55, 1.0, 1.0), CFrame.new(0, 0.55, 0.95) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(52, 58, 46), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.5, 0.86, 0.86), CFrame.new(0, 0.55, -2.95) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(62, 70, 52), nil, Enum.PartType.Cylinder)
+	-- Cohete asomando con ojiva roja
+	piece(model, Vector3.new(1.2, 0.24, 0.24), CFrame.new(0, 0.55, -3.5) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(74, 78, 72), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.6, 0.4, 0.4), CFrame.new(0, 0.55, -4.15) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(226, 96, 70), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.4, 0.26, 0.26), CFrame.new(0, 0.55, -4.5) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(178, 58, 44), nil, Enum.PartType.Cylinder)
+	-- Mira de hierro plegada
+	piece(model, Vector3.new(0.09, 0.4, 0.09), CFrame.new(-0.15, 1.05, -2.1), Color3.fromRGB(42, 46, 40))
+	piece(model, Vector3.new(0.09, 0.4, 0.09), CFrame.new(0.15, 1.05, -2.1), Color3.fromRGB(42, 46, 40))
+	-- Empuñadura de pistola + guardamonte + empuñadura delantera
+	piece(model, Vector3.new(0.3, 0.72, 0.44), CFrame.new(0, -0.02, -0.05) * CFrame.Angles(math.rad(-14), 0, 0),
+		Color3.fromRGB(110, 76, 46), Enum.Material.Wood)
+	piece(model, Vector3.new(0.12, 0.3, 0.5), CFrame.new(0, -0.2, -0.42), Color3.fromRGB(44, 46, 42))
+	piece(model, Vector3.new(0.26, 0.62, 0.36), CFrame.new(0, -0.02, -1.5) * CFrame.Angles(math.rad(-10), 0, 0),
+		Color3.fromRGB(110, 76, 46), Enum.Material.Wood)
+	-- Hombrera trasera
+	piece(model, Vector3.new(0.36, 0.8, 0.55), CFrame.new(0, 0.5, 1.4), Color3.fromRGB(60, 64, 54))
+	model.muzzle = Vector3.new(0, 0.55, -4.7)
 	return model
 end
 
@@ -234,10 +258,12 @@ local function ensureFolder()
 		return nil
 	end
 	if folder and folder.Parent ~= camera then
+		folder:Destroy()
 		folder = nil
 		models = {}
 		current = nil
 		currentId = nil
+		reparentDirty = true
 	end
 	if not folder then
 		folder = Instance.new("Folder")
@@ -252,6 +278,9 @@ end
 -- ===============================================================
 function ViewModel.setWeapon(id)
 	if not id then
+		if currentId then
+			reparentDirty = true
+		end
 		currentId = nil
 		current = nil
 		return
@@ -259,6 +288,7 @@ function ViewModel.setWeapon(id)
 	if id == currentId then
 		return
 	end
+	reparentDirty = true
 	currentId = id
 	current = nil
 	if not BUILDERS[id] then
@@ -286,7 +316,11 @@ function ViewModel.setWeapon(id)
 end
 
 function ViewModel.setVisible(value)
-	visible = value and true or false
+	value = value and true or false
+	if visible ~= value then
+		visible = value
+		reparentDirty = true
+	end
 end
 
 function ViewModel.setAds(goal)
@@ -294,7 +328,11 @@ function ViewModel.setAds(goal)
 end
 
 function ViewModel.setHidden(value)
-	hiddenByScope = value and true or false
+	value = value and true or false
+	if hiddenByScope ~= value then
+		hiddenByScope = value
+		reparentDirty = true
+	end
 end
 
 function ViewModel.recoil(amount)
@@ -339,11 +377,15 @@ local function stepUnbound(dt)
 	flashTimer = math.max(0, flashTimer - dt)
 
 	local show = visible and current and not hiddenByScope
-	for _, model in pairs(models) do
-		local parent = (model == current and show) and folder or nil
-		for _, item in ipairs(model.pieces) do
-			if item.part.Parent ~= parent then
-				item.part.Parent = parent
+	-- Reacomodar piezas SOLO cuando algo cambio (no recorrer todo cada frame)
+	if reparentDirty then
+		reparentDirty = false
+		for _, model in pairs(models) do
+			local parent = (model == current and show) and folder or nil
+			for _, item in ipairs(model.pieces) do
+				if item.part.Parent ~= parent then
+					item.part.Parent = parent
+				end
 			end
 		end
 	end

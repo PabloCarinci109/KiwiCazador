@@ -43,7 +43,7 @@
 
 local Config = {}
 
-Config.Version = "1.5.1"
+Config.Version = "1.6.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -810,6 +810,11 @@ Config.Sounds = {
 	netHit = "rbxasset://sounds/snap.wav",
 	dartShot = "rbxasset://sounds/unsheath.mp3",
 	dartHit = "rbxasset://sounds/impact_explosion_03.mp3",
+	-- Disparos por capas (no hay sonidos de bala en Roblox): golpe grave
+	-- distorsionado + chasquido seco + cola corta del estampido
+	gunBoom = "rbxasset://sounds/collide.wav",
+	gunCrack = "rbxasset://sounds/snap.wav",
+	gunTail = "rbxasset://sounds/impact_explosion_03.mp3",
 	flush = "rbxasset://sounds/swordlunge.wav",
 	rustle = "rbxasset://sounds/action_footsteps_plastic.mp3",
 	win = "rbxasset://sounds/electronicpingshort.wav",
@@ -5560,6 +5565,31 @@ local function buildRocketTool(id)
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
+	weldPiece(handle, {
+		Name = "Punta",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.55, 0.5, 0.5),
+		CFrame = handle.CFrame * CFrame.new(0, 0.9, -4.7) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(198, 72, 52),
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Hombro",
+		Size = Vector3.new(0.34, 0.75, 0.55),
+		CFrame = handle.CFrame * CFrame.new(0, 0.75, 1.35),
+		Color = Color3.fromRGB(60, 62, 56),
+		Material = Enum.Material.Plastic,
+		Parent = tool,
+	})
+	weldPiece(handle, {
+		Name = "Empunadura",
+		Size = Vector3.new(0.22, 0.5, 0.3),
+		CFrame = handle.CFrame * CFrame.new(0, 0.28, -2.15) * CFrame.Angles(math.rad(-12), 0, 0),
+		Color = Color3.fromRGB(74, 60, 40),
+		Material = Enum.Material.Wood,
+		Parent = tool,
+	})
 	return tool
 end
 
@@ -6263,7 +6293,7 @@ function Actions.rifle(session, player, data)
 	end
 
 	ToolService.startCooldown(player, "rifle", cfg.cooldown)
-	session:event("dartshot", { pos = muzzle, dir = dir, tracer = true })
+	session:event("dartshot", { pos = muzzle, dir = dir, tracer = true, weapon = "rifle" })
 end
 
 --[[
@@ -6311,7 +6341,7 @@ function Actions.relente(session, player, data)
 
 	table.insert(session.projectiles, dart)
 	ToolService.startCooldown(player, "relente", cfg.cooldown)
-	session:event("dartshot", { pos = muzzle, dir = dir })
+	session:event("dartshot", { pos = muzzle, dir = dir, weapon = "relente" })
 end
 
 -- ===============================================================
@@ -6405,7 +6435,7 @@ function Actions.fireWeapon(session, player, weaponId, data)
 
 	ToolService.startCooldown(player, weaponId, cfg.cooldown)
 	ToolService.consumeLoot(player, weaponId)
-	session:event("dartshot", { pos = muzzle, dir = dir })
+	session:event("dartshot", { pos = muzzle, dir = dir, weapon = weaponId })
 	session:event("weaponfx", { weapon = weaponId, pos = muzzle, dir = dir })
 end
 
@@ -6487,6 +6517,7 @@ function Actions.sniperShot(session, player, cfg, muzzle, dir, data)
 		session:event("dartmiss", { pos = pos, normal = hit.Normal })
 	end
 
+	session:event("dartshot", { pos = muzzle, dir = dir, weapon = "sniper" })
 	session:event("weaponfx", { weapon = "sniper", pos = muzzle, dir = dir, hit = victim ~= nil or hitKiwi })
 end
 
@@ -9509,6 +9540,82 @@ local function sound2D(soundId, volume, pitch)
 	Debris:AddItem(sound, 5)
 end
 
+-- ===============================================================
+-- Disparos armados por capas (los sonidos de Roblox no traen balas)
+-- Cada estilo mezcla un golpe grave distorsionado (boom), un chasquido
+-- seco (crack) y una cola corta del estampido. Los Sound se reutilizan
+-- de un pool para no crear instancias en cada rafaga automatica.
+-- ===============================================================
+local GUN_SHOT = {
+	-- estilo = { { sonido, volumen, tono, distorsion }, ... }
+	pistol = { { "gunBoom", 0.50, 1.15, 0.30 }, { "gunCrack", 0.45, 1.55, 0.50 }, { "gunTail", 0.15, 1.65, 0.00 } },
+	smg = { { "gunBoom", 0.45, 1.25, 0.30 }, { "gunCrack", 0.42, 1.65, 0.45 }, { "gunTail", 0.13, 1.75, 0.00 } },
+	rifle = { { "gunBoom", 0.62, 0.95, 0.45 }, { "gunCrack", 0.50, 1.30, 0.55 }, { "gunTail", 0.26, 1.40, 0.00 } },
+	heavy = { { "gunBoom", 0.72, 0.85, 0.50 }, { "gunCrack", 0.54, 1.20, 0.60 }, { "gunTail", 0.36, 1.30, 0.05 } },
+	shotgun = { { "gunBoom", 0.80, 0.72, 0.55 }, { "gunCrack", 0.50, 1.05, 0.60 }, { "gunTail", 0.50, 1.05, 0.10 } },
+	sniper = { { "gunBoom", 0.82, 0.82, 0.50 }, { "gunCrack", 0.62, 1.15, 0.65 }, { "gunTail", 0.45, 1.15, 0.15 } },
+	dart = { { "gunCrack", 0.30, 1.45, 0.15 }, { "dartShot", 0.30, 1.30, 0.00 } },
+	rocket = { { "gunBoom", 0.70, 0.60, 0.25 }, { "gunCrack", 0.25, 0.85, 0.10 }, { "dartShot", 0.35, 0.55, 0.00 } },
+}
+
+-- Arma -&gt; estilo de sonido
+local GUN_STYLE = {
+	revolver = "pistol", glock = "pistol",
+	mp5 = "smg",
+	ak = "rifle", m4 = "rifle",
+	rifle = "dart", pintura = "dart", relente = "dart",
+	escopeta = "shotgun",
+	sniper = "sniper",
+	cohete = "rocket",
+}
+
+local GUN_POOL_SIZE = 16
+local gunPool = {}
+local gunPoolIndex = 0
+
+local function gunPlay(soundId, volume, pitch, distortion)
+	local slot = (gunPoolIndex % GUN_POOL_SIZE) + 1
+	gunPoolIndex = gunPoolIndex + 1
+	local entry = gunPool[slot]
+	if not entry then
+		local sound = Instance.new("Sound")
+		sound.Parent = player:FindFirstChildOfClass("PlayerGui") or workspace
+		local dist = Instance.new("DistortionSoundEffect")
+		dist.Level = distortion or 0
+		dist.Parent = sound
+		local eq = Instance.new("EqualizerSoundEffect")
+		eq.LowGain = 5
+		eq.MidGain = -2
+		eq.HighGain = 2
+		eq.Parent = sound
+		entry = { sound = sound, dist = dist, lastId = nil }
+		gunPool[slot] = entry
+	end
+	local sound = entry.sound
+	if entry.lastId ~= soundId then
+		sound.SoundId = soundId
+		entry.lastId = soundId
+	end
+	sound.Volume = volume
+	sound.PlaybackSpeed = pitch or 1
+	entry.dist.Level = distortion or 0
+	sound.TimePosition = 0
+	sound:Play()
+end
+
+local function gunshot(style)
+	local layers = GUN_SHOT[style]
+	if not layers then
+		return
+	end
+	for _, layer in ipairs(layers) do
+		local id = Config.Sounds[layer[1]]
+		if id then
+			gunPlay(id, layer[2], layer[3], layer[4])
+		end
+	end
+end
+
 local function burst(position, color, count)
 	local holder = Instance.new("Part")
 	holder.Name = "FxParticulas"
@@ -9822,32 +9929,19 @@ local function fireTool(toolId)
 		cooldown.left = total
 	end
 
-	if toolId == "red" then
+	-- Sonido del arma: capas de boom + chasquido + cola segun el estilo
+	if GUN_STYLE[toolId] then
+		gunshot(GUN_STYLE[toolId])
+	elseif toolId == "red" then
 		sound2D(Config.Sounds.netSwing, 0.8)
-	elseif toolId == "rifle" then
-		sound2D(Config.Sounds.dartShot, 0.8)
 	elseif toolId == "trampa" then
 		sound2D(Config.Sounds.trapSet, 0.6, 0.8)
-	elseif toolId == "pintura" then
-		sound2D(Config.Sounds.paintShot, 0.7)
-	elseif toolId == "relente" then
-		sound2D(Config.Sounds.dartShot, 0.8, 1.2)
-	elseif toolId == "cohete" then
-		sound2D(Config.Sounds.dartShot, 1, 0.55)
-	elseif toolId == "revolver" then
-		sound2D(Config.Sounds.dartHit, 0.5, 1.6)
 	elseif toolId == "arco" then
 		sound2D(Config.Sounds.netSwing, 0.6, 1.4)
-	elseif toolId == "sniper" then
-		sound2D(Config.Sounds.dartShot, 0.95, 0.72)
 	elseif toolId == "cuchillo" then
 		sound2D(Config.Sounds.netSwing, 0.55, 1.3)
 	elseif toolId == "lanzallamas" then
-		sound2D(Config.Sounds.dartShot, 0.7, 0.55)
-	elseif toolId == "ak" or toolId == "m4" or toolId == "mp5" or toolId == "glock" then
-		sound2D(Config.Sounds.dartShot, 0.62, 1.45)
-	elseif toolId == "escopeta" then
-		sound2D(Config.Sounds.dartShot, 0.95, 0.5)
+		sound2D(Config.Sounds.dartShot, 0.6, 0.5)
 	end
 
 	-- Patada del arma (estilo Counter)
@@ -10031,6 +10125,7 @@ local function spreadErrorLocal(weaponId)
 end
 
 local lastCross = nil
+local lastDot = nil
 RunService.RenderStepped:Connect(function(dt)
 	shotBloom = math.max(0, shotBloom - dt * 30)
 	-- La telescopica del francotirador tapa la pantalla: ahi no va la cruz
@@ -10044,9 +10139,14 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 	if show then
 		local grados = spreadErrorLocal(equippedId)
-		-- Apuntando queda solo el puntito central (estilo Counter)
+		-- Apuntando quedan las rayitas apagadas: manda el punto central
 		HUD.setCrosshair(true, 3 + math.min(grados * 2.2, 12) + shotBloom * 0.35,
 			4 + math.min(grados * 0.8, 4), scoped)
+	end
+	-- El punto central se ve siempre que tengas un arma en mano
+	if show ~= lastDot then
+		lastDot = show
+		HUD.setAimDot(show)
 	end
 end)
 
@@ -10184,7 +10284,19 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 			soundAt(Config.Sounds.netSwing, position, 0.7)
 		end
 	elseif kind == "dartshot" then
-		soundAt(Config.Sounds.dartShot, position or Vector3.new(), 0.9)
+		if position then
+			-- Sonido segun el arma: rifles graves, pistolas secas, dardos suaves
+			local style = GUN_STYLE[data.weapon] or "rifle"
+			if style == "dart" then
+				soundAt(Config.Sounds.dartShot, position, 0.8, 1.15)
+			elseif style == "shotgun" or style == "sniper" or style == "rocket" then
+				soundAt(Config.Sounds.gunBoom, position, 0.9,
+					style == "shotgun" and 0.78 or (style == "sniper" and 0.95 or 0.6))
+			else
+				soundAt(Config.Sounds.gunCrack, position, 0.8,
+					style == "pistol" and 1.45 or (style == "smg" and 1.6 or 1.15))
+			end
+		end
 		if position and data.tracer and data.dir then
 			-- Estilo Counter: bala instantanea = trazadora, no proyectil
 			tracer(position, data.dir, 240, Color3.fromRGB(255, 240, 190), 0.1)
@@ -10299,7 +10411,8 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 	elseif kind == "boom" then
 		if position then
 			local cfg = data.weapon and Config.Weapons[data.weapon]
-			soundAt(Config.Sounds.dartHit, position, 1, 0.6)
+			soundAt(Config.Sounds.gunBoom, position, 1, 0.5)
+			soundAt(Config.Sounds.dartHit, position, 0.85, 0.75)
 			burst(position, (cfg and cfg.color) or Color3.fromRGB(255, 186, 120), 46)
 			if distanceToLocal(position) &lt; 70 then
 				sound2D(Config.Sounds.roar, 0.5, 0.7)
@@ -10438,6 +10551,8 @@ HUD.init(player:WaitForChild("PlayerGui"), {
 -- ===============================================================
 -- Bucle del cliente
 -- ===============================================================
+-- Tabla reutilizada: no crear basura nueva cada frame
+local remainingCooldowns = {}
 RunService.Heartbeat:Connect(function(dt)
 	-- Si te esta comiendo el kiwi: camara de cine en tercera persona
 	if eatCam then
@@ -10486,7 +10601,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 
-	local remaining = {}
+	local remaining = remainingCooldowns
 	for toolId, data in pairs(cooldowns) do
 		data.left = math.max(0, data.left - dt)
 		remaining[toolId] = data.left
@@ -10865,15 +10980,13 @@ local function buildSessionHud(parent)
 		Text = "VIDA",
 	}, top)
 
-	-- Punto de mira estilo Counter: se abre al moverse o disparar
+	-- Cruz estilo Counter: cuatro rayitas que se abren con la dispersion
 	local cross = new("Frame", {
 		Name = "PuntoMira",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0, 3, 0, 3),
-		BackgroundColor3 = Color3.fromRGB(120, 255, 150),
-		BackgroundTransparency = 0.1,
-		BorderSizePixel = 0,
+		Size = UDim2.new(0, 2, 0, 2),
+		BackgroundTransparency = 1,
 		Visible = false,
 		ZIndex = 20,
 	}, top)
@@ -10896,6 +11009,23 @@ local function buildSessionHud(parent)
 		}, cross)
 		table.insert(parts.crossLines, { line = line, axis = spec.axis })
 	end
+
+	-- Punto de mira central: la referencia fina que se ve SIEMPRE con el
+	-- arma en mano (a la cadera y tambien al apuntar, estilo Counter)
+	local aimDot = new("Frame", {
+		Name = "PuntoCentral",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0, 4, 0, 4),
+		BackgroundColor3 = Color3.fromRGB(170, 255, 185),
+		BackgroundTransparency = 0.02,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 30,
+	}, top)
+	corner(99, aimDot)
+	stroke(Color3.fromRGB(10, 14, 12), 1.5, 0.35, aimDot)
+	parts.aimDot = aimDot
 
 	-- Marcador de equipos (solo modo Asedio 5 vs 5)
 	local teamBar = new("Frame", {
@@ -11850,35 +11980,53 @@ function HUD.setTeams(team, score, round, toWin, modeName)
 end
 
 -- Punto de mira: visible al jugar, se abre segun la dispersion.
--- Con dotOnly queda solo el puntito central (al apuntar, estilo Counter).
+-- Con dotOnly quedan las rayitas apagadas y manda el punto central (al
+-- apuntar, estilo Counter). Cache para no escribir propiedades cada frame.
+local crossCache = { gap = nil, length = nil, lines = nil }
 function HUD.setCrosshair(visible, gap, length, dotOnly)
 	if not parts.crosshair then
 		return
 	end
 	parts.crosshair.Visible = visible and true or false
-	for _, item in ipairs(parts.crossLines or {}) do
-		item.line.Visible = (visible and not dotOnly) and true or false
+	local wantLines = (visible and not dotOnly) and true or false
+	if crossCache.lines ~= wantLines then
+		crossCache.lines = wantLines
+		for _, item in ipairs(parts.crossLines or {}) do
+			item.line.Visible = wantLines
+		end
 	end
 	if not visible then
 		return
 	end
-	gap = math.clamp(gap or 4, 0, 40)
-	length = math.clamp(length or 5, 3, 14)
+	local g = math.clamp(gap or 4, 0, 40)
+	local l = math.clamp(length or 5, 3, 14)
+	if crossCache.gap == g and crossCache.length == l then
+		return
+	end
+	crossCache.gap = g
+	crossCache.length = l
 	for _, item in ipairs(parts.crossLines or {}) do
 		local line = item.line
 		if item.axis == "up" then
-			line.Position = UDim2.new(0.5, 0, 0.5, -gap)
-			line.Size = UDim2.new(0, 1, 0, length)
+			line.Position = UDim2.new(0.5, 0, 0.5, -g)
+			line.Size = UDim2.new(0, 1, 0, l)
 		elseif item.axis == "down" then
-			line.Position = UDim2.new(0.5, 0, 0.5, gap)
-			line.Size = UDim2.new(0, 1, 0, length)
+			line.Position = UDim2.new(0.5, 0, 0.5, g)
+			line.Size = UDim2.new(0, 1, 0, l)
 		elseif item.axis == "left" then
-			line.Position = UDim2.new(0.5, -gap, 0.5, 0)
-			line.Size = UDim2.new(0, length, 0, 1)
+			line.Position = UDim2.new(0.5, -g, 0.5, 0)
+			line.Size = UDim2.new(0, l, 0, 1)
 		else
-			line.Position = UDim2.new(0.5, gap, 0.5, 0)
-			line.Size = UDim2.new(0, length, 0, 1)
+			line.Position = UDim2.new(0.5, g, 0.5, 0)
+			line.Size = UDim2.new(0, l, 0, 1)
 		end
+	end
+end
+
+-- Punto de mira central: se ve siempre que tengas un arma en mano
+function HUD.setAimDot(visible)
+	if parts.aimDot then
+		parts.aimDot.Visible = visible and true or false
 	end
 end
 
@@ -12117,16 +12265,28 @@ function HUD.setCooldowns(remaining)
 		local total = chip.total or 1
 		local ratio = left &gt; 0.05 and math.clamp(left / total, 0, 1) or 0
 
+		-- Solo tocar el texto cuando cambia lo que se ve (menos trabajo por frame)
+		local text, color, nameT
 		if left &gt; 0.05 then
-			chip.state.Text = string.format("%.1fs", left)
-			chip.state.TextColor3 = Color3.fromRGB(232, 108, 100)
-			chip.name.TextTransparency = 0.5
+			text = string.format("%.1fs", left)
+			color = Color3.fromRGB(232, 108, 100)
+			nameT = 0.5
 		else
-			chip.state.Text = "Listo"
-			chip.state.TextColor3 = COLOR.muted
-			chip.name.TextTransparency = 0
+			text = "Listo"
+			color = COLOR.muted
+			nameT = 0
 		end
-		chip.fill.Size = UDim2.new(ratio, 0, 0, 3)
+		if chip.lastText ~= text then
+			chip.lastText = text
+			chip.state.Text = text
+			chip.state.TextColor3 = color
+			chip.name.TextTransparency = nameT
+		end
+		local r = math.floor(ratio * 100 + 0.5) / 100
+		if chip.lastFill ~= r then
+			chip.lastFill = r
+			chip.fill.Size = UDim2.new(r, 0, 0, 3)
+		end
 	end
 end
 
@@ -12392,6 +12552,7 @@ local recoil = 0       -- patada: se va sola
 local recoilRoll = 0   -- volcado al azar de la patada (estilo Counter)
 local camKick = Vector2.new(0, 0) -- patada de camara (radianes)
 local flashTimer = 0   -- fogonazo del canon
+local reparentDirty = true -- hay que reacomodar piezas (arma/visibilidad)
 
 -- Posicion del arma respecto de la camara (estilo Counter Blox: al costado,
 -- bien abajo a la derecha y con una leve inclinacion, para no tapar la vista)
@@ -12434,6 +12595,9 @@ local function buildRifle(tint, accent)
 	piece(model, Vector3.new(0.42, 0.95, 0.75), CFrame.new(0, -0.85, -0.55) * CFrame.Angles(math.rad(14), 0, 0), Color3.fromRGB(44, 47, 54))
 	piece(model, Vector3.new(0.4, 0.95, 0.6), CFrame.new(0, -0.9, 0.8) * CFrame.Angles(math.rad(-12), 0, 0), Color3.fromRGB(40, 42, 48))
 	piece(model, Vector3.new(0.3, 0.28, 1.15), CFrame.new(0, 0.6, -0.7), accent or Color3.fromRGB(58, 62, 70))
+	-- Mira de hierro: punto delantero y alza trasera
+	piece(model, Vector3.new(0.09, 0.32, 0.09), CFrame.new(0, 0.32, -3.8), Color3.fromRGB(28, 30, 34))
+	piece(model, Vector3.new(0.2, 0.2, 0.1), CFrame.new(0, 0.8, -0.22), Color3.fromRGB(28, 30, 34))
 	model.muzzle = Vector3.new(0, 0.06, -4.15)
 	return model
 end
@@ -12510,17 +12674,37 @@ local function buildLanzallamas()
 	return model
 end
 
+-- Lanzamisiles estilo RPG: tubo grueso con el cohete asomando, empuñaduras
+-- de madera y hombrera. Se tiene que ver GRANDE, nada de pistola.
 local function buildCohete()
 	local model = { pieces = {} }
-	piece(model, Vector3.new(0.85, 0.85, 3.6), CFrame.new(0, 0.15, -1.1) * CFrame.Angles(0, math.rad(90), 0),
-		Color3.fromRGB(70, 84, 66), nil, Enum.PartType.Cylinder)
-	piece(model, Vector3.new(0.95, 0.95, 0.4), CFrame.new(0, 0.15, -2.85) * CFrame.Angles(0, math.rad(90), 0),
-		Color3.fromRGB(48, 52, 48), nil, Enum.PartType.Cylinder)
-	piece(model, Vector3.new(0.4, 0.9, 0.6), CFrame.new(0, -0.5, -0.5) * CFrame.Angles(math.rad(-10), 0, 0),
-		Color3.fromRGB(52, 56, 52))
-	piece(model, Vector3.new(0.3, 0.3, 0.7), CFrame.new(0, 0.8, -1.2), Color3.fromRGB(40, 44, 40))
-	piece(model, Vector3.new(0.16, 0.16, 0.16), CFrame.new(0, 0.95, -1.5), Color3.fromRGB(200, 80, 60), Enum.Material.Neon)
-	model.muzzle = Vector3.new(0, 0.15, -3.2)
+	-- Tubo principal
+	piece(model, Vector3.new(3.7, 0.72, 0.72), CFrame.new(0, 0.55, -1.0) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(88, 98, 68), nil, Enum.PartType.Cylinder)
+	-- Campana trasera y refuerzo delantero
+	piece(model, Vector3.new(0.55, 1.0, 1.0), CFrame.new(0, 0.55, 0.95) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(52, 58, 46), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.5, 0.86, 0.86), CFrame.new(0, 0.55, -2.95) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(62, 70, 52), nil, Enum.PartType.Cylinder)
+	-- Cohete asomando con ojiva roja
+	piece(model, Vector3.new(1.2, 0.24, 0.24), CFrame.new(0, 0.55, -3.5) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(74, 78, 72), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.6, 0.4, 0.4), CFrame.new(0, 0.55, -4.15) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(226, 96, 70), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.4, 0.26, 0.26), CFrame.new(0, 0.55, -4.5) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(178, 58, 44), nil, Enum.PartType.Cylinder)
+	-- Mira de hierro plegada
+	piece(model, Vector3.new(0.09, 0.4, 0.09), CFrame.new(-0.15, 1.05, -2.1), Color3.fromRGB(42, 46, 40))
+	piece(model, Vector3.new(0.09, 0.4, 0.09), CFrame.new(0.15, 1.05, -2.1), Color3.fromRGB(42, 46, 40))
+	-- Empuñadura de pistola + guardamonte + empuñadura delantera
+	piece(model, Vector3.new(0.3, 0.72, 0.44), CFrame.new(0, -0.02, -0.05) * CFrame.Angles(math.rad(-14), 0, 0),
+		Color3.fromRGB(110, 76, 46), Enum.Material.Wood)
+	piece(model, Vector3.new(0.12, 0.3, 0.5), CFrame.new(0, -0.2, -0.42), Color3.fromRGB(44, 46, 42))
+	piece(model, Vector3.new(0.26, 0.62, 0.36), CFrame.new(0, -0.02, -1.5) * CFrame.Angles(math.rad(-10), 0, 0),
+		Color3.fromRGB(110, 76, 46), Enum.Material.Wood)
+	-- Hombrera trasera
+	piece(model, Vector3.new(0.36, 0.8, 0.55), CFrame.new(0, 0.5, 1.4), Color3.fromRGB(60, 64, 54))
+	model.muzzle = Vector3.new(0, 0.55, -4.7)
 	return model
 end
 
@@ -12595,10 +12779,12 @@ local function ensureFolder()
 		return nil
 	end
 	if folder and folder.Parent ~= camera then
+		folder:Destroy()
 		folder = nil
 		models = {}
 		current = nil
 		currentId = nil
+		reparentDirty = true
 	end
 	if not folder then
 		folder = Instance.new("Folder")
@@ -12613,6 +12799,9 @@ end
 -- ===============================================================
 function ViewModel.setWeapon(id)
 	if not id then
+		if currentId then
+			reparentDirty = true
+		end
 		currentId = nil
 		current = nil
 		return
@@ -12620,6 +12809,7 @@ function ViewModel.setWeapon(id)
 	if id == currentId then
 		return
 	end
+	reparentDirty = true
 	currentId = id
 	current = nil
 	if not BUILDERS[id] then
@@ -12647,7 +12837,11 @@ function ViewModel.setWeapon(id)
 end
 
 function ViewModel.setVisible(value)
-	visible = value and true or false
+	value = value and true or false
+	if visible ~= value then
+		visible = value
+		reparentDirty = true
+	end
 end
 
 function ViewModel.setAds(goal)
@@ -12655,7 +12849,11 @@ function ViewModel.setAds(goal)
 end
 
 function ViewModel.setHidden(value)
-	hiddenByScope = value and true or false
+	value = value and true or false
+	if hiddenByScope ~= value then
+		hiddenByScope = value
+		reparentDirty = true
+	end
 end
 
 function ViewModel.recoil(amount)
@@ -12700,11 +12898,15 @@ local function stepUnbound(dt)
 	flashTimer = math.max(0, flashTimer - dt)
 
 	local show = visible and current and not hiddenByScope
-	for _, model in pairs(models) do
-		local parent = (model == current and show) and folder or nil
-		for _, item in ipairs(model.pieces) do
-			if item.part.Parent ~= parent then
-				item.part.Parent = parent
+	-- Reacomodar piezas SOLO cuando algo cambio (no recorrer todo cada frame)
+	if reparentDirty then
+		reparentDirty = false
+		for _, model in pairs(models) do
+			local parent = (model == current and show) and folder or nil
+			for _, item in ipairs(model.pieces) do
+				if item.part.Parent ~= parent then
+					item.part.Parent = parent
+				end
 			end
 		end
 	end
