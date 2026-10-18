@@ -80,7 +80,8 @@ end
 -- Rifle base (tranquilizante, pintura y relente comparten cuerpo)
 local function buildRifle(tint, accent)
 	local model = { pieces = {} }
-	piece(model, Vector3.new(0.62, 0.85, 3.1), CFrame.new(0, -0.1, -0.6), Color3.fromRGB(52, 55, 62))
+	local acero = Color3.fromRGB(52, 55, 62)
+	piece(model, Vector3.new(0.62, 0.85, 3.1), CFrame.new(0, -0.1, -0.6), acero)
 	piece(model, Vector3.new(0.26, 0.26, 2.4), CFrame.new(0, 0.06, -2.9), Color3.fromRGB(34, 36, 42))
 	piece(model, Vector3.new(0.5, 0.75, 1.5), CFrame.new(0, -0.28, 1.6), tint or Color3.fromRGB(122, 92, 62), Enum.Material.Wood)
 	piece(model, Vector3.new(0.42, 0.95, 0.75), CFrame.new(0, -0.85, -0.55) * CFrame.Angles(math.rad(14), 0, 0), Color3.fromRGB(44, 47, 54))
@@ -89,6 +90,16 @@ local function buildRifle(tint, accent)
 	-- Mira de hierro: punto delantero y alza trasera
 	piece(model, Vector3.new(0.09, 0.32, 0.09), CFrame.new(0, 0.32, -3.8), Color3.fromRGB(28, 30, 34))
 	piece(model, Vector3.new(0.2, 0.2, 0.1), CFrame.new(0, 0.8, -0.22), Color3.fromRGB(28, 30, 34))
+	-- Detalles de fusil: riel con dientes sobre el guardamanos, guardamonte
+	-- y culata con tope de goma (se ve mas arma y menos caja)
+	piece(model, Vector3.new(0.14, 0.09, 1.9), CFrame.new(0, 0.23, -2.3), Color3.fromRGB(30, 32, 36))
+	for i = 0, 6 do
+		piece(model, Vector3.new(0.18, 0.05, 0.12), CFrame.new(0, 0.29, -1.45 - i * 0.28), Color3.fromRGB(24, 26, 30))
+	end
+	piece(model, Vector3.new(0.22, 0.1, 0.55), CFrame.new(0, -0.62, -0.1), Color3.fromRGB(30, 32, 36))
+	piece(model, Vector3.new(0.5, 0.86, 0.22), CFrame.new(0, -0.28, 2.42), Color3.fromRGB(34, 36, 40), Enum.Material.Rubber)
+	-- Cerrojo con manija plateada al costado
+	piece(model, Vector3.new(0.3, 0.09, 0.09), CFrame.new(0.34, 0.28, 0.42) * CFrame.Angles(0, math.rad(-18), math.rad(-12)), Color3.fromRGB(150, 154, 162))
 	model.muzzle = Vector3.new(0, 0.06, -4.15)
 	return model
 end
@@ -109,6 +120,14 @@ local function buildSniper()
 	piece(model, Vector3.new(0.16, 0.34, 0.34), CFrame.new(0, 0.8, 0.18) * CFrame.Angles(0, math.rad(90), 0),
 		Color3.fromRGB(60, 70, 74), Enum.Material.Glass, Enum.PartType.Cylinder)
 	piece(model, Vector3.new(0.16, 0.16, 0.16), CFrame.new(0, 0.8, -2.14), Color3.fromRGB(140, 235, 255), Enum.Material.Neon)
+	-- Anillas que agarran la mira al cuerpo, carrillera, cerrojo, cargador
+	-- y guardamonte: detalles de rifle de verdad
+	piece(model, Vector3.new(0.34, 0.5, 0.16), CFrame.new(0, 0.52, -1.5), Color3.fromRGB(34, 38, 38))
+	piece(model, Vector3.new(0.34, 0.5, 0.16), CFrame.new(0, 0.52, -0.3), Color3.fromRGB(34, 38, 38))
+	piece(model, Vector3.new(0.42, 0.22, 1.0), CFrame.new(0, 0.04, 1.35), Color3.fromRGB(52, 64, 54), Enum.Material.WoodPlanks)
+	piece(model, Vector3.new(0.32, 0.1, 0.1), CFrame.new(0.32, 0.24, 0.3) * CFrame.Angles(0, 0, math.rad(-20)), Color3.fromRGB(150, 154, 162))
+	piece(model, Vector3.new(0.36, 0.5, 0.6), CFrame.new(0, -0.6, -0.65) * CFrame.Angles(math.rad(8), 0, 0), Color3.fromRGB(36, 40, 40))
+	piece(model, Vector3.new(0.22, 0.12, 0.5), CFrame.new(0, -0.58, 0.42), Color3.fromRGB(30, 34, 34))
 	model.muzzle = Vector3.new(0, 0.08, -5.25)
 	return model
 end
@@ -116,11 +135,20 @@ end
 local function buildRevolver()
 	local model = { pieces = {} }
 	piece(model, Vector3.new(0.34, 0.5, 0.9), CFrame.new(0, 0, -0.35), Color3.fromRGB(96, 100, 110))
-	piece(model, Vector3.new(0.42, 0.42, 0.62), CFrame.new(0, 0.02, -0.15) * CFrame.Angles(0, 0, 0),
+	-- Tambor de verdad: cilindro acostado a lo largo del cañon
+	piece(model, Vector3.new(0.66, 0.5, 0.5), CFrame.new(0, 0.04, -0.1) * CFrame.Angles(0, math.rad(90), 0),
 		Color3.fromRGB(150, 154, 164), nil, Enum.PartType.Cylinder)  -- tambor
 	piece(model, Vector3.new(0.2, 0.2, 1.5), CFrame.new(0, 0.08, -1.4), Color3.fromRGB(60, 64, 72))
 	piece(model, Vector3.new(0.34, 0.8, 0.5), CFrame.new(0, -0.62, 0.28) * CFrame.Angles(math.rad(-16), 0, 0),
 		Color3.fromRGB(96, 66, 42), Enum.Material.Wood)
+	-- Varilla expulsora abajo del cañon, martillo atras, mira al frente
+	-- y guardamonte con gatillo
+	piece(model, Vector3.new(0.9, 0.09, 0.09), CFrame.new(0, -0.1, -1.3) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(120, 124, 134), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.09, 0.24, 0.16), CFrame.new(0, 0.34, 0.1) * CFrame.Angles(math.rad(-22), 0, 0), Color3.fromRGB(70, 74, 84))
+	piece(model, Vector3.new(0.06, 0.16, 0.06), CFrame.new(0, 0.26, -2.05), Color3.fromRGB(40, 44, 52))
+	piece(model, Vector3.new(0.1, 0.08, 0.42), CFrame.new(0, -0.3, -0.12), Color3.fromRGB(70, 74, 84))
+	piece(model, Vector3.new(0.06, 0.16, 0.06), CFrame.new(0, -0.26, -0.02) * CFrame.Angles(math.rad(-14), 0, 0), Color3.fromRGB(140, 144, 154))
 	model.muzzle = Vector3.new(0, 0.08, -2.25)
 	return model
 end
@@ -215,8 +243,31 @@ local function buildCohete()
 end
 
 -- ===== Arsenal estilo Counter Blox =====
+-- AK-47: madera, tubo de gases arriba del cañon y cargador curvado
 local function buildAK()
-	return buildRifle(Color3.fromRGB(150, 96, 52), Color3.fromRGB(70, 74, 84))
+	local model = { pieces = {} }
+	local acero = Color3.fromRGB(56, 58, 64)
+	local madera = Color3.fromRGB(138, 86, 48)
+	-- Receptor, cañon y tubo de gases
+	piece(model, Vector3.new(0.34, 0.5, 1.5), CFrame.new(0, -0.04, 0.25), acero)
+	piece(model, Vector3.new(0.16, 0.16, 1.9), CFrame.new(0, 0.02, -2.05), Color3.fromRGB(36, 38, 44))
+	piece(model, Vector3.new(0.13, 0.13, 1.15), CFrame.new(0, 0.18, -1.6), Color3.fromRGB(48, 50, 56))
+	-- Guardamanos y culata de madera con tope
+	piece(model, Vector3.new(0.36, 0.44, 1.15), CFrame.new(0, -0.08, -1.6), madera, Enum.Material.Wood)
+	piece(model, Vector3.new(0.3, 0.44, 1.55), CFrame.new(0, -0.2, 1.65) * CFrame.Angles(math.rad(3), 0, 0), madera, Enum.Material.Wood)
+	piece(model, Vector3.new(0.34, 0.64, 0.24), CFrame.new(0, -0.26, 2.5), Color3.fromRGB(96, 62, 36), Enum.Material.Wood)
+	-- Cargador curvado en dos tramos: lo mas AK que hay
+	piece(model, Vector3.new(0.24, 0.5, 0.36), CFrame.new(0, -0.48, -0.3) * CFrame.Angles(math.rad(-16), 0, 0), Color3.fromRGB(58, 60, 66))
+	piece(model, Vector3.new(0.24, 0.42, 0.32), CFrame.new(0, -0.84, -0.55) * CFrame.Angles(math.rad(-34), 0, 0), Color3.fromRGB(52, 54, 60))
+	-- Empuñadura de madera, guardamonte y gatillo
+	piece(model, Vector3.new(0.24, 0.64, 0.38), CFrame.new(0, -0.52, 0.72) * CFrame.Angles(math.rad(-16), 0, 0), madera, Enum.Material.Wood)
+	piece(model, Vector3.new(0.2, 0.09, 0.5), CFrame.new(0, -0.34, 0.28), Color3.fromRGB(34, 36, 40))
+	-- Mira de AK: punto delantero con capucha y alza trasera
+	piece(model, Vector3.new(0.08, 0.32, 0.08), CFrame.new(0, 0.3, -2.85), Color3.fromRGB(30, 32, 36))
+	piece(model, Vector3.new(0.22, 0.16, 0.1), CFrame.new(0, 0.42, -2.85), Color3.fromRGB(30, 32, 36))
+	piece(model, Vector3.new(0.16, 0.14, 0.1), CFrame.new(0, 0.28, -0.2), Color3.fromRGB(30, 32, 36))
+	model.muzzle = Vector3.new(0, 0.02, -3.05)
+	return model
 end
 
 local function buildM4()
@@ -225,6 +276,10 @@ local function buildM4()
 	piece(model, Vector3.new(0.42, 0.42, 0.22), CFrame.new(0, 0.06, -4.05), Color3.fromRGB(52, 55, 62))
 	piece(model, Vector3.new(0.34, 0.34, 1.45), CFrame.new(0, 0.06, -4.88), Color3.fromRGB(30, 32, 36))
 	piece(model, Vector3.new(0.4, 0.4, 0.16), CFrame.new(0, 0.06, -5.66), Color3.fromRGB(48, 50, 56))
+	-- Detalles M4: mira delantera con capucha y alza plegable atras
+	piece(model, Vector3.new(0.08, 0.3, 0.08), CFrame.new(0, 0.32, -3.9), Color3.fromRGB(30, 32, 36))
+	piece(model, Vector3.new(0.2, 0.12, 0.14), CFrame.new(0, 0.44, -3.9), Color3.fromRGB(30, 32, 36))
+	piece(model, Vector3.new(0.2, 0.16, 0.12), CFrame.new(0, 0.84, -0.45), Color3.fromRGB(30, 32, 36))
 	model.muzzle = Vector3.new(0, 0.06, -5.78)
 	return model
 end
@@ -237,18 +292,38 @@ local function buildMP5()
 	piece(model, Vector3.new(0.34, 0.55, 0.5), CFrame.new(0, -0.55, 0.35) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(48, 52, 60))
 	piece(model, Vector3.new(0.2, 0.45, 0.3), CFrame.new(0, -0.42, -0.5) * CFrame.Angles(math.rad(-14), 0, 0), Color3.fromRGB(44, 48, 54))
 	piece(model, Vector3.new(0.26, 0.24, 0.7), CFrame.new(0, 0.36, -0.5), Color3.fromRGB(210, 160, 60))
+	-- Detalles MP5: mira delantera con capucha, palanca de carga a la
+	-- izquierda, culata telescopica de varillas y guardamonte
+	piece(model, Vector3.new(0.09, 0.3, 0.09), CFrame.new(0, 0.4, -2.15), Color3.fromRGB(30, 33, 38))
+	piece(model, Vector3.new(0.16, 0.1, 0.14), CFrame.new(0, 0.5, -2.15), Color3.fromRGB(30, 33, 38))
+	piece(model, Vector3.new(0.34, 0.15, 0.15), CFrame.new(-0.36, 0.26, -1.4), Color3.fromRGB(48, 52, 60), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.07, 0.07, 0.9), CFrame.new(-0.13, -0.05, 0.95), Color3.fromRGB(40, 44, 50))
+	piece(model, Vector3.new(0.07, 0.07, 0.9), CFrame.new(0.13, -0.05, 0.95), Color3.fromRGB(40, 44, 50))
+	piece(model, Vector3.new(0.36, 0.6, 0.2), CFrame.new(0, -0.08, 1.52), Color3.fromRGB(44, 48, 54))
+	piece(model, Vector3.new(0.18, 0.08, 0.45), CFrame.new(0, -0.4, -0.05), Color3.fromRGB(36, 40, 46))
 	model.muzzle = Vector3.new(0, 0.2, -2.55)
 	return model
 end
 
 local function buildGlock()
 	local model = { pieces = {} }
-	piece(model, Vector3.new(0.3, 0.42, 1.15), CFrame.new(0, 0.08, -0.55), Color3.fromRGB(58, 60, 68))
-	piece(model, Vector3.new(0.26, 0.52, 0.44), CFrame.new(0, -0.34, -0.02) * CFrame.Angles(math.rad(-8), 0, 0), Color3.fromRGB(46, 48, 54))
-	piece(model, Vector3.new(0.5, 0.14, 0.14), CFrame.new(0, 0.08, -1.35) * CFrame.Angles(0, math.rad(90), 0),
-		Color3.fromRGB(80, 84, 94), nil, Enum.PartType.Cylinder)
-	piece(model, Vector3.new(0.1, 0.1, 0.1), CFrame.new(0, 0.33, -0.95), Color3.fromRGB(236, 238, 244), Enum.Material.SmoothPlastic)
-	model.muzzle = Vector3.new(0, 0.08, -1.6)
+	-- Corredera con fresados laterales, armazon y empuñadura texturada
+	piece(model, Vector3.new(0.3, 0.38, 1.35), CFrame.new(0, 0.2, -0.5), Color3.fromRGB(56, 58, 66))
+	piece(model, Vector3.new(0.28, 0.3, 0.95), CFrame.new(0, -0.1, -0.42), Color3.fromRGB(44, 46, 52))
+	piece(model, Vector3.new(0.28, 0.7, 0.48), CFrame.new(0, -0.56, 0.02) * CFrame.Angles(math.rad(-14), 0, 0), Color3.fromRGB(38, 40, 46))
+	piece(model, Vector3.new(0.02, 0.14, 0.5), CFrame.new(-0.16, 0.2, -0.05), Color3.fromRGB(40, 42, 48))
+	piece(model, Vector3.new(0.02, 0.14, 0.5), CFrame.new(0.16, 0.2, -0.05), Color3.fromRGB(40, 42, 48))
+	-- Guardamonte (poste y barra) con gatillo
+	piece(model, Vector3.new(0.12, 0.3, 0.1), CFrame.new(0, -0.38, -0.68), Color3.fromRGB(36, 38, 44))
+	piece(model, Vector3.new(0.12, 0.08, 0.48), CFrame.new(0, -0.5, -0.5), Color3.fromRGB(36, 38, 44))
+	piece(model, Vector3.new(0.07, 0.18, 0.07), CFrame.new(0, -0.36, -0.44) * CFrame.Angles(math.rad(-12), 0, 0), Color3.fromRGB(90, 94, 102))
+	-- Boca del cañon y miras: punto con puntito blanco y alza trasera
+	piece(model, Vector3.new(0.16, 0.2, 0.2), CFrame.new(0, 0.2, -1.22) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(70, 74, 82), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.07, 0.16, 0.07), CFrame.new(0, 0.45, -1.1), Color3.fromRGB(28, 30, 34))
+	piece(model, Vector3.new(0.05, 0.05, 0.05), CFrame.new(0, 0.55, -1.1), Color3.fromRGB(236, 238, 244), Enum.Material.SmoothPlastic)
+	piece(model, Vector3.new(0.16, 0.1, 0.12), CFrame.new(0, 0.44, 0.1), Color3.fromRGB(28, 30, 34))
+	model.muzzle = Vector3.new(0, 0.2, -1.35)
 	return model
 end
 
@@ -260,6 +335,14 @@ local function buildEscopeta()
 		Color3.fromRGB(52, 54, 60), nil, Enum.PartType.Cylinder)
 	piece(model, Vector3.new(0.34, 0.28, 0.9), CFrame.new(0, -0.16, -1.55), Color3.fromRGB(96, 74, 52), Enum.Material.Wood)
 	piece(model, Vector3.new(0.22, 0.22, 0.6), CFrame.new(0, -0.05, -0.9), Color3.fromRGB(58, 62, 68))
+	-- Tubo almacen de cartuchos abajo del cañon, banda, gatillo y tope
+	piece(model, Vector3.new(2.2, 0.16, 0.16), CFrame.new(0, 0.0, -1.7) * CFrame.Angles(0, math.rad(90), 0),
+		Color3.fromRGB(52, 54, 60), nil, Enum.PartType.Cylinder)
+	piece(model, Vector3.new(0.3, 0.34, 0.14), CFrame.new(0, 0.1, -2.6), Color3.fromRGB(44, 46, 52))
+	piece(model, Vector3.new(0.05, 0.09, 0.05), CFrame.new(0, 0.3, -2.85), Color3.fromRGB(226, 206, 120), Enum.Material.SmoothPlastic)
+	piece(model, Vector3.new(0.1, 0.07, 0.42), CFrame.new(0, -0.3, -0.12), Color3.fromRGB(44, 46, 52))
+	piece(model, Vector3.new(0.06, 0.14, 0.06), CFrame.new(0, -0.26, -0.05) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(140, 144, 154))
+	piece(model, Vector3.new(0.4, 0.56, 0.2), CFrame.new(0, -0.1, 1.88), Color3.fromRGB(70, 48, 30), Enum.Material.Wood)
 	model.muzzle = Vector3.new(0, 0.16, -3.0)
 	return model
 end

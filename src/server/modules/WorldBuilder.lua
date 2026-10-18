@@ -2474,7 +2474,7 @@ function WorldBuilder.buildAsedioFort(arena)
 				local cols = math.max(2, math.floor(ancho / 8 + 0.5))
 				for i = 0, cols do
 					local cx = -ancho / 2 + (ancho / cols) * i
-					bloque("Columna", cf * CFrame.new(cx, 5.5, 0), Vector3.new(2.0, ALTO, 1.9), FORT_OSCURO, Enum.Material.CorrugatedMetal)
+					bloque("Columna", cf * CFrame.new(cx, 5.5, 0), Vector3.new(2.0, ALTO, 1.9), FORT_OSCURO, Enum.Material.DiamondPlate)
 				end
 			else
 				bloque("Muro", cf * CFrame.new(0, ALTO / 2, 0), Vector3.new(ancho, ALTO, 1.7), FORT_MURO)
@@ -2482,13 +2482,13 @@ function WorldBuilder.buildAsedioFort(arena)
 		end
 
 		-- Alero del pasillo de guardia (lado de adentro)
-		bloque("Alero", cfEn(base - n * 2.4 + Vector3.new(0, ALTO + 0.5, 0), t), Vector3.new(L, 0.9, 3.6), FORT_OSCURO, Enum.Material.CorrugatedMetal)
+		bloque("Alero", cfEn(base - n * 2.4 + Vector3.new(0, ALTO + 0.5, 0), t), Vector3.new(L, 0.9, 3.6), FORT_OSCURO, Enum.Material.DiamondPlate)
 
 		-- Marcos de cada abertura
 		for _, a in ipairs(aberturas) do
 			for _, lado in ipairs({ -1, 1 }) do
 				local cf = cfEn(base + t * (a.c + lado * (a.w / 2 + 0.6)), t)
-				bloque("Marco", cf * CFrame.new(0, ALTO / 2, 0), Vector3.new(1.4, ALTO + 0.6, 2.1), FORT_OSCURO, Enum.Material.CorrugatedMetal)
+				bloque("Marco", cf * CFrame.new(0, ALTO / 2, 0), Vector3.new(1.4, ALTO + 0.6, 2.1), FORT_OSCURO, Enum.Material.DiamondPlate)
 			end
 		end
 
@@ -2497,7 +2497,7 @@ function WorldBuilder.buildAsedioFort(arena)
 
 	-- Porton del frente (mira al centro de la arena)
 	local baseFrente, frenteT = pared(haciaCentro, { { c = 0, w = 12 } })
-	bloque("Dintel", cfEn(baseFrente + Vector3.new(0, 10.4, 0), frenteT), Vector3.new(12.4, 1.4, 2.1), FORT_OSCURO, Enum.Material.CorrugatedMetal)
+	bloque("Dintel", cfEn(baseFrente + Vector3.new(0, 10.4, 0), frenteT), Vector3.new(12.4, 1.4, 2.1), FORT_OSCURO, Enum.Material.DiamondPlate)
 
 	-- Ductos de ventilacion: se entra agachado, sin pasar por el porton
 	local function ducto(n)

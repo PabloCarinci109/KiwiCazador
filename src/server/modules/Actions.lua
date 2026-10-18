@@ -995,39 +995,67 @@ local function smokeCloud(pos)
 	end)
 end
 
--- Molotov: lengua de fuego en el piso que quema a quien se quede adentro
+-- Molotov: lengua de fuego en el piso que quema a quien se quede adentro.
+-- Tres capas (brasa roja, llama naranja y punta amarilla) que suben y
+-- titilan cada una a su ritmo: se ve como fuego de verdad, no bolitas.
 local function fireZone(session, thrower, pos)
 	local cfg = Config.Grenades.molotov
-	local parts = {}
-	for i = 1, 12 do
-		local angle = math.random() * math.pi * 2
-		local dist = math.sqrt(math.random()) * (cfg.radius * 0.6)
-		local size = math.random(20, 34) / 10
-		local part = Util.makePart({
-			Name = "Llama",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(size, size * 1.7, size),
-			Color = Color3.fromRGB(255, 128, 48),
-			Material = Enum.Material.Neon,
-			Transparency = 0.15,
-			Anchored = true,
-			CanCollide = false,
-			CanQuery = false,
-			CanTouch = false,
-			CFrame = CFrame.new(pos + Vector3.new(math.cos(angle) * dist, 0.7, math.sin(angle) * dist)),
-			Parent = workspace,
-		})
-		table.insert(parts, part)
+	local flames = {}
+	local function capa(cantidad, radio, altura, tamano, color, transparencia)
+		for i = 1, cantidad do
+			local angle = math.random() * math.pi * 2
+			local dist = math.sqrt(math.random()) * radio
+			local size = tamano * (0.72 + math.random() * 0.56)
+			local alto = altura * (0.8 + math.random() * 0.4)
+			local base = pos + Vector3.new(math.cos(angle) * dist, 0, math.sin(angle) * dist)
+			local part = Util.makePart({
+				Name = "Llama",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(size, size, size),
+				Color = color,
+				Material = Enum.Material.Neon,
+				Transparency = transparencia,
+				Anchored = true,
+				CanCollide = false,
+				CanQuery = false,
+				CanTouch = false,
+				CFrame = CFrame.new(base + Vector3.new(0, alto * 0.4, 0)),
+				Parent = workspace,
+			})
+			table.insert(flames, {
+				part = part, base = base, alto = alto, tamano = size, trans = transparencia,
+				speed = 1.6 + math.random() * 2.2, fase = math.random() * 6.28,
+			})
+		end
 	end
+	capa(14, cfg.radius * 0.78, 1.2, 2.5, Color3.fromRGB(168, 44, 16), 0.2)
+	capa(18, cfg.radius * 0.66, 2.0, 1.9, Color3.fromRGB(255, 116, 30), 0.12)
+	capa(10, cfg.radius * 0.44, 2.8, 1.2, Color3.fromRGB(255, 214, 96), 0.08)
+
+	-- Luz calida: de noche la fogata se ve desde lejos
+	local glow = Instance.new("PointLight")
+	glow.Color = Color3.fromRGB(255, 138, 58)
+	glow.Brightness = 3.2
+	glow.Range = math.max(24, cfg.radius * 2)
+	glow.Parent = flames[1].part
 
 	local endsAt = os.clock() + cfg.time
 	local nextBurn = 0
 	task.spawn(function()
+		local t0 = os.clock()
 		while os.clock() < endsAt do
-			task.wait(0.22)
-			for _, p in ipairs(parts) do
+			task.wait(0.09)
+			local t = os.clock() - t0
+			for _, f in ipairs(flames) do
+				local p = f.part
 				if p and p.Parent then
-					p.Transparency = 0.05 + math.random() * 0.4
+					-- Cada lengua late distinto y se estira hacia arriba
+					local onda = math.sin(t * f.speed * 3.1 + f.fase)
+					local subida = (math.sin(t * f.speed + f.fase) * 0.5 + 0.5) * f.alto
+					local alto = f.alto * (0.75 + math.random() * 0.5)
+					p.CFrame = CFrame.new(f.base + Vector3.new(0, alto * 0.4 + subida * 0.5, 0))
+					p.Size = Vector3.new(f.tamano * (0.9 + onda * 0.12), alto * 1.6, f.tamano * (0.9 + onda * 0.12))
+					p.Transparency = math.clamp(f.trans + math.abs(onda) * 0.08 + math.random() * 0.06, 0, 0.7)
 				end
 			end
 			if os.clock() >= nextBurn then
@@ -1046,17 +1074,20 @@ local function fireZone(session, thrower, pos)
 				end
 			end
 		end
-		for _, p in ipairs(parts) do
-			if p and p.Parent then
-				p:Destroy()
+		for _, f in ipairs(flames) do
+			if f.part and f.part.Parent then
+				f.part:Destroy()
 			end
 		end
 	end)
 end
 
--- Flashbang: pantalla blanca para quienes la ven sin pared en el medio
+-- Flashbang: pantalla blanca para quienes la ven sin pared en el medio.
+-- Radio grande y 5 segundos de ceguera plena de cerca; una pared solo
+-- amortigua la luz, no la anula del todo.
 local function flashBlast(session, pos)
 	local cfg = Config.Grenades.flash
+	local core = cfg.radius * 0.45
 	for _, other in ipairs(session.players) do
 		local _, otherRoot = getRoot(other)
 		if otherRoot then
@@ -1065,16 +1096,17 @@ local function flashBlast(session, pos)
 			if dist <= cfg.radius then
 				local params = Actions.makeDartParams(other.Character)
 				local blocked = workspace:Raycast(pos, away, params)
-				local dur = 0
+				local dur
 				if blocked then
-					-- Tapada por una pared: casi no molesta
-					dur = cfg.maxTime * 0.12
+					-- Detras de una pared igual queda un velo corto
+					dur = 1
+				elseif dist <= core then
+					-- De cerca se lleva los 5 segundos completos
+					dur = cfg.maxTime
 				else
-					dur = math.clamp(cfg.maxTime * (1 - dist / cfg.radius), 0.8, cfg.maxTime)
+					dur = math.max(1.2, cfg.maxTime * (1 - (dist - core) / (cfg.radius - core)))
 				end
-				if dur > 0.5 then
-					Net.get("WorldEvent"):FireClient(other, "flash", { dur = dur, pos = pos })
-				end
+				Net.get("WorldEvent"):FireClient(other, "flash", { dur = dur, pos = pos })
 			end
 		end
 	end

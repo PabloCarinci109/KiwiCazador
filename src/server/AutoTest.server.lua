@@ -17,7 +17,9 @@ local GameManager = require(modulos.GameManager)
 local Weather = require(modulos.Weather)
 local Destruction = require(modulos.Destruction)
 local Actions = require(modulos.Actions)
-local Config = require(modulos.Shared.Config)
+-- Shared devuelve la carpeta ReplicatedStorage.KiwiShared: ahi vive Config
+local Shared = require(modulos.Shared)
+local Config = require(Shared.Config)
 
 local pruebas, fallos = 0, 0
 
@@ -242,7 +244,7 @@ if not player then
 	player = Players.PlayerAdded:Wait()
 end
 task.wait(8)
-print("[AUTO-TEST] jugador: " .. player.Name .. " (v" .. require(modulos.Shared.Config).Version .. ")")
+print("[AUTO-TEST] jugador: " .. player.Name .. " (v" .. Config.Version .. ")")
 
 -- Clima: estado publicado y una nevada de prueba (despues vuelve el sol)
 check(workspace:GetAttribute("Clima") ~= nil, "clima: estado publicado en el workspace")

@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.9.3"
+Config.Version = "1.9.4"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -315,8 +315,9 @@ Config.Grenades = {
 		uses = 1,
 		cooldown = 0.9,
 		speed = 76, lift = 0.28,
-		radius = 10, time = 6.5,
-		burnDamage = 9, burnEvery = 1,
+		-- Pide mas area: radio 15 y dura 8 segundos en el piso
+		radius = 15, time = 8,
+		burnDamage = 10, burnEvery = 1,
 	},
 	flash = {
 		name = "Flashbang",
@@ -326,7 +327,8 @@ Config.Grenades = {
 		cooldown = 0.8,
 		speed = 84, lift = 0.30,
 		fuse = 1.5,
-		radius = 30, maxTime = 4,
+		-- Pide mas alcance y 5 segundos: radio 45, ceguera plena 5 s
+		radius = 45, maxTime = 5,
 	},
 }
 
