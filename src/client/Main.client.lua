@@ -199,6 +199,110 @@ local function burst(position, color, count)
 	Debris:AddItem(holder, 2)
 end
 
+-- ===============================================================
+-- Lanzallamas: chorro de fuego visible (todo por codigo, sin assets)
+-- ===============================================================
+local flameRigs = {}
+
+local function getFlameRig(key)
+	local rig = flameRigs[key]
+	if rig then
+		return rig
+	end
+	local part = Instance.new("Part")
+	part.Name = "ChorroLlama"
+	part.Size = Vector3.new(0.4, 0.4, 0.4)
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Transparency = 1
+	part.Parent = workspace
+
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "Llama"
+	emitter.Texture = "rbxasset://textures/particles/fire_main.dds"
+	emitter.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 240, 180)),
+		ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255, 150, 60)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(170, 40, 12)),
+	})
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.1),
+		NumberSequenceKeypoint.new(0.75, 0.5),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1.4),
+		NumberSequenceKeypoint.new(1, 4.6),
+	})
+	emitter.Lifetime = NumberRange.new(0.4, 0.65)
+	emitter.Speed = NumberRange.new(20, 30)
+	emitter.SpreadAngle = Vector2.new(6, 6)
+	emitter.Acceleration = Vector3.new(0, 4.5, 0)
+	emitter.LightEmission = 1
+	emitter.LightInfluence = 0
+	emitter.Rate = 70
+	emitter.Enabled = false
+	emitter.Parent = part
+
+	local light = Instance.new("PointLight")
+	light.Name = "LuzLlama"
+	light.Color = Color3.fromRGB(255, 150, 70)
+	light.Range = 18
+	light.Brightness = 1.8
+	light.Shadows = false
+	light.Enabled = false
+	light.Parent = part
+
+	rig = { part = part, emitter = emitter, light = light, until_ = 0 }
+	flameRigs[key] = rig
+	return rig
+end
+
+-- Enciende (o refresca) el chorro en esa posicion y direccion
+local function flameAt(key, position, direction)
+	local rig = getFlameRig(key)
+	local look = direction.Magnitude > 0.01 and direction.Unit or Vector3.new(0, 0, -1)
+	rig.part.CFrame = CFrame.lookAt(position, position + look)
+	rig.emitter.Enabled = true
+	rig.light.Enabled = true
+	rig.until_ = os.clock() + 0.4
+end
+
+-- Apaga los chorros que quedaron sin refrescar (lo llama el Heartbeat)
+local function flameCleanup()
+	local now = os.clock()
+	for _, rig in pairs(flameRigs) do
+		if rig.emitter.Enabled and now > rig.until_ then
+			rig.emitter.Enabled = false
+			rig.light.Enabled = false
+		end
+	end
+end
+
+-- Soplete: sonido en loop mientras sale el chorro
+local flameSound = nil
+local function setFlameSound(on)
+	if on then
+		if not flameSound then
+			flameSound = Instance.new("Sound")
+			flameSound.Name = "Soplete"
+			flameSound.SoundId = Config.Sounds.flame
+			flameSound.Looped = true
+			flameSound.Volume = 0.42
+			flameSound.PlaybackSpeed = 0.42
+			flameSound.Parent = player:FindFirstChildOfClass("PlayerGui") or workspace
+		end
+		if not flameSound.IsPlaying then
+			flameSound:Play()
+		end
+	elseif flameSound and flameSound.IsPlaying then
+		flameSound:Stop()
+	end
+end
+
 -- Trazadora estilo Counter: una linea neon que se apaga al instante
 local function tracer(from, dir, length, color, thickness)
 	local beam = Instance.new("Part")
@@ -459,6 +563,7 @@ end
 local holdingFire = false
 local autoJob = nil
 local startAutoFire
+local lastFlameCrackle = 0
 
 local function fireTool(toolId)
 	if not state.active or state.phase ~= "playing" then
@@ -491,13 +596,18 @@ local function fireTool(toolId)
 	elseif toolId == "cuchillo" then
 		sound2D(Config.Sounds.netSwing, 0.55, 1.3)
 	elseif toolId == "lanzallamas" then
-		sound2D(Config.Sounds.dartShot, 0.6, 0.5)
+		-- El soplete va en loop aparte; esto es un chisporroteo cada tanto
+		local now = os.clock()
+		if now - lastFlameCrackle > 0.32 then
+			lastFlameCrackle = now
+			gunPlay(Config.Sounds.flame, 0.28, 0.62, 0.3)
+		end
 	end
 
 	-- Patada del arma (estilo Counter)
 	local RECOIL = {
 		rifle = 0.45, pintura = 0.45, relente = 0.45, sniper = 1.1,
-		revolver = 0.7, cohete = 1.0, arco = 0.5, cuchillo = 0.35, lanzallamas = 0.3,
+		revolver = 0.7, cohete = 1.0, arco = 0.5, cuchillo = 0.35, lanzallamas = 0.15,
 		ak = 0.8, m4 = 0.7, mp5 = 0.5, glock = 0.5, escopeta = 0.95,
 	}
 	ViewModel.recoil(RECOIL[toolId] or 0)
@@ -509,7 +619,8 @@ local function fireTool(toolId)
 	local kick = math.rad(2 * (1 - control / 100))
 	ViewModel.kickCamera(kick * (1 + math.random() * 0.5), kick * (math.random() * 4 - 2))
 
-	shotBloom = math.min(20, shotBloom + 8)
+	-- El chorro de fuego no abre la cruz como un balazo
+	shotBloom = math.min(20, shotBloom + (toolId == "lanzallamas" and 2 or 8))
 
 	-- Automaticas (AK, M4, MP5): si seguis apretando, la rafaga continua
 	local wcfg = Config.Weapons[toolId]
@@ -693,10 +804,22 @@ RunService.RenderStepped:Connect(function(dt)
 		HUD.setCrosshair(true, 3 + math.min(grados * 2.2, 12) + shotBloom * 0.35,
 			4 + math.min(grados * 0.8, 4), scoped)
 	end
-	-- El punto central se ve siempre que tengas un arma en mano
-	if show ~= lastDot then
-		lastDot = show
-		HUD.setAimDot(show)
+	-- El punto central se ve SIEMPRE en partida, incluso sin armas
+	local inRound = state.active and (state.phase == "playing" or state.phase == "countdown")
+	local dotShow = inRound and not hiddenNow and not sniperScope
+	if dotShow ~= lastDot then
+		lastDot = dotShow
+		HUD.setAimDot(dotShow)
+	end
+
+	-- Lanzallamas: mientras mantenes apretado sale el chorro de fuego
+	local flaming = inRound and not hiddenNow and holdingFire and equippedId == "lanzallamas"
+	setFlameSound(flaming)
+	if flaming then
+		local muzzlePos, look = ViewModel.getMuzzle()
+		if muzzlePos and look then
+			flameAt("local", muzzlePos, look)
+		end
 	end
 end)
 
@@ -981,10 +1104,9 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 		elseif position and weapon == "cuchillo" then
 			burst(position + dir * 3.2, Color3.fromRGB(230, 240, 250), data.hit and 16 or 7)
 		elseif position and weapon == "lanzallamas" then
-			for i = 1, 5 do
-				task.delay(i * 0.055, function()
-					burst(position + dir * (2 + i * 2.3), Color3.fromRGB(255, 140 + i * 14, 60), 16)
-				end)
+			-- Chorro continuo: cada aviso del servidor refresca el rig
+			if data.user ~= player.UserId then
+				flameAt("r" .. tostring(data.user or 0), position, dir)
 			end
 		elseif position and weapon == "arco" then
 			burst(position + dir * 1.2, Color3.fromRGB(180, 225, 150), 5)
@@ -1150,6 +1272,9 @@ RunService.Heartbeat:Connect(function(dt)
 			end
 		end
 	end
+
+	-- Chorros de llama que quedaron viejos
+	flameCleanup()
 
 	local remaining = remainingCooldowns
 	for toolId, data in pairs(cooldowns) do

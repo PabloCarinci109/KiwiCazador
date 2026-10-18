@@ -322,11 +322,10 @@ function Actions.fireWeapon(session, player, weaponId, data)
 		return
 	end
 
-	-- Lanzallamas: chorro corto en cono
+	-- Lanzallamas: chorro continuo en cono (los usos se gastan por tick)
 	if cfg.flame then
 		Actions.flame(session, player, weaponId, cfg, muzzle, dir)
 		ToolService.startCooldown(player, weaponId, cfg.cooldown)
-		ToolService.consumeLoot(player, weaponId)
 		return
 	end
 
@@ -468,11 +467,52 @@ function Actions.sniperShot(session, player, cfg, muzzle, dir, data)
 end
 
 -- Lanzallamas: cono corto que hiere jugadores con linea de vista y frena al kiwi.
+-- Lanzallamas: chorro continuo mientras mantenes el clic. Cada segundo
+-- (tick) saca 10% de la vida maxima a quien este dentro del cono. Si el
+-- chorro pasa de 10 segundos seguidos, el que lo usa tambien se quema:
+-- la unica salida es soltar el gatillo.
 function Actions.flame(session, player, weaponId, cfg, muzzle, dir)
+	local now = os.clock()
+	session.flame = session.flame or {}
+	local state = session.flame[player]
+	if not state then
+		state = { last = now, streak = 0, dmg = 0, fx = 0 }
+		session.flame[player] = state
+	end
+
+	-- Tiempo desde el ultimo pedido: si hubo un bache, el chorro se corto
+	local dt = math.clamp(now - state.last, 0, 0.5)
+	state.last = now
+	if dt > 0.35 then
+		state.streak = 0
+		state.dmg = 0
+	end
+	state.streak = state.streak + dt
+
+	-- Chorro visible para todos (4 avisos por segundo alcanzan: el rig
+	-- del cliente sigue emitiendo entre avisos)
+	if now - state.fx >= 0.25 then
+		state.fx = now
+		session:event("weaponfx", { weapon = weaponId, pos = muzzle, dir = dir, user = player.UserId })
+	end
+
+	-- Un tick de daño por segundo
+	local tickTime = cfg.tickTime or 1
+	state.dmg = state.dmg + dt
+	if state.dmg < tickTime then
+		return
+	end
+	state.dmg = state.dmg - tickTime
+
+	-- Combustible: cada tick gasta un uso (12 usos = 12 segundos de chorro)
+	if ToolService.consumeLoot(player, weaponId) <= 0 then
+		return
+	end
+
 	local reach = cfg.reach or 17
 	local cosLimit = math.cos(math.rad(cfg.coneAngle or 32))
 	local aimFlat = flat(dir).Unit
-	local hitAnyone = false
+	local damage = Config.Player.maxHealth * (cfg.damagePercent or 10) / 100
 
 	for _, other in ipairs(session.players) do
 		local _, otherRoot = getRoot(other)
@@ -489,10 +529,9 @@ function Actions.flame(session, player, weaponId, cfg, muzzle, dir)
 					params.IgnoreWater = true
 					local los = workspace:Raycast(muzzle, to, params)
 					if los == nil or los.Instance:IsDescendantOf(other.Character) then
-						session:damagePlayer(other, player, cfg.name, cfg.damage, otherRoot.Position)
-						local push = toFlat.Unit * (cfg.knockback or 12)
-						otherRoot.AssemblyLinearVelocity = Vector3.new(push.X, 10, push.Z)
-						hitAnyone = true
+						session:damagePlayer(other, player, cfg.name, damage, otherRoot.Position)
+						local push = toFlat.Unit * (cfg.knockback or 8)
+						otherRoot.AssemblyLinearVelocity = Vector3.new(push.X, 8, push.Z)
 					end
 				end
 			end
@@ -512,7 +551,12 @@ function Actions.flame(session, player, weaponId, cfg, muzzle, dir)
 		end
 	end
 
-	session:event("weaponfx", { weapon = weaponId, pos = muzzle, dir = dir, hit = hitAnyone })
+	-- Sobrecalentado: mas de 10 segundos de chorro seguido = te quemas vos
+	if state.streak > (cfg.overheat or 10) then
+		local _, myRoot = getRoot(player)
+		session:damagePlayer(player, player, cfg.name, damage,
+			myRoot and myRoot.Position or muzzle, "Te estas quemando con tu propio lanzallamas")
+	end
 end
 
 -- Flecha clavada: queda en el mundo con un cartel para recuperarla (+1 uso).

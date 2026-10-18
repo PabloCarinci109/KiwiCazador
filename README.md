@@ -42,6 +42,13 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 ### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
 
+> **1.7.0:** el **punto de mira central** ahora sí queda en el centro de la pantalla (antes
+> estaba pegado a la barra de arriba) y se ve **siempre en partida, incluso sin armas**. La
+> **mira del francotirador** es mucho más grande y se adapta a tu pantalla, con bastante menos
+> negro. El **lanzallamas** ahora tira un **chorro de fuego visible** que saca **10% de la vida
+> por segundo** durante hasta 10 segundos seguidos; si te pasás de ese tiempo **te quemás vos
+> también**, así que hay que soltar el gatillo (12 usos = 12 segundos de combustible).
+
 > **1.6.0:** el **punto de mira central** ahora se ve bien (a la cadera y al apuntar, en cualquier
 > vista); las armas tienen **sonido propio de disparo** (boom grave + chasquido + cola, armado por
 > capas) y el **lanzamisiles se ve como un RPG de verdad** (tubo gordo con el cohete asomando).
@@ -300,7 +307,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.6.0 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.7.0 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):

@@ -43,7 +43,7 @@
 
 local Config = {}
 
-Config.Version = "1.6.0"
+Config.Version = "1.7.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -229,7 +229,7 @@ Config.Shoot = {
 		revolver = { vel = 0.45, spread = 0.3, dead = 1.6, recoil = 26 },
 		arco = { vel = 0.60, spread = 0.3, dead = 1.2, recoil = 72 },
 		cuchillo = { recoil = 92 },
-		lanzallamas = { vel = 0.5, recoil = 88 },
+		lanzallamas = { vel = 0.5, recoil = 96 },
 		cohete = { recoil = 18 },
 		-- Arsenal estilo Counter Blox (baules): automaticas, MP5, pistola
 		-- y escopeta de perdigones.
@@ -300,7 +300,7 @@ Config.Loot = {
 		{ id = "revolver", weight = 22 },
 		{ id = "cuchillo", weight = 18 },
 		{ id = "arco", weight = 15 },
-		{ id = "lanzallamas", weight = 14 },
+		{ id = "lanzallamas", weight = 14, uses = 12 }, -- 12s de chorro (1 uso por tick)
 		{ id = "sniper", weight = 14 },
 		{ id = "cohete", weight = 8 },
 		-- Arsenal estilo Counter Blox: automaticas y escopeta (mas tiros)
@@ -389,12 +389,15 @@ Config.Weapons = {
 	lanzallamas = {
 		name = "Lanzallamas",
 		color = Color3.fromRGB(240, 140, 60),
-		cooldown = 1.3,
-		flame = true,   -- chorro corto en cono (no proyectil)
-		reach = 17,     -- alcance del chorro
-		coneAngle = 32, -- medio angulo del cono (grados)
-		damage = 24,    -- daño total por rafaga
-		knockback = 12,
+		cooldown = 0.1,      -- chorro continuo: mantene apretado el clic
+		auto = true,
+		flame = true,        -- chorro en cono (no proyectil)
+		reach = 17,          -- alcance del chorro
+		coneAngle = 32,      -- medio angulo del cono (grados)
+		damagePercent = 10,  -- 10% de la vida maxima por tick
+		tickTime = 1.0,      -- un tick de daño por segundo
+		overheat = 10,       -- segundos de chorro seguido antes de quemarte
+		knockback = 8,
 		slowFactor = 0.60,
 		slowTime = 1.0,
 		size = Vector3.new(0.3, 0.3, 1.6),
@@ -815,6 +818,8 @@ Config.Sounds = {
 	gunBoom = "rbxasset://sounds/collide.wav",
 	gunCrack = "rbxasset://sounds/snap.wav",
 	gunTail = "rbxasset://sounds/impact_explosion_03.mp3",
+	-- Soplete del lanzallamas (suena en loop mientras sale el chorro)
+	flame = "rbxasset://sounds/unsheath.mp3",
 	flush = "rbxasset://sounds/swordlunge.wav",
 	rustle = "rbxasset://sounds/action_footsteps_plastic.mp3",
 	win = "rbxasset://sounds/electronicpingshort.wav",
@@ -6376,11 +6381,10 @@ function Actions.fireWeapon(session, player, weaponId, data)
 		return
 	end
 
-	-- Lanzallamas: chorro corto en cono
+	-- Lanzallamas: chorro continuo en cono (los usos se gastan por tick)
 	if cfg.flame then
 		Actions.flame(session, player, weaponId, cfg, muzzle, dir)
 		ToolService.startCooldown(player, weaponId, cfg.cooldown)
-		ToolService.consumeLoot(player, weaponId)
 		return
 	end
 
@@ -6522,11 +6526,52 @@ function Actions.sniperShot(session, player, cfg, muzzle, dir, data)
 end
 
 -- Lanzallamas: cono corto que hiere jugadores con linea de vista y frena al kiwi.
+-- Lanzallamas: chorro continuo mientras mantenes el clic. Cada segundo
+-- (tick) saca 10% de la vida maxima a quien este dentro del cono. Si el
+-- chorro pasa de 10 segundos seguidos, el que lo usa tambien se quema:
+-- la unica salida es soltar el gatillo.
 function Actions.flame(session, player, weaponId, cfg, muzzle, dir)
+	local now = os.clock()
+	session.flame = session.flame or {}
+	local state = session.flame[player]
+	if not state then
+		state = { last = now, streak = 0, dmg = 0, fx = 0 }
+		session.flame[player] = state
+	end
+
+	-- Tiempo desde el ultimo pedido: si hubo un bache, el chorro se corto
+	local dt = math.clamp(now - state.last, 0, 0.5)
+	state.last = now
+	if dt &gt; 0.35 then
+		state.streak = 0
+		state.dmg = 0
+	end
+	state.streak = state.streak + dt
+
+	-- Chorro visible para todos (4 avisos por segundo alcanzan: el rig
+	-- del cliente sigue emitiendo entre avisos)
+	if now - state.fx &gt;= 0.25 then
+		state.fx = now
+		session:event("weaponfx", { weapon = weaponId, pos = muzzle, dir = dir, user = player.UserId })
+	end
+
+	-- Un tick de daño por segundo
+	local tickTime = cfg.tickTime or 1
+	state.dmg = state.dmg + dt
+	if state.dmg &lt; tickTime then
+		return
+	end
+	state.dmg = state.dmg - tickTime
+
+	-- Combustible: cada tick gasta un uso (12 usos = 12 segundos de chorro)
+	if ToolService.consumeLoot(player, weaponId) &lt;= 0 then
+		return
+	end
+
 	local reach = cfg.reach or 17
 	local cosLimit = math.cos(math.rad(cfg.coneAngle or 32))
 	local aimFlat = flat(dir).Unit
-	local hitAnyone = false
+	local damage = Config.Player.maxHealth * (cfg.damagePercent or 10) / 100
 
 	for _, other in ipairs(session.players) do
 		local _, otherRoot = getRoot(other)
@@ -6543,10 +6588,9 @@ function Actions.flame(session, player, weaponId, cfg, muzzle, dir)
 					params.IgnoreWater = true
 					local los = workspace:Raycast(muzzle, to, params)
 					if los == nil or los.Instance:IsDescendantOf(other.Character) then
-						session:damagePlayer(other, player, cfg.name, cfg.damage, otherRoot.Position)
-						local push = toFlat.Unit * (cfg.knockback or 12)
-						otherRoot.AssemblyLinearVelocity = Vector3.new(push.X, 10, push.Z)
-						hitAnyone = true
+						session:damagePlayer(other, player, cfg.name, damage, otherRoot.Position)
+						local push = toFlat.Unit * (cfg.knockback or 8)
+						otherRoot.AssemblyLinearVelocity = Vector3.new(push.X, 8, push.Z)
 					end
 				end
 			end
@@ -6566,7 +6610,12 @@ function Actions.flame(session, player, weaponId, cfg, muzzle, dir)
 		end
 	end
 
-	session:event("weaponfx", { weapon = weaponId, pos = muzzle, dir = dir, hit = hitAnyone })
+	-- Sobrecalentado: mas de 10 segundos de chorro seguido = te quemas vos
+	if state.streak &gt; (cfg.overheat or 10) then
+		local _, myRoot = getRoot(player)
+		session:damagePlayer(player, player, cfg.name, damage,
+			myRoot and myRoot.Position or muzzle, "Te estas quemando con tu propio lanzallamas")
+	end
 end
 
 -- Flecha clavada: queda en el mundo con un cartel para recuperarla (+1 uso).
@@ -9649,6 +9698,110 @@ local function burst(position, color, count)
 	Debris:AddItem(holder, 2)
 end
 
+-- ===============================================================
+-- Lanzallamas: chorro de fuego visible (todo por codigo, sin assets)
+-- ===============================================================
+local flameRigs = {}
+
+local function getFlameRig(key)
+	local rig = flameRigs[key]
+	if rig then
+		return rig
+	end
+	local part = Instance.new("Part")
+	part.Name = "ChorroLlama"
+	part.Size = Vector3.new(0.4, 0.4, 0.4)
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Transparency = 1
+	part.Parent = workspace
+
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "Llama"
+	emitter.Texture = "rbxasset://textures/particles/fire_main.dds"
+	emitter.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 240, 180)),
+		ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255, 150, 60)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(170, 40, 12)),
+	})
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.1),
+		NumberSequenceKeypoint.new(0.75, 0.5),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1.4),
+		NumberSequenceKeypoint.new(1, 4.6),
+	})
+	emitter.Lifetime = NumberRange.new(0.4, 0.65)
+	emitter.Speed = NumberRange.new(20, 30)
+	emitter.SpreadAngle = Vector2.new(6, 6)
+	emitter.Acceleration = Vector3.new(0, 4.5, 0)
+	emitter.LightEmission = 1
+	emitter.LightInfluence = 0
+	emitter.Rate = 70
+	emitter.Enabled = false
+	emitter.Parent = part
+
+	local light = Instance.new("PointLight")
+	light.Name = "LuzLlama"
+	light.Color = Color3.fromRGB(255, 150, 70)
+	light.Range = 18
+	light.Brightness = 1.8
+	light.Shadows = false
+	light.Enabled = false
+	light.Parent = part
+
+	rig = { part = part, emitter = emitter, light = light, until_ = 0 }
+	flameRigs[key] = rig
+	return rig
+end
+
+-- Enciende (o refresca) el chorro en esa posicion y direccion
+local function flameAt(key, position, direction)
+	local rig = getFlameRig(key)
+	local look = direction.Magnitude &gt; 0.01 and direction.Unit or Vector3.new(0, 0, -1)
+	rig.part.CFrame = CFrame.lookAt(position, position + look)
+	rig.emitter.Enabled = true
+	rig.light.Enabled = true
+	rig.until_ = os.clock() + 0.4
+end
+
+-- Apaga los chorros que quedaron sin refrescar (lo llama el Heartbeat)
+local function flameCleanup()
+	local now = os.clock()
+	for _, rig in pairs(flameRigs) do
+		if rig.emitter.Enabled and now &gt; rig.until_ then
+			rig.emitter.Enabled = false
+			rig.light.Enabled = false
+		end
+	end
+end
+
+-- Soplete: sonido en loop mientras sale el chorro
+local flameSound = nil
+local function setFlameSound(on)
+	if on then
+		if not flameSound then
+			flameSound = Instance.new("Sound")
+			flameSound.Name = "Soplete"
+			flameSound.SoundId = Config.Sounds.flame
+			flameSound.Looped = true
+			flameSound.Volume = 0.42
+			flameSound.PlaybackSpeed = 0.42
+			flameSound.Parent = player:FindFirstChildOfClass("PlayerGui") or workspace
+		end
+		if not flameSound.IsPlaying then
+			flameSound:Play()
+		end
+	elseif flameSound and flameSound.IsPlaying then
+		flameSound:Stop()
+	end
+end
+
 -- Trazadora estilo Counter: una linea neon que se apaga al instante
 local function tracer(from, dir, length, color, thickness)
 	local beam = Instance.new("Part")
@@ -9909,6 +10062,7 @@ end
 local holdingFire = false
 local autoJob = nil
 local startAutoFire
+local lastFlameCrackle = 0
 
 local function fireTool(toolId)
 	if not state.active or state.phase ~= "playing" then
@@ -9941,13 +10095,18 @@ local function fireTool(toolId)
 	elseif toolId == "cuchillo" then
 		sound2D(Config.Sounds.netSwing, 0.55, 1.3)
 	elseif toolId == "lanzallamas" then
-		sound2D(Config.Sounds.dartShot, 0.6, 0.5)
+		-- El soplete va en loop aparte; esto es un chisporroteo cada tanto
+		local now = os.clock()
+		if now - lastFlameCrackle &gt; 0.32 then
+			lastFlameCrackle = now
+			gunPlay(Config.Sounds.flame, 0.28, 0.62, 0.3)
+		end
 	end
 
 	-- Patada del arma (estilo Counter)
 	local RECOIL = {
 		rifle = 0.45, pintura = 0.45, relente = 0.45, sniper = 1.1,
-		revolver = 0.7, cohete = 1.0, arco = 0.5, cuchillo = 0.35, lanzallamas = 0.3,
+		revolver = 0.7, cohete = 1.0, arco = 0.5, cuchillo = 0.35, lanzallamas = 0.15,
 		ak = 0.8, m4 = 0.7, mp5 = 0.5, glock = 0.5, escopeta = 0.95,
 	}
 	ViewModel.recoil(RECOIL[toolId] or 0)
@@ -9959,7 +10118,8 @@ local function fireTool(toolId)
 	local kick = math.rad(2 * (1 - control / 100))
 	ViewModel.kickCamera(kick * (1 + math.random() * 0.5), kick * (math.random() * 4 - 2))
 
-	shotBloom = math.min(20, shotBloom + 8)
+	-- El chorro de fuego no abre la cruz como un balazo
+	shotBloom = math.min(20, shotBloom + (toolId == "lanzallamas" and 2 or 8))
 
 	-- Automaticas (AK, M4, MP5): si seguis apretando, la rafaga continua
 	local wcfg = Config.Weapons[toolId]
@@ -10143,10 +10303,22 @@ RunService.RenderStepped:Connect(function(dt)
 		HUD.setCrosshair(true, 3 + math.min(grados * 2.2, 12) + shotBloom * 0.35,
 			4 + math.min(grados * 0.8, 4), scoped)
 	end
-	-- El punto central se ve siempre que tengas un arma en mano
-	if show ~= lastDot then
-		lastDot = show
-		HUD.setAimDot(show)
+	-- El punto central se ve SIEMPRE en partida, incluso sin armas
+	local inRound = state.active and (state.phase == "playing" or state.phase == "countdown")
+	local dotShow = inRound and not hiddenNow and not sniperScope
+	if dotShow ~= lastDot then
+		lastDot = dotShow
+		HUD.setAimDot(dotShow)
+	end
+
+	-- Lanzallamas: mientras mantenes apretado sale el chorro de fuego
+	local flaming = inRound and not hiddenNow and holdingFire and equippedId == "lanzallamas"
+	setFlameSound(flaming)
+	if flaming then
+		local muzzlePos, look = ViewModel.getMuzzle()
+		if muzzlePos and look then
+			flameAt("local", muzzlePos, look)
+		end
 	end
 end)
 
@@ -10431,10 +10603,9 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 		elseif position and weapon == "cuchillo" then
 			burst(position + dir * 3.2, Color3.fromRGB(230, 240, 250), data.hit and 16 or 7)
 		elseif position and weapon == "lanzallamas" then
-			for i = 1, 5 do
-				task.delay(i * 0.055, function()
-					burst(position + dir * (2 + i * 2.3), Color3.fromRGB(255, 140 + i * 14, 60), 16)
-				end)
+			-- Chorro continuo: cada aviso del servidor refresca el rig
+			if data.user ~= player.UserId then
+				flameAt("r" .. tostring(data.user or 0), position, dir)
 			end
 		elseif position and weapon == "arco" then
 			burst(position + dir * 1.2, Color3.fromRGB(180, 225, 150), 5)
@@ -10600,6 +10771,9 @@ RunService.Heartbeat:Connect(function(dt)
 			end
 		end
 	end
+
+	-- Chorros de llama que quedaron viejos
+	flameCleanup()
 
 	local remaining = remainingCooldowns
 	for toolId, data in pairs(cooldowns) do
@@ -10980,7 +11154,9 @@ local function buildSessionHud(parent)
 		Text = "VIDA",
 	}, top)
 
-	-- Cruz estilo Counter: cuatro rayitas que se abren con la dispersion
+	-- Cruz estilo Counter: cuatro rayitas que se abren con la dispersion.
+	-- Va parentada al HUD completo (no a la barra de arriba) para quedar
+	-- en el centro REAL de la pantalla.
 	local cross = new("Frame", {
 		Name = "PuntoMira",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -10989,7 +11165,7 @@ local function buildSessionHud(parent)
 		BackgroundTransparency = 1,
 		Visible = false,
 		ZIndex = 20,
-	}, top)
+	}, hud)
 	parts.crosshair = cross
 	parts.crossLines = {}
 	for _, spec in ipairs({
@@ -11010,21 +11186,21 @@ local function buildSessionHud(parent)
 		table.insert(parts.crossLines, { line = line, axis = spec.axis })
 	end
 
-	-- Punto de mira central: la referencia fina que se ve SIEMPRE con el
-	-- arma en mano (a la cadera y tambien al apuntar, estilo Counter)
+	-- Punto de mira central: se ve SIEMPRE durante la partida, incluso
+	-- sin armas. En el centro real de la pantalla y bien visible.
 	local aimDot = new("Frame", {
 		Name = "PuntoCentral",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0, 4, 0, 4),
-		BackgroundColor3 = Color3.fromRGB(170, 255, 185),
-		BackgroundTransparency = 0.02,
+		Size = UDim2.new(0, 6, 0, 6),
+		BackgroundColor3 = Color3.fromRGB(248, 252, 255),
+		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		Visible = false,
 		ZIndex = 30,
-	}, top)
+	}, hud)
 	corner(99, aimDot)
-	stroke(Color3.fromRGB(10, 14, 12), 1.5, 0.35, aimDot)
+	stroke(Color3.fromRGB(8, 10, 14), 1, 0.25, aimDot)
 	parts.aimDot = aimDot
 
 	-- Marcador de equipos (solo modo Asedio 5 vs 5)
@@ -11361,7 +11537,8 @@ end
 
 -- ===============================================================
 -- MIRA ESTILO COUNTER (clic derecho)
--- El francotirador usa "vidrio": pantalla negra con un circulo limpio.
+-- El francotirador usa "vidrio": pantalla oscura con un circulo grande
+-- y limpio. El tamaño se calcula segun la pantalla (poco negro).
 -- ===============================================================
 local function buildScope(parent)
 	local scope = new("Frame", {
@@ -11373,7 +11550,8 @@ local function buildScope(parent)
 	}, parent)
 	parts.scope = scope
 
-	-- Vidrio: cuatro barras negras bien redondeadas dejan el centro limpio
+	-- Vidrio: cuatro barras oscuras redondeadas; el hueco central queda
+	-- del tamaño del circulo (lo calcula layoutScope con la pantalla real)
 	local vignette = new("Frame", {
 		Name = "Vidrio",
 		Size = UDim2.fromScale(1, 1),
@@ -11382,21 +11560,22 @@ local function buildScope(parent)
 		ZIndex = 1,
 	}, scope)
 	parts.scopeVignette = vignette
-	local function glassBar(name, size, position)
+	local bars = {}
+	local function glassBar(name, key)
 		local bar = new("Frame", {
 			Name = name,
-			Size = size,
-			Position = position,
 			BackgroundColor3 = Color3.new(0, 0, 0),
+			BackgroundTransparency = 0.12,
 			BorderSizePixel = 0,
 		}, vignette)
 		corner(300, bar)
-		return bar
+		bars[key] = bar
 	end
-	glassBar("Arriba", UDim2.new(1, 0, 0.44, 0), UDim2.new(0, 0, 0, 0))
-	glassBar("Abajo", UDim2.new(1, 0, 0.44, 0), UDim2.new(0, 0, 0.56, 0))
-	glassBar("Izquierda", UDim2.new(0.44, 0, 1, 0), UDim2.new(0, 0, 0, 0))
-	glassBar("Derecha", UDim2.new(0.44, 0, 1, 0), UDim2.new(0.56, 0, 0, 0))
+	glassBar("Arriba", "up")
+	glassBar("Abajo", "down")
+	glassBar("Izquierda", "left")
+	glassBar("Derecha", "right")
+	parts.scopeBars = bars
 
 	local ring = new("Frame", {
 		Name = "Anillo",
@@ -11408,35 +11587,39 @@ local function buildScope(parent)
 		ZIndex = 2,
 	}, scope)
 	corner(999, ring)
-	stroke(Color3.fromRGB(235, 240, 245), 1.5, 0.25, ring)
+	stroke(Color3.fromRGB(235, 240, 245), 2, 0.2, ring)
+	parts.scopeRing = ring
 
-	local function tick(name, size, position)
-		new("Frame", {
+	local ticks = {}
+	local function tick(name, side)
+		local item = new("Frame", {
 			Name = name,
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = position,
-			Size = size,
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(0, 2, 0, 30),
 			BackgroundColor3 = Color3.fromRGB(235, 240, 245),
-			BackgroundTransparency = 0.15,
+			BackgroundTransparency = 0.12,
 			BorderSizePixel = 0,
 		}, ring)
+		table.insert(ticks, { frame = item, side = side })
 	end
-
-	tick("Arriba", UDim2.new(0, 1.5, 0, 30), UDim2.new(0.5, 0, 0.5, -70))
-	tick("Abajo", UDim2.new(0, 1.5, 0, 30), UDim2.new(0.5, 0, 0.5, 70))
-	tick("Izquierda", UDim2.new(0, 30, 0, 1.5), UDim2.new(0.5, -70, 0.5, 0))
-	tick("Derecha", UDim2.new(0, 30, 0, 1.5), UDim2.new(0.5, 70, 0.5, 0))
+	tick("Arriba", "up")
+	tick("Abajo", "down")
+	tick("Izquierda", "left")
+	tick("Derecha", "right")
+	parts.scopeTicks = ticks
 
 	local dot = new("Frame", {
 		Name = "Punto",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0, 3, 0, 3),
-		BackgroundColor3 = Color3.fromRGB(235, 240, 245),
+		Size = UDim2.new(0, 4, 0, 4),
+		BackgroundColor3 = Color3.fromRGB(245, 250, 255),
 		BackgroundTransparency = 0.05,
 		BorderSizePixel = 0,
 	}, ring)
 	corner(999, dot)
+	parts.scopeDot = dot
 
 	-- Aumento actual de la telescopica (5x / 10x)
 	parts.scopeZoom = new("TextLabel", {
@@ -11452,7 +11635,7 @@ local function buildScope(parent)
 		Text = "",
 	}, scope)
 
-	new("TextLabel", {
+	parts.scopeHint = new("TextLabel", {
 		Name = "Etiqueta",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0.5, 126),
@@ -11466,6 +11649,65 @@ local function buildScope(parent)
 	}, scope)
 
 	return scope
+end
+
+-- La mira se arma segun la pantalla: circulo grande y hueco del mismo
+-- tamaño (bastante mas vision que antes, sin tanto negro)
+local function layoutScope()
+	local camera = workspace.CurrentCamera
+	local vp = (camera and camera.ViewportSize) or Vector2.new(1920, 1080)
+	local d = math.clamp(math.floor(math.min(vp.X, vp.Y) * 0.64), 320, 760)
+	local half = d * 0.5
+
+	if parts.scopeRing then
+		parts.scopeRing.Size = UDim2.new(0, d, 0, d)
+	end
+
+	if parts.scopeBars then
+		local thickY = math.clamp(0.5 - half / vp.Y, 0.04, 0.48)
+		local thickX = math.clamp(0.5 - half / vp.X, 0.04, 0.48)
+		local bars = parts.scopeBars
+		bars.up.Size = UDim2.new(1, 0, thickY, 0)
+		bars.up.Position = UDim2.new(0, 0, 0, 0)
+		bars.down.Size = UDim2.new(1, 0, thickY, 0)
+		bars.down.Position = UDim2.new(0, 0, 1 - thickY, 0)
+		bars.left.Size = UDim2.new(thickX, 0, 1, 0)
+		bars.left.Position = UDim2.new(0, 0, 0, 0)
+		bars.right.Size = UDim2.new(thickX, 0, 1, 0)
+		bars.right.Position = UDim2.new(1 - thickX, 0, 0, 0)
+	end
+
+	local off = math.floor(d * 0.40)
+	local len = math.max(18, math.floor(d * 0.10))
+	local thick = math.max(2, math.floor(d * 0.0075))
+	for _, item in ipairs(parts.scopeTicks or {}) do
+		local t = item.frame
+		if item.side == "up" then
+			t.Position = UDim2.new(0.5, 0, 0.5, -off)
+			t.Size = UDim2.new(0, thick, 0, len)
+		elseif item.side == "down" then
+			t.Position = UDim2.new(0.5, 0, 0.5, off)
+			t.Size = UDim2.new(0, thick, 0, len)
+		elseif item.side == "left" then
+			t.Position = UDim2.new(0.5, -off, 0.5, 0)
+			t.Size = UDim2.new(0, len, 0, thick)
+		else
+			t.Position = UDim2.new(0.5, off, 0.5, 0)
+			t.Size = UDim2.new(0, len, 0, thick)
+		end
+	end
+
+	if parts.scopeDot then
+		local dotSize = math.max(3, math.floor(d * 0.007))
+		parts.scopeDot.Size = UDim2.new(0, dotSize, 0, dotSize)
+	end
+
+	if parts.scopeZoom then
+		parts.scopeZoom.Position = UDim2.new(0.5, 0, 0.5, math.floor(half) + 16)
+	end
+	if parts.scopeHint then
+		parts.scopeHint.Position = UDim2.new(0.5, 0, 0.5, math.floor(half) + 38)
+	end
 end
 
 -- ===============================================================
@@ -12489,6 +12731,10 @@ end
 
 function HUD.setScope(enabled, sniperScope)
 	if parts.scope then
+		if enabled then
+			-- Se rearma con el tamaño actual de la pantalla
+			layoutScope()
+		end
 		parts.scope.Visible = enabled and true or false
 	end
 	if parts.scopeVignette then

@@ -353,7 +353,9 @@ local function buildSessionHud(parent)
 		Text = "VIDA",
 	}, top)
 
-	-- Cruz estilo Counter: cuatro rayitas que se abren con la dispersion
+	-- Cruz estilo Counter: cuatro rayitas que se abren con la dispersion.
+	-- Va parentada al HUD completo (no a la barra de arriba) para quedar
+	-- en el centro REAL de la pantalla.
 	local cross = new("Frame", {
 		Name = "PuntoMira",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -362,7 +364,7 @@ local function buildSessionHud(parent)
 		BackgroundTransparency = 1,
 		Visible = false,
 		ZIndex = 20,
-	}, top)
+	}, hud)
 	parts.crosshair = cross
 	parts.crossLines = {}
 	for _, spec in ipairs({
@@ -383,21 +385,21 @@ local function buildSessionHud(parent)
 		table.insert(parts.crossLines, { line = line, axis = spec.axis })
 	end
 
-	-- Punto de mira central: la referencia fina que se ve SIEMPRE con el
-	-- arma en mano (a la cadera y tambien al apuntar, estilo Counter)
+	-- Punto de mira central: se ve SIEMPRE durante la partida, incluso
+	-- sin armas. En el centro real de la pantalla y bien visible.
 	local aimDot = new("Frame", {
 		Name = "PuntoCentral",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0, 4, 0, 4),
-		BackgroundColor3 = Color3.fromRGB(170, 255, 185),
-		BackgroundTransparency = 0.02,
+		Size = UDim2.new(0, 6, 0, 6),
+		BackgroundColor3 = Color3.fromRGB(248, 252, 255),
+		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		Visible = false,
 		ZIndex = 30,
-	}, top)
+	}, hud)
 	corner(99, aimDot)
-	stroke(Color3.fromRGB(10, 14, 12), 1.5, 0.35, aimDot)
+	stroke(Color3.fromRGB(8, 10, 14), 1, 0.25, aimDot)
 	parts.aimDot = aimDot
 
 	-- Marcador de equipos (solo modo Asedio 5 vs 5)
@@ -734,7 +736,8 @@ end
 
 -- ===============================================================
 -- MIRA ESTILO COUNTER (clic derecho)
--- El francotirador usa "vidrio": pantalla negra con un circulo limpio.
+-- El francotirador usa "vidrio": pantalla oscura con un circulo grande
+-- y limpio. El tamaño se calcula segun la pantalla (poco negro).
 -- ===============================================================
 local function buildScope(parent)
 	local scope = new("Frame", {
@@ -746,7 +749,8 @@ local function buildScope(parent)
 	}, parent)
 	parts.scope = scope
 
-	-- Vidrio: cuatro barras negras bien redondeadas dejan el centro limpio
+	-- Vidrio: cuatro barras oscuras redondeadas; el hueco central queda
+	-- del tamaño del circulo (lo calcula layoutScope con la pantalla real)
 	local vignette = new("Frame", {
 		Name = "Vidrio",
 		Size = UDim2.fromScale(1, 1),
@@ -755,21 +759,22 @@ local function buildScope(parent)
 		ZIndex = 1,
 	}, scope)
 	parts.scopeVignette = vignette
-	local function glassBar(name, size, position)
+	local bars = {}
+	local function glassBar(name, key)
 		local bar = new("Frame", {
 			Name = name,
-			Size = size,
-			Position = position,
 			BackgroundColor3 = Color3.new(0, 0, 0),
+			BackgroundTransparency = 0.12,
 			BorderSizePixel = 0,
 		}, vignette)
 		corner(300, bar)
-		return bar
+		bars[key] = bar
 	end
-	glassBar("Arriba", UDim2.new(1, 0, 0.44, 0), UDim2.new(0, 0, 0, 0))
-	glassBar("Abajo", UDim2.new(1, 0, 0.44, 0), UDim2.new(0, 0, 0.56, 0))
-	glassBar("Izquierda", UDim2.new(0.44, 0, 1, 0), UDim2.new(0, 0, 0, 0))
-	glassBar("Derecha", UDim2.new(0.44, 0, 1, 0), UDim2.new(0.56, 0, 0, 0))
+	glassBar("Arriba", "up")
+	glassBar("Abajo", "down")
+	glassBar("Izquierda", "left")
+	glassBar("Derecha", "right")
+	parts.scopeBars = bars
 
 	local ring = new("Frame", {
 		Name = "Anillo",
@@ -781,35 +786,39 @@ local function buildScope(parent)
 		ZIndex = 2,
 	}, scope)
 	corner(999, ring)
-	stroke(Color3.fromRGB(235, 240, 245), 1.5, 0.25, ring)
+	stroke(Color3.fromRGB(235, 240, 245), 2, 0.2, ring)
+	parts.scopeRing = ring
 
-	local function tick(name, size, position)
-		new("Frame", {
+	local ticks = {}
+	local function tick(name, side)
+		local item = new("Frame", {
 			Name = name,
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = position,
-			Size = size,
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(0, 2, 0, 30),
 			BackgroundColor3 = Color3.fromRGB(235, 240, 245),
-			BackgroundTransparency = 0.15,
+			BackgroundTransparency = 0.12,
 			BorderSizePixel = 0,
 		}, ring)
+		table.insert(ticks, { frame = item, side = side })
 	end
-
-	tick("Arriba", UDim2.new(0, 1.5, 0, 30), UDim2.new(0.5, 0, 0.5, -70))
-	tick("Abajo", UDim2.new(0, 1.5, 0, 30), UDim2.new(0.5, 0, 0.5, 70))
-	tick("Izquierda", UDim2.new(0, 30, 0, 1.5), UDim2.new(0.5, -70, 0.5, 0))
-	tick("Derecha", UDim2.new(0, 30, 0, 1.5), UDim2.new(0.5, 70, 0.5, 0))
+	tick("Arriba", "up")
+	tick("Abajo", "down")
+	tick("Izquierda", "left")
+	tick("Derecha", "right")
+	parts.scopeTicks = ticks
 
 	local dot = new("Frame", {
 		Name = "Punto",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0, 3, 0, 3),
-		BackgroundColor3 = Color3.fromRGB(235, 240, 245),
+		Size = UDim2.new(0, 4, 0, 4),
+		BackgroundColor3 = Color3.fromRGB(245, 250, 255),
 		BackgroundTransparency = 0.05,
 		BorderSizePixel = 0,
 	}, ring)
 	corner(999, dot)
+	parts.scopeDot = dot
 
 	-- Aumento actual de la telescopica (5x / 10x)
 	parts.scopeZoom = new("TextLabel", {
@@ -825,7 +834,7 @@ local function buildScope(parent)
 		Text = "",
 	}, scope)
 
-	new("TextLabel", {
+	parts.scopeHint = new("TextLabel", {
 		Name = "Etiqueta",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0.5, 126),
@@ -839,6 +848,65 @@ local function buildScope(parent)
 	}, scope)
 
 	return scope
+end
+
+-- La mira se arma segun la pantalla: circulo grande y hueco del mismo
+-- tamaño (bastante mas vision que antes, sin tanto negro)
+local function layoutScope()
+	local camera = workspace.CurrentCamera
+	local vp = (camera and camera.ViewportSize) or Vector2.new(1920, 1080)
+	local d = math.clamp(math.floor(math.min(vp.X, vp.Y) * 0.64), 320, 760)
+	local half = d * 0.5
+
+	if parts.scopeRing then
+		parts.scopeRing.Size = UDim2.new(0, d, 0, d)
+	end
+
+	if parts.scopeBars then
+		local thickY = math.clamp(0.5 - half / vp.Y, 0.04, 0.48)
+		local thickX = math.clamp(0.5 - half / vp.X, 0.04, 0.48)
+		local bars = parts.scopeBars
+		bars.up.Size = UDim2.new(1, 0, thickY, 0)
+		bars.up.Position = UDim2.new(0, 0, 0, 0)
+		bars.down.Size = UDim2.new(1, 0, thickY, 0)
+		bars.down.Position = UDim2.new(0, 0, 1 - thickY, 0)
+		bars.left.Size = UDim2.new(thickX, 0, 1, 0)
+		bars.left.Position = UDim2.new(0, 0, 0, 0)
+		bars.right.Size = UDim2.new(thickX, 0, 1, 0)
+		bars.right.Position = UDim2.new(1 - thickX, 0, 0, 0)
+	end
+
+	local off = math.floor(d * 0.40)
+	local len = math.max(18, math.floor(d * 0.10))
+	local thick = math.max(2, math.floor(d * 0.0075))
+	for _, item in ipairs(parts.scopeTicks or {}) do
+		local t = item.frame
+		if item.side == "up" then
+			t.Position = UDim2.new(0.5, 0, 0.5, -off)
+			t.Size = UDim2.new(0, thick, 0, len)
+		elseif item.side == "down" then
+			t.Position = UDim2.new(0.5, 0, 0.5, off)
+			t.Size = UDim2.new(0, thick, 0, len)
+		elseif item.side == "left" then
+			t.Position = UDim2.new(0.5, -off, 0.5, 0)
+			t.Size = UDim2.new(0, len, 0, thick)
+		else
+			t.Position = UDim2.new(0.5, off, 0.5, 0)
+			t.Size = UDim2.new(0, len, 0, thick)
+		end
+	end
+
+	if parts.scopeDot then
+		local dotSize = math.max(3, math.floor(d * 0.007))
+		parts.scopeDot.Size = UDim2.new(0, dotSize, 0, dotSize)
+	end
+
+	if parts.scopeZoom then
+		parts.scopeZoom.Position = UDim2.new(0.5, 0, 0.5, math.floor(half) + 16)
+	end
+	if parts.scopeHint then
+		parts.scopeHint.Position = UDim2.new(0.5, 0, 0.5, math.floor(half) + 38)
+	end
 end
 
 -- ===============================================================
@@ -1862,6 +1930,10 @@ end
 
 function HUD.setScope(enabled, sniperScope)
 	if parts.scope then
+		if enabled then
+			-- Se rearma con el tamaño actual de la pantalla
+			layoutScope()
+		end
 		parts.scope.Visible = enabled and true or false
 	end
 	if parts.scopeVignette then

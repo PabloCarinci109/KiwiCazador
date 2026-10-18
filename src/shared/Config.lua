@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.6.0"
+Config.Version = "1.7.0"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -196,7 +196,7 @@ Config.Shoot = {
 		revolver = { vel = 0.45, spread = 0.3, dead = 1.6, recoil = 26 },
 		arco = { vel = 0.60, spread = 0.3, dead = 1.2, recoil = 72 },
 		cuchillo = { recoil = 92 },
-		lanzallamas = { vel = 0.5, recoil = 88 },
+		lanzallamas = { vel = 0.5, recoil = 96 },
 		cohete = { recoil = 18 },
 		-- Arsenal estilo Counter Blox (baules): automaticas, MP5, pistola
 		-- y escopeta de perdigones.
@@ -267,7 +267,7 @@ Config.Loot = {
 		{ id = "revolver", weight = 22 },
 		{ id = "cuchillo", weight = 18 },
 		{ id = "arco", weight = 15 },
-		{ id = "lanzallamas", weight = 14 },
+		{ id = "lanzallamas", weight = 14, uses = 12 }, -- 12s de chorro (1 uso por tick)
 		{ id = "sniper", weight = 14 },
 		{ id = "cohete", weight = 8 },
 		-- Arsenal estilo Counter Blox: automaticas y escopeta (mas tiros)
@@ -356,12 +356,15 @@ Config.Weapons = {
 	lanzallamas = {
 		name = "Lanzallamas",
 		color = Color3.fromRGB(240, 140, 60),
-		cooldown = 1.3,
-		flame = true,   -- chorro corto en cono (no proyectil)
-		reach = 17,     -- alcance del chorro
-		coneAngle = 32, -- medio angulo del cono (grados)
-		damage = 24,    -- daño total por rafaga
-		knockback = 12,
+		cooldown = 0.1,      -- chorro continuo: mantene apretado el clic
+		auto = true,
+		flame = true,        -- chorro en cono (no proyectil)
+		reach = 17,          -- alcance del chorro
+		coneAngle = 32,      -- medio angulo del cono (grados)
+		damagePercent = 10,  -- 10% de la vida maxima por tick
+		tickTime = 1.0,      -- un tick de daño por segundo
+		overheat = 10,       -- segundos de chorro seguido antes de quemarte
+		knockback = 8,
 		slowFactor = 0.60,
 		slowTime = 1.0,
 		size = Vector3.new(0.3, 0.3, 1.6),
@@ -782,6 +785,8 @@ Config.Sounds = {
 	gunBoom = "rbxasset://sounds/collide.wav",
 	gunCrack = "rbxasset://sounds/snap.wav",
 	gunTail = "rbxasset://sounds/impact_explosion_03.mp3",
+	-- Soplete del lanzallamas (suena en loop mientras sale el chorro)
+	flame = "rbxasset://sounds/unsheath.mp3",
 	flush = "rbxasset://sounds/swordlunge.wav",
 	rustle = "rbxasset://sounds/action_footsteps_plastic.mp3",
 	win = "rbxasset://sounds/electronicpingshort.wav",
