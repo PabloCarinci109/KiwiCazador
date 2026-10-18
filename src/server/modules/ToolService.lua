@@ -628,6 +628,9 @@ local function buildKnifeTool(parent)
 		Material = Enum.Material.Neon,
 		Parent = tool,
 	})
+	-- El cuchillo tambien entra a la carpeta de plantillas: era el unico
+	-- que se quedaba afuera y por eso no aparecia de fabrica
+	tool.Parent = parent
 	return tool
 end
 
@@ -1035,6 +1038,10 @@ function ToolService.give(player, only)
 	-- Limpia lo que haya quedado de la partida anterior
 	ToolService.clear(player)
 
+	-- Se clona en orden: la red atrapa kiwis va 1, el cuchillo mariposa 2 y
+	-- despues el resto. La barra de Roblox sigue el orden de la mochila, asi
+	-- que con clonarlos en esta secuencia queda ordenada de una.
+	local resto, red, cuchillo = {}, nil, nil
 	for _, template in ipairs(folder:GetChildren()) do
 		local toolId = template:GetAttribute("ToolId")
 		-- pintura, relente y las armas de baul solo se entregan cuando toca
@@ -1055,30 +1062,44 @@ function ToolService.give(player, only)
 			allowed = not locked
 		end
 		if allowed then
-			local clone = template:Clone()
-			wireTool(clone)
-			clone.Parent = backpack
+			if toolId == "cuchillo" then
+				cuchillo = cuchillo or template
+			elseif toolId == "red" then
+				red = red or template
+			else
+				table.insert(resto, template)
+			end
 		end
 	end
 
 	-- Blindaje: el cuchillo mariposa va de fabrica SIEMPRE (en todos los
 	-- modos y para todos los personajes), aunque la lista del modo lo olvide.
-	local tieneCuchillo = false
-	for _, item in ipairs(backpack:GetChildren()) do
-		if item:IsA("Tool") and item:GetAttribute("ToolId") == "cuchillo" then
-			tieneCuchillo = true
-			break
-		end
-	end
-	if not tieneCuchillo then
+	if not cuchillo then
 		for _, template in ipairs(folder:GetChildren()) do
 			if template:GetAttribute("ToolId") == "cuchillo" then
-				local clone = template:Clone()
-				wireTool(clone)
-				clone.Parent = backpack
+				cuchillo = template
 				break
 			end
 		end
+	end
+
+	local orden = {}
+	if red then
+		table.insert(orden, red)
+		if cuchillo then
+			table.insert(orden, cuchillo)
+		end
+	elseif cuchillo then
+		-- Sin red (Defensores, colosal, multi): el cuchillo queda primero
+		table.insert(orden, cuchillo)
+	end
+	for _, template in ipairs(resto) do
+		table.insert(orden, template)
+	end
+	for _, template in ipairs(orden) do
+		local clone = template:Clone()
+		wireTool(clone)
+		clone.Parent = backpack
 	end
 
 	ToolService.cooldowns[player] = {}

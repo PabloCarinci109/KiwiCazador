@@ -33,6 +33,7 @@ Session.__index = Session
 local world
 local sessions = {}
 local playerSession = {}
+local rematchInvites = {}
 local sessionCounter = 0
 
 local COLOR = {
@@ -150,7 +151,7 @@ end
 -- ===============================================================
 -- SESION
 -- ===============================================================
-function Session.new(modeId, rng)
+function Session.new(modeId, rng, opts)
 	local self = setmetatable({}, Session)
 	sessionCounter = sessionCounter + 1
 	self.id = sessionCounter
@@ -176,7 +177,7 @@ function Session.new(modeId, rng)
 	self.voteDone = false
 	self.knocked = {}
 	self.looted = {}       -- quien ya saco su arma del baul de equipo (asedio)
-	self.fort = nil        -- bunker del asedio (se destruye al terminar)
+	self.fort = nil        -- castillo del asedio (se destruye al terminar)
 	self.fortChests = nil
 
 	if modeId == "asedio" then
@@ -191,6 +192,8 @@ function Session.new(modeId, rng)
 		self.teamScore = { attack = 0, defend = 0 }
 		self.asedioRound = 1
 		self.teamsReady = false
+		self.carry = nil
+		self.wipeSince = nil
 		-- Como el multijugador: entre todos votan el mapa y arranca.
 		self.phase = "vote"
 		self.phaseEnds = os.clock() + Config.Vote.multiTime
@@ -214,6 +217,18 @@ function Session.new(modeId, rng)
 		-- Modo solo: elige el mapa el jugador y arranca enseguida.
 		self.phase = "vote"
 		self.phaseEnds = os.clock() + Config.Vote.soloTime
+	end
+
+	-- Revancha: si pidieron una arena puntual y esta libre, arranca ahi
+	-- mismo (mismo modo, misma arena, sin votacion)
+	if opts and opts.mapId then
+		for _, arena in ipairs(world.arenas) do
+			if not arena.busy and arena.mapId == opts.mapId then
+				self:allocateArena(opts.mapId)
+				self:startCountdown()
+				break
+			end
+		end
 	end
 
 	return self
@@ -490,6 +505,8 @@ function Session:knockout(victim, attacker)
 			-- Igual que cuando te come el kiwi: al lobby con el menu listo
 			Net.get("SessionUpdate"):FireClient(victim, { active = false })
 			Net.get("Notify"):FireClient(victim, Config.Text.KoMenu, Util.colorToTable(COLOR.info), 5)
+			-- Revancha anotada: si no elige otro modo, vuelve a la misma arena
+			GameManager.setRematch(victim, self)
 		end
 	end)
 end
@@ -614,6 +631,8 @@ end
 
 -- Limpia la ronda (kiwi, proyectiles, vida) antes de la siguiente
 function Session:asedioReset()
+	self.carry = nil
+	self.wipeSince = nil
 	if self.kiwi then
 		self.kiwi:destroy()
 		self.kiwi = nil
@@ -648,6 +667,10 @@ function Session:asedioScore(side, reason)
 
 	if reason == "capture" then
 		self:notifyAll(string.format(Config.Text.AsedioCapture, attackName), Config.Asedio.colorAttack, 6)
+	elseif reason == "wipe" then
+		local loseName = side == "attack" and defendName or attackName
+		local winName = side == "attack" and attackName or defendName
+		self:notifyAll(string.format(Config.Text.AsedioWipe, loseName, winName), Config.Asedio.colorAttack, 6)
 	else
 		self:notifyAll(string.format(Config.Text.AsedioTimeout, defendName), Config.Asedio.colorDefend, 6)
 	end
@@ -668,6 +691,182 @@ function Session:asedioScore(side, reason)
 	self.phaseEnds = os.clock() + Config.Asedio.breakTime
 	self:notifyAll(string.format(Config.Text.AsedioNext, self.asedioRound), COLOR.info, Config.Asedio.breakTime)
 	self:sendUpdates(true)
+end
+
+-- Asedio: al atrapar al kiwi los Cazadores lo alzan en brazos y tienen que
+-- llevarlo a la ZONA DE EXTRACCION (marcada con un haz de luz afuera del
+-- castillo). Ahi hay que aguantarlo 2 minutos; los Defensores lo rescatan
+-- acercandose (al portador o al piso donde quedo).
+function Session:asedioCarryStart(player)
+	local nombre = player.DisplayName ~= "" and player.DisplayName or player.Name
+	self.carry = {
+		captor = player,
+		by = player,
+		hold = 0,
+		inZona = false,
+		warned = {},
+	}
+	self:notifyAll(string.format(Config.Text.AsedioCarry, nombre), Config.Asedio.colorAttack, 8)
+	self:sendUpdates(true)
+end
+
+-- El portador cayo: el kiwi queda en el piso, ahi donde estaba
+function Session:asedioCarryDrop()
+	local carry = self.carry
+	if not carry or not carry.by then
+		return
+	end
+	carry.by = nil
+	if self.kiwi then
+		self.kiwi:dropHold()
+	end
+	self:notifyAll(Config.Text.AsedioDropped, COLOR.warn, 5)
+	self:sendUpdates(true)
+end
+
+-- Un Defensor que llega hasta el kiwi capturado lo rescata: vuelve al nido
+function Session:asedioRecover()
+	if not self.carry then
+		return false
+	end
+	self.carry = nil
+	self:notifyAll(string.format(Config.Text.AsedioRecovered, Config.Asedio.teamDefend), Config.Asedio.colorDefend, 6)
+	-- El kiwi vuelve a su nido, sano y salvo
+	self:spawnKiwi()
+	self:sendUpdates(true)
+	return true
+end
+
+-- Pose del kiwi en brazos: adelante del pecho del portador
+local function carryPose(root)
+	return root.CFrame * CFrame.new(0, 1.3, -3.0) * CFrame.Angles(0, math.rad(180), 0)
+end
+
+-- Paso de la extraccion: el kiwi sigue al portador o queda en el piso, se
+-- recoge al toque, los Defensores rescatan por cercania y los 2 minutos
+-- dentro de la zona marcada le dan la ronda a los Cazadores.
+function Session:stepCarry(dt, now)
+	local carry = self.carry
+	local kiwi = self.kiwi
+	if not carry or not kiwi then
+		return
+	end
+	-- Mientras el kiwi esta capturado, el reloj de la ronda se pausa
+	self.startedAt = self.startedAt + dt
+
+	-- 1) En brazos: sigue al portador (si lo noquean, queda en el piso)
+	if carry.by then
+		local root = getRoot(carry.by)
+		if root and self.stats[carry.by] and not self.knocked[carry.by] then
+			kiwi:holdAt(carryPose(root))
+		else
+			self:asedioCarryDrop()
+		end
+	end
+
+	-- 2) Recogida: un Cazador que llega hasta el kiwi en el piso lo levanta
+	if not carry.by then
+		local kpos = kiwi:getPosition()
+		if kpos then
+			for _, player in ipairs(self.players) do
+				if not self.knocked[player] and self:asedioSide(player) == "attack" then
+					local root = getRoot(player)
+					if root and (root.Position - kpos).Magnitude <= 7 then
+						carry.by = player
+						local nombre = player.DisplayName ~= "" and player.DisplayName or player.Name
+						self:notifyAll(string.format(Config.Text.AsedioPickup, nombre), Config.Asedio.colorAttack, 4)
+						kiwi:holdAt(carryPose(root))
+						break
+					end
+				end
+			end
+		end
+	end
+
+	local kpos = kiwi:getPosition()
+	if not kpos then
+		return
+	end
+
+	-- 3) Rescate: un Defensor que se acerca al kiwi lo libera
+	local rango = Config.Asedio.recoveryRange or 7
+	for _, player in ipairs(self.players) do
+		if not self.knocked[player] and self:asedioSide(player) == "defend" then
+			local root = getRoot(player)
+			if root and (root.Position - kpos).Magnitude <= rango then
+				self:asedioRecover()
+				return
+			end
+		end
+	end
+
+	-- 4) Extraccion: los 2 minutos cuentan adentro de la zona marcada
+	local zona = self.fort and self.fort.zone
+	if zona and (kpos - zona.pos).Magnitude <= (zona.radius or 9) then
+		if not carry.inZona then
+			carry.inZona = true
+			self:notifyAll(string.format(Config.Text.AsedioZoneIn, Config.Asedio.recoveryTime or 120), Config.Asedio.colorAttack, 5)
+		end
+		carry.hold = carry.hold + dt
+		local tiempo = Config.Asedio.recoveryTime or 120
+		local left = tiempo - carry.hold
+		for _, marca in ipairs({ 30, 10, 5 }) do
+			if left <= marca and not carry.warned[marca] then
+				carry.warned[marca] = true
+				self:notifyAll(string.format(Config.Text.AsedioHoldWarn, marca), COLOR.warn, 3)
+			end
+		end
+		if carry.hold >= tiempo then
+			local captor = carry.captor
+			self.carry = nil
+			-- Recien aca el Cazador que lo atrapo cobra las monedas
+			local data = captor and self.stats[captor]
+			if data then
+				data.caught = (data.caught or 0) + 1
+				addCaught(captor, 1)
+				addCoins(captor, Config.Asedio.reward or 60)
+			end
+			self:asedioScore("attack", "capture")
+		end
+	else
+		carry.inZona = false
+	end
+end
+
+-- Si a un equipo lo noquean entero a la vez, el otro se lleva la ronda
+function Session:stepWipe(now)
+	if self.asedioWinner or not self.teams then
+		return
+	end
+	local gente, enPie = {}, {}
+	for _, side in ipairs({ "attack", "defend" }) do
+		gente[side], enPie[side] = 0, 0
+		for _, player in ipairs(self.teams[side] or {}) do
+			if self.stats[player] then
+				gente[side] = gente[side] + 1
+				if not self.knocked[player] then
+					enPie[side] = enPie[side] + 1
+				end
+			end
+		end
+	end
+	local barrido
+	if gente.attack > 0 and enPie.attack == 0 and enPie.defend > 0 then
+		barrido = "attack"
+	elseif gente.defend > 0 and enPie.defend == 0 and enPie.attack > 0 then
+		barrido = "defend"
+	end
+	if not barrido then
+		self.wipeSince = nil
+		return
+	end
+	-- Se exige un momento de barrida completa (evita falsos por un parpadeo)
+	self.wipeSince = self.wipeSince or now
+	if now - self.wipeSince < 1.2 then
+		return
+	end
+	self.wipeSince = nil
+	self:asedioScore(barrido == "attack" and "defend" or "attack", "wipe")
 end
 
 -- ---------------- trafico de la ciudad ----------------
@@ -1058,10 +1257,18 @@ function Session:spawnsFor(player)
 		end
 		local count = math.max(1, #list)
 		local angle = (index - 1) / count * math.pi * 2
-		local radius = 24
+		-- Los Defensores aparecen adentro del castillo, cerca de la casa
+		local radius = math.min(24, (self.fort and self.fort.half or 34) - 10)
 		if side == "attack" then
 			radius = math.min(Config.Asedio.attackSpawn, (self.arena.halfSize or 150) - 34)
-			angle = angle + 0.7
+			-- Los Cazadores aparecen afuera, repartidos frente al porton
+			local frente = self.fort and self.fort.front
+			if frente then
+				local base = math.atan2(frente.Z, frente.X)
+				angle = base + (index - (count + 1) / 2) * 0.3
+			else
+				angle = angle + 0.7
+			end
 		end
 
 		-- Busca suelo firme en ese angulo (avisa si el punto esta tapado)
@@ -1384,7 +1591,11 @@ function Session:finish()
 	Actions.clearPickups(self)
 
 	if self.fort then
-		self.fort:Destroy()
+		-- self.fort es la tabla del castillo { folder = ..., chests = ... }:
+		-- hay que destruir la carpeta, no la tabla
+		if self.fort.folder then
+			self.fort.folder:Destroy()
+		end
 		self.fort = nil
 		self.fortChests = nil
 	end
@@ -1393,6 +1604,8 @@ function Session:finish()
 		self:returnAllToLobby()
 	end
 	for _, player in ipairs(self.players) do
+		-- Revancha: se anota el modo y la arena para volver a la misma
+		GameManager.setRematch(player, self)
 		if self.isAsedio then
 			player.Team = nil
 			player.Neutral = true
@@ -1555,11 +1768,10 @@ function Session:capture(player, method)
 			return
 		end
 		self.kiwi:capture(player)
-		data.caught = data.caught + 1
-		addCaught(player, 1)
-		addCoins(player, Config.Asedio.reward or 60)
 		self:event("captured", { pos = self.kiwi and self.kiwi:getPosition() })
-		self:asedioScore("attack", "capture")
+		-- No hay punto instantaneo: el kiwi queda en brazos y hay que
+		-- llevarlo a la zona de extraccion y aguantarlo ahi 2 minutos
+		self:asedioCarryStart(player)
 		return
 	end
 
@@ -1918,7 +2130,15 @@ function Session:step(dt)
 			self:startPlaying()
 		end
 	elseif self.phase == "playing" then
-		if self.timeLimit and now >= self.startedAt + self.timeLimit then
+		if self.isAsedio and self.carry then
+			-- Kiwi capturado: sigue al portador, rescate y cuenta de la zona
+			self:stepCarry(dt, now)
+		end
+		if self.isAsedio and self.phase == "playing" then
+			-- Equipo eliminado entero: punto para el rival
+			self:stepWipe(now)
+		end
+		if self.timeLimit and not self.carry and self.phase == "playing" and now >= self.startedAt + self.timeLimit then
 			if self.isAsedio then
 				-- Se acabó el tiempo: punto para los Defensores
 				self:asedioScore("defend", "timeout")
@@ -1984,16 +2204,42 @@ function Session:sendUpdate(player)
 		end
 	elseif self.isAsedio then
 		local side = self:asedioSide(player)
-		local kiwi = self.kiwi
 		local root = getRoot(player)
-		local near = kiwi and not kiwi.defeated and root
-			and (kiwi:getPosition() - root.Position).Magnitude < 40
-		if side == "attack" then
-			objective = "Entra a la casa del kiwi y atrápalo"
-			progressText = near and "¡El kiwi está cerca!" or "Busca la casa del kiwi"
+		if self.carry then
+			local zona = self.fort and self.fort.zone
+			local kpos = self.kiwi and self.kiwi:getPosition()
+			local enZona = zona and kpos and (kpos - zona.pos).Magnitude <= (zona.radius or 9)
+			if side == "attack" then
+				if enZona then
+					local left = math.max(0, math.ceil((Config.Asedio.recoveryTime or 120) - (self.carry.hold or 0)))
+					objective = "¡Aguanten la extracción!"
+					progressText = string.format("Extracción: %d s", left)
+				elseif self.carry.by then
+					objective = "¡Lleven al kiwi a la ZONA marcada!"
+					progressText = "Sigan el haz de luz frente al castillo"
+				else
+					objective = "¡Levanten al kiwi del piso!"
+					progressText = "Quedó donde cayó el portador"
+				end
+			else
+				objective = "¡Rescaten al kiwi!"
+				if root and kpos then
+					progressText = string.format("Kiwi a %d studs", (kpos - root.Position).Magnitude)
+				else
+					progressText = "Corran hasta el kiwi"
+				end
+			end
 		else
-			objective = "Cuida al kiwi de los Cazadores"
-			progressText = near and "¡El kiwi está contigo! Cúbrelo" or "El kiwi está en su casa"
+			local kiwi = self.kiwi
+			local near = kiwi and not kiwi.defeated and root
+				and (kiwi:getPosition() - root.Position).Magnitude < 40
+			if side == "attack" then
+				objective = "Atrapa al kiwi y llévalo a la ZONA marcada"
+				progressText = near and "¡El kiwi está cerca! Atrapalo" or "Entra al castillo: portón, ductos, subsuelo o techo"
+			else
+				objective = "Cuida al kiwi en su castillo"
+				progressText = near and "¡El kiwi está contigo! Cúbrelo" or "El kiwi está en su castillo"
+			end
 		end
 	elseif self.isColosal then
 		local zone = self.arena and self.arena.safeZone
@@ -2273,13 +2519,21 @@ function GameManager.returnToLobby(player, keepInPlace)
 end
 
 function GameManager.requestJoin(player, modeId)
+	-- Elegir a mano cancela la revancha automatica
+	rematchInvites[player] = nil
+	return GameManager.joinMode(player, modeId)
+end
+
+-- Une al jugador a una partida del modo pedido. Si viene de una revancha
+-- y la arena esta libre, arranca directo en el mismo mapa.
+function GameManager.joinMode(player, modeId, mapId)
 	local current = playerSession[player]
 	if current then
 		if current.phase == "ended" then
 			current:removePlayer(player, true)
 		else
 			Net.get("Notify"):FireClient(player, Config.Text.AlreadyIn, Util.colorToTable(COLOR.warn), 4)
-			return
+			return nil
 		end
 	end
 
@@ -2293,11 +2547,11 @@ function GameManager.requestJoin(player, modeId)
 			end
 		end
 		if not session then
-			session = Session.new("multi", Random.new())
+			session = Session.new("multi", Random.new(), mapId and { mapId = mapId } or nil)
 			table.insert(sessions, session)
 		end
 		session:addPlayer(player)
-		return
+		return session
 	end
 
 	if modeId == "asedio" then
@@ -2310,21 +2564,47 @@ function GameManager.requestJoin(player, modeId)
 			end
 		end
 		if not session then
-			session = Session.new("asedio", Random.new())
+			session = Session.new("asedio", Random.new(), mapId and { mapId = mapId } or nil)
 			table.insert(sessions, session)
 		end
 		session:addPlayer(player)
-		return
+		return session
 	end
 
 	if not Config.Difficulties[modeId] then
-		return
+		return nil
 	end
 
-	local session = Session.new(modeId, Random.new())
+	local session = Session.new(modeId, Random.new(), mapId and { mapId = mapId } or nil)
 	table.insert(sessions, session)
 	session:addPlayer(player)
 	session:sendUpdate(player)
+	return session
+end
+
+-- Revancha: se anota el modo y la arena para que, al terminar la partida
+-- (o al caer noqueado), puedas volver a la misma sin votar mapa de nuevo.
+function GameManager.setRematch(player, session)
+	if not session or not session.arena then
+		return
+	end
+	local wait = Config.Round.RematchTime or 12
+	rematchInvites[player] = {
+		modeId = session.modeId,
+		mapId = session.arena.mapId,
+		name = session.name,
+		at = os.clock() + wait,
+	}
+	Net.get("Notify"):FireClient(
+		player,
+		string.format(Config.Text.RematchOffer, session.name, wait),
+		Util.colorToTable(session.color or COLOR.info),
+		wait
+	)
+end
+
+function GameManager.getRematch(player)
+	return rematchInvites[player]
 end
 
 function GameManager.requestLeave(player)
@@ -2349,6 +2629,23 @@ function GameManager.step(dt)
 		end
 		if session.finished then
 			table.remove(sessions, index)
+		end
+	end
+
+	-- Revancha: si no eligio otro modo, vuelve solo a la misma arena
+	for player, invite in pairs(rematchInvites) do
+		if not player.Parent or playerSession[player] then
+			rematchInvites[player] = nil
+		elseif os.clock() >= invite.at then
+			rematchInvites[player] = nil
+			if GameManager.joinMode(player, invite.modeId, invite.mapId) then
+				Net.get("Notify"):FireClient(
+					player,
+					string.format(Config.Text.RematchStart, invite.name),
+					Util.colorToTable(COLOR.good),
+					5
+				)
+			end
 		end
 	end
 

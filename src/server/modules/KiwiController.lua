@@ -722,6 +722,34 @@ function KiwiController:capture(player)
 	return true
 end
 
+-- Asedio: el kiwi capturado queda en brazos y lo posiciona el modo
+-- cuadro a cuadro (patas encogidas, como cargado)
+function KiwiController:holdAt(cf)
+	self.pos = cf.Position
+	self.facing = cf.LookVector
+	self.held = true
+	self.rig:update(cf, {
+		phase = os.clock() * 3,
+		legSwing = 0,
+		legFold = 0.85,
+		headPitch = 0.12,
+	})
+end
+
+-- Lo sueltan (cayo el portador): queda en el piso donde estaba
+function KiwiController:dropHold()
+	self.held = false
+	if self.pos then
+		local cf = CFrame.lookAt(self.pos, self.pos + self.facing)
+		self.rig:update(cf, {
+			phase = 0,
+			legSwing = 0,
+			legFold = 0.55,
+			headPitch = 0.22,
+		})
+	end
+end
+
 -- ===============================================================
 -- Bucle principal
 -- ===============================================================

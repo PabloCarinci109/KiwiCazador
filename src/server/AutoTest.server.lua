@@ -1,7 +1,8 @@
 --[[
 	AutoTest.server.lua  (SOLO en builds de prueba)
 	Recorre los 6 modos automaticamente y revisa que arranquen bien:
-	arena, teleport, armas, kiwi, bunker, baules de equipo y cierre.
+	arena, teleport, armas, kiwi, castillo, extraccion, baules de equipo
+	y cierre.
 	Se incluye en el lugar unicamente al compilar con KIWI_AUTOTEST=1
 	(ver tools/build_rbxlx.py). No va en el entregable normal.
 --]]
@@ -76,6 +77,24 @@ local function tieneTool(player, toolId)
 	return false
 end
 
+-- Puesto de una herramienta en la barra (solo la mochila: ahi vive el orden)
+local function posicionTool(player, toolId)
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	if not backpack then
+		return 0
+	end
+	local puesto = 0
+	for _, item in ipairs(backpack:GetChildren()) do
+		if item:IsA("Tool") then
+			puesto = puesto + 1
+			if item:GetAttribute("ToolId") == toolId then
+				return puesto
+			end
+		end
+	end
+	return 0
+end
+
 local function usosDe(player, toolId)
 	for _, container in ipairs({ player:FindFirstChildOfClass("Backpack"), player.Character }) do
 		if container then
@@ -87,6 +106,25 @@ local function usosDe(player, toolId)
 		end
 	end
 	return 0
+end
+
+-- El jugador se declara a nivel de archivo: lo usan tanto el corredor de
+-- modos como las pruebas extra (se completa en el arranque, mas abajo).
+local player
+
+-- Para diagnosticar el equipamiento si algo falta
+local function nombresMochila(p)
+	local nombres = {}
+	for _, container in ipairs({ p:FindFirstChildOfClass("Backpack"), p.Character }) do
+		if container then
+			for _, item in ipairs(container:GetChildren()) do
+				if item:IsA("Tool") then
+					table.insert(nombres, item.Name)
+				end
+			end
+		end
+	end
+	return #nombres > 0 and table.concat(nombres, ", ") or "(vacia)"
 end
 
 local function correrModo(player, modeId, extra)
@@ -101,7 +139,9 @@ local function correrModo(player, modeId, extra)
 	if sesion.phase == "vote" then
 		sesion:castVote(player, "random")
 	end
-	check(esperar(function() return sesion.phase == "countdown" end, 25) ~= nil, modeId .. ": paso a cuenta regresiva")
+	check(esperar(function()
+		return sesion.phase == "countdown" or sesion.phase == "playing"
+	end, 25) ~= nil, modeId .. ": paso a cuenta regresiva")
 	check(esperar(function() return sesion.phase == "playing" end, 20) ~= nil, modeId .. ": paso a juego")
 	task.wait(1.5)
 
@@ -115,7 +155,24 @@ local function correrModo(player, modeId, extra)
 		check(root ~= nil, modeId .. ": personaje con raiz")
 	end
 	check(contarArmas(player) > 0, modeId .. ": recibio herramientas", string.format("tools=%d", contarArmas(player)))
-	check(tieneTool(player, "cuchillo"), modeId .. ": cuchillo mariposa de fabrica")
+	if not esperar(function()
+		return tieneTool(player, "cuchillo")
+	end, 8) then
+		check(false, modeId .. ": cuchillo mariposa de fabrica", "mochila: " .. nombresMochila(player))
+	else
+		check(true, modeId .. ": cuchillo mariposa de fabrica")
+	end
+	-- La barra: la red atrapa kiwis 1 y el cuchillo mariposa 2. En los modos
+	-- sin red (o con la red puesta en la mano) el cuchillo queda primero.
+	local posCuchillo = posicionTool(player, "cuchillo")
+	local posRed = posicionTool(player, "red")
+	local ordenOk
+	if posRed == 0 then
+		ordenOk = posCuchillo == 0 or posCuchillo == 1
+	else
+		ordenOk = posRed == 1 and (posCuchillo == 0 or posCuchillo == 2)
+	end
+	check(ordenOk, modeId .. ": barra ordenada (red 1 / cuchillo 2)", "mochila: " .. nombresMochila(player))
 	check(sesion.kiwi ~= nil, modeId .. ": el kiwi existe")
 
 	if extra then
@@ -137,7 +194,13 @@ local function correrModo(player, modeId, extra)
 			sesion:finish()
 		end)
 	end
-	check(GameManager.getSession(player) == nil, modeId .. ": volvio al lobby")
+	-- "Volvio al lobby": la sesion termina. Ojo: el juego puede armar una
+	-- sesion nueva enseguida, asi que vale si salio de ESTA sesion.
+	check(esperar(function()
+		local actual = GameManager.getSession(player)
+		return actual == nil or actual ~= sesion
+	end, 8) ~= nil, modeId .. ": volvio al lobby")
+	check(GameManager.getRematch(player) ~= nil, modeId .. ": revancha anotada en la misma arena")
 	task.wait(1)
 end
 
@@ -200,15 +263,67 @@ local function extrasMulti(sesion)
 end
 
 local function extrasAsedio(sesion)
-	check(sesion.fort ~= nil, "asedio: bunker construido")
+	check(sesion.fort ~= nil, "asedio: castillo construido")
+	check(sesion.fort and sesion.fort.folder:FindFirstChild("Escalon") ~= nil, "asedio: escalera al techo")
+	check(sesion.fort and sesion.fort.folder:FindFirstChild("CulvertPiso") ~= nil, "asedio: subterraneo secreto")
+	check(Config.Asedio.roundTime == 300 and Config.Asedio.recoveryTime == 120, "asedio: reglas 5 min / 2 min de extraccion")
 	check(sesion.fortChests ~= nil, "asedio: baules de equipo")
 	check(sesion.kiwi ~= nil and sesion.kiwi.leash ~= nil, "asedio: kiwi con nido")
 	check(sesion.teamsReady and sesion.teamOf[player] ~= nil, "asedio: equipos repartidos")
 
+	-- La captura no da el punto al instante: el Cazador alza al kiwi y hay
+	-- que llevarlo a la zona marcada y aguantarlo ahi 2 minutos. El jugador
+	-- puede caer en cualquier equipo (los bandos se sortean): se prueban los
+	-- dos caminos.
 	local side = sesion.teamOf[player] or "attack"
+	local okCap = pcall(function()
+		if side == "attack" then
+			sesion.kiwi:sedate(5, player)
+			sesion:onKiwiTouch(sesion.kiwi, player)
+		else
+			sesion.kiwi:capture(player)
+			sesion:asedioCarryStart(player)
+		end
+	end)
+	check(okCap, "asedio: capturar al kiwi sin errores")
+	check(sesion.carry ~= nil, "asedio: el kiwi queda en brazos")
+	check(sesion.fort ~= nil and sesion.fort.zone ~= nil and sesion.fort.zone.pos ~= nil, "asedio: zona de extraccion marcada")
+	local character = player.Character
+	if side == "attack" then
+		-- Llevarlo a la zona: ahi la cuenta de extraccion avanza
+		local okLleva = false
+		if character and sesion.fort.zone then
+			okLleva = pcall(function()
+				character:PivotTo(CFrame.new(sesion.fort.zone.pos + Vector3.new(0, 4, 0)))
+			end)
+		end
+		task.wait(1.5)
+		check(okLleva and sesion.carry ~= nil and (sesion.carry.hold or 0) > 0.5, "asedio: la extraccion avanza en la zona")
+		local okRescate = pcall(function()
+			sesion:asedioRecover()
+		end)
+		check(okRescate and sesion.carry == nil, "asedio: el rescate corta la extraccion")
+	else
+		-- Defensor: al kiwi lo soltaron y acercarse lo rescata
+		sesion.carry.by = nil
+		local okSuelta = pcall(function()
+			sesion.kiwi:dropHold()
+		end)
+		local okCerca = false
+		if character and sesion.kiwi then
+			okCerca = pcall(function()
+				character:PivotTo(CFrame.new(sesion.kiwi:getPosition() + Vector3.new(0, 4, 0)))
+			end)
+		end
+		local rescatado = okSuelta and okCerca and esperar(function()
+			return sesion.carry == nil
+		end, 6) ~= nil
+		check(rescatado, "asedio: acercarse rescata al kiwi")
+	end
+	check(sesion.kiwi ~= nil and not sesion.kiwi.defeated, "asedio: el kiwi rescatado vuelve sano")
+
 	local mio = sesion.fortChests and sesion.fortChests[side]
 	local otro = sesion.fortChests and sesion.fortChests[side == "attack" and "defend" or "attack"]
-	local character = player.Character
 
 	if otro and character then
 		character:PivotTo(CFrame.new(otro.center + Vector3.new(0, 4, 0)))
@@ -236,10 +351,32 @@ local function extrasAsedio(sesion)
 	end)
 	check(okRespawn, "asedio: respawn sin errores")
 	check(sesion.stats[player].hp == 100, "asedio: respawn con vida llena")
+
+	-- Barrida total: si a un equipo lo noquean entero a la vez, el otro se
+	-- lleva la ronda. Con un solo jugador se anota un companero de prueba
+	-- del otro lado para poder verificarlo.
+	local miLado = sesion:asedioSide(player)
+	local rival = miLado == "attack" and "defend" or "attack"
+	local antes = sesion.teamScore[rival] or 0
+	local dummy = {}
+	table.insert(sesion.teams[rival], dummy)
+	sesion.stats[dummy] = { caught = 0 }
+	sesion.knocked[player] = true
+	local gano = esperar(function()
+		return (sesion.teamScore[rival] or 0) > antes
+	end, 6) ~= nil
+	sesion.knocked[player] = nil
+	sesion.stats[dummy] = nil
+	for i = #sesion.teams[rival], 1, -1 do
+		if sesion.teams[rival][i] == dummy then
+			table.remove(sesion.teams[rival], i)
+		end
+	end
+	check(gano, "asedio: equipo eliminado da la ronda al rival")
 end
 
 -- Arranque --------------------------------------------------------------
-local player = Players:GetPlayers()[1]
+player = Players:GetPlayers()[1]
 if not player then
 	player = Players.PlayerAdded:Wait()
 end

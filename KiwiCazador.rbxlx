@@ -43,7 +43,7 @@
 
 local Config = {}
 
-Config.Version = "1.9.4"
+Config.Version = "1.9.5"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -760,10 +760,10 @@ Config.Asedio = {
 	name = "Asedio al Kiwi",
 	tag = "¡5 vs 5!",
 	color = Color3.fromRGB(255, 176, 74),
-	blurb = "5 contra 5: un equipo defiende al kiwi en su bunker (portón, ductos de ventilación y un túnel) y el otro entra a capturarlo con la red. Al mejor de 3 rondas.",
+	blurb = "5 contra 5: un equipo cuida al kiwi en su castillo (portón, ductos de ventilación, un subterráneo secreto y una escalera al techo) y el otro entra a capturarlo con la red. Hay 5 minutos para atraparlo y después hay que llevarlo a la zona de extracción marcada con una luz y aguantarlo ahí 2 minutos. Los Defensores lo rescatan acercándose. Si a un equipo lo noquean entero, el rival se lleva la ronda. Al mejor de 3 rondas.",
 	baseDifficulty = "normal",
 	maxPlayers = 10,
-	roundTime = 150,        -- segundos por ronda
+	roundTime = 300,        -- segundos por ronda (5 minutos para capturar al kiwi)
 	breakTime = 7,          -- descanso entre rondas
 	roundsToWin = 2,        -- primero a 2 rondas gana la partida
 	respawn = 7,            -- segundos para volver tras un noqueo
@@ -773,6 +773,8 @@ Config.Asedio = {
 	revolverUses = 40,      -- tiros de revolver que recibe cada cazador
 	paintDamage = 11,       -- la pintura tambien lastima un poco en este modo
 	reward = 60,            -- monedas por capturar al kiwi
+	recoveryTime = 120,     -- segundos para rescatar al kiwi capturado (2 minutos)
+	recoveryRange = 7,      -- distancia a la que un Defensor rescata al kiwi capturado
 	winBonus = 240,         -- monedas por ganar la partida
 	teamAttack = "Cazadores",
 	teamDefend = "Defensores",
@@ -812,6 +814,7 @@ Config.Round = {
 	KiwiRespawnDelay = 1.0,  -- espera entre capturas (modo solo)
 	EatHold = 2.6,           -- cuanto dura "comerse" a un cazador (modo Colosal)
 	KoHold = 1.8,            -- cuanto dura un noqueado antes de volver al lobby
+	RematchTime = 12,        -- revancha: segundos para volver a la misma arena
 	HubReturn = true,        -- devolver al lobby al terminar
 }
 
@@ -888,11 +891,18 @@ Config.Text = {
 	Headshot = "¡TIRO A LA CABEZA!",
 	AsedioRound = "¡Ronda %d! Los %s atacan y los %s defienden al kiwi (marcador %d - %d)",
 	AsedioNext = "Próxima ronda en unos segundos... (ronda %d)",
-	AsedioCapture = "¡Los %s atrapáron al kiwi!",
+	AsedioCapture = "¡Extracción completa! Los %s se llevan la ronda",
+	AsedioCarry = "¡%s capturó al kiwi! Llévenlo a la ZONA DE EXTRACCIÓN marcada con una luz frente al castillo",
+	AsedioZoneIn = "¡El kiwi llegó a la zona! Aguanten %d segundos para sacarlo del mapa",
+	AsedioHoldWarn = "¡Quedan %d segundos de extracción!",
+	AsedioDropped = "¡Cayó el portador! El kiwi quedó en el piso: vuelvan a levantarlo",
+	AsedioPickup = "%s volvió a levantar al kiwi",
+	AsedioRecovered = "¡Los %s rescataron al kiwi! Vuelve a su castillo y la extracción se corta",
+	AsedioWipe = "¡No quedó nadie en pie del equipo %s! La ronda es para %s",
 	AsedioTimeout = "¡Se acabó el tiempo! Punto para los %s",
 	AsedioMatch = "¡Ganaron los %s la partida!",
-	AsedioTeamAttack = "Eres CAZADOR: entra a la casa y atrapa al kiwi con la red (o tócalo)",
-	AsedioTeamDefend = "Eres DEFENSOR: cuida al kiwi y no dejes que lo toquen",
+	AsedioTeamAttack = "Eres CAZADOR: atrapa al kiwi y llévalo a la ZONA DE EXTRACCIÓN (marcada con una luz frente al castillo)",
+	AsedioTeamDefend = "Eres DEFENSOR: cuida al kiwi en su castillo y rescátalo si lo capturan",
 	AsedioRespawnWait = "Te noquearon: vuelves en %d segundos",
 	AsedioBack = "¡De vuelta al combate!",
 	AsedioPounce = "El kiwi te saltó encima por acercarte demasiado",
@@ -913,6 +923,8 @@ Config.Text = {
 	ArrowNoBow = "Esa flecha es de un arco. No tienes uno equipado.",
 	KoedAll = "¡%s dejó fuera a %s de un disparo!",
 	KoMenu = "Te noquearon a tiros. Elige otro modo para volver a jugar.",
+	RematchOffer = "Revancha de %s en la misma arena en %d segundos... (elegí otro modo para cambiar)",
+	RematchStart = "¡Revancha de %s! Otra ronda en la misma arena",
 	DeathTitle = "¡TE COMIÓ EL KIWI!",
 	DeathSubtitle = "Vuelves al lobby... la reserva no perdona.",
 	SlowHit = "¡Diste al kiwi gigante! Va más lento por %d segundos.",
@@ -3699,8 +3711,9 @@ function WorldBuilder.buildAsedioFort(arena)
 		return Vector3.new(x, centro.Y, z)
 	end
 
-	-- Una pared con sus aberturas ({ c = corrimiento, w = ancho })
-	local function pared(n, aberturas)
+	-- Una pared con sus aberturas ({ c = corrimiento, w = ancho }) y,
+	-- opcionalmente, una brecha sin almenas ({ c = centro, w = ancho })
+	local function pared(n, aberturas, brecha)
 		local base = centro + n * H
 		local t = Vector3.new(-n.Z, 0, n.X)
 		local L = H * 2
@@ -3737,6 +3750,17 @@ function WorldBuilder.buildAsedioFort(arena)
 			end
 		end
 
+		-- Almenas del castillo: remate dentado sobre el muro (la brecha
+		-- deja libre el paso de la escalera al techo)
+		local paso = 3.6
+		for i = 0, math.floor(L / paso) do
+			local cx = -L / 2 + (i + 0.5) * paso
+			local libre = brecha and math.abs(cx - brecha.c) &lt; brecha.w / 2
+			if cx &lt;= L / 2 - 1 and not libre then
+				bloque("Almena", cfEn(base + t * cx + Vector3.new(0, ALTO + 0.7, 0), t), Vector3.new(1.5, 1.4, 1.9), FORT_OSCURO, Enum.Material.Slate)
+			end
+		end
+
 		-- Alero del pasillo de guardia (lado de adentro)
 		bloque("Alero", cfEn(base - n * 2.4 + Vector3.new(0, ALTO + 0.5, 0), t), Vector3.new(L, 0.9, 3.6), FORT_OSCURO, Enum.Material.DiamondPlate)
 
@@ -3755,9 +3779,28 @@ function WorldBuilder.buildAsedioFort(arena)
 	local baseFrente, frenteT = pared(haciaCentro, { { c = 0, w = 12 } })
 	bloque("Dintel", cfEn(baseFrente + Vector3.new(0, 10.4, 0), frenteT), Vector3.new(12.4, 1.4, 2.1), FORT_OSCURO, Enum.Material.DiamondPlate)
 
+	-- Escalera al techo: sube por afuera de la muralla izquierda hasta una
+	-- puerta en lo alto y de ahi se entra al castillo saltando adentro
+	local PASOS_TECHO = 15
+	local PASO_ALTO = ALTO / PASOS_TECHO
+	local PASO_LARGO = 1.45
+	local tEsc = Vector3.new(-izq.Z, 0, izq.X)
+	local c0Techo = 5
+	local cTecho = c0Techo + (PASOS_TECHO - 1) * PASO_LARGO
+	local baseEsc = centro + izq * H
+	for i = 1, PASOS_TECHO do
+		local c = c0Techo + (i - 1) * PASO_LARGO
+		bloque("Escalon", cfEn(baseEsc + izq * 2.3 + tEsc * c + Vector3.new(0, i * PASO_ALTO - 0.35, 0), tEsc), Vector3.new(PASO_LARGO + 0.25, 0.7, 4.6), FORT_MURO)
+	end
+	for _, lado in ipairs({ -1, 1 }) do
+		bloque("PuertaTecho", cfEn(baseEsc + tEsc * (cTecho + lado * 1.7) + Vector3.new(0, ALTO + 2.0, 0), tEsc), Vector3.new(0.55, 4.4, 0.55), FORT_OSCURO, Enum.Material.Wood)
+	end
+	bloque("PuertaTechoDintel", cfEn(baseEsc + tEsc * cTecho + Vector3.new(0, ALTO + 4.0, 0), tEsc), Vector3.new(4.0, 0.6, 0.6), FORT_OSCURO, Enum.Material.Wood)
+	bloque("Escotilla", cfEn(baseEsc + izq * 1.7 + tEsc * (cTecho + 2.6) + Vector3.new(0, ALTO + 2.6, 0), tEsc) * CFrame.Angles(math.rad(-58), 0, 0), Vector3.new(3.0, 0.28, 2.6), Color3.fromRGB(96, 74, 48), Enum.Material.WoodPlanks)
+
 	-- Ductos de ventilacion: se entra agachado, sin pasar por el porton
-	local function ducto(n)
-		local base, t = pared(n, { { c = 0, w = 6 } })
+	local function ducto(n, brecha)
+		local base, t = pared(n, { { c = 0, w = 6 } }, brecha)
 		bloque("DuctoTapa", cfEn(base + Vector3.new(0, 8.9, 0), t), Vector3.new(6.4, 4.2, 1.9), FORT_MURO)
 		local medio = base + n * 3
 		bloque("DuctoPiso", cfEn(medio + Vector3.new(0, 0.25, 0), t), Vector3.new(6, 0.5, 13.5), FORT_OSCURO, Enum.Material.CorrodedMetal)
@@ -3770,11 +3813,13 @@ function WorldBuilder.buildAsedioFort(arena)
 			bloque("Rejilla", cfEn(base + n * 9.5 + t * dx + Vector3.new(0, 5.6, 0), t), Vector3.new(1.2, 2.2, 0.4), FORT_BOLSA, Enum.Material.Metal)
 		end
 	end
-	ducto(izq)
+	ducto(izq, { c = cTecho, w = 4.4 })
 	ducto(-izq)
 
 	-- Tunel cubierto: el "subsuelo", se entra por atras de la muralla
-	local baseFondo, fondoT = pared(-haciaCentro, { { c = 0, w = 7 } })
+	-- (y cerca de la esquina la muralla esconde una gatera baja secreta)
+	local cCulv = H * 0.62
+	local baseFondo, fondoT = pared(-haciaCentro, { { c = 0, w = 7 }, { c = cCulv, w = 4.5 } })
 	local nFondo = -haciaCentro
 	bloque("TunelTapa", cfEn(baseFondo + Vector3.new(0, 9.4, 0), fondoT), Vector3.new(7.4, 3.2, 1.9), FORT_MURO)
 	local medioTunel = baseFondo + nFondo * 10
@@ -3789,6 +3834,87 @@ function WorldBuilder.buildAsedioFort(arena)
 		bloque("TunelMarco", cfEn(baseFondo + nFondo * 23 + fondoT * lado * 4 + Vector3.new(0, 3.7, 0), fondoT), Vector3.new(1.5, 7.4, 1.8), FORT_OSCURO, Enum.Material.CorrodedMetal)
 	end
 	bloque("TunelMarco", cfEn(baseFondo + nFondo * 23 + Vector3.new(0, 7.8, 0), fondoT), Vector3.new(9.5, 1.4, 1.8), FORT_OSCURO, Enum.Material.CorrodedMetal)
+
+	-- Subterraneo secreto: detras de la muralla hay una gatera baja entre
+	-- rocas y arbustos. Se cruza por un paso bajo y desemboca adentro.
+	bloque("CulvertDintel", cfEn(baseFondo + fondoT * cCulv + Vector3.new(0, 8.75, 0), fondoT), Vector3.new(4.9, 4.7, 1.9), FORT_MURO)
+	local medioCulv = baseFondo + nFondo * 8 + fondoT * cCulv
+	bloque("CulvertPiso", cfEn(medioCulv + Vector3.new(0, 0.25, 0), fondoT), Vector3.new(4.5, 0.5, 16), FORT_OSCURO, Enum.Material.CorrodedMetal)
+	bloque("CulvertTecho", cfEn(medioCulv + Vector3.new(0, 6.9, 0), fondoT), Vector3.new(5.6, 0.8, 16), FORT_MURO)
+	for _, lado in ipairs({ -1, 1 }) do
+		bloque("CulvertLado", cfEn(medioCulv + fondoT * lado * 2.7 + Vector3.new(0, 3.3, 0), fondoT), Vector3.new(1.2, 6.6, 16), FORT_MURO)
+	end
+	local boca = medioCulv + nFondo * 8
+	part({
+		Name = "RocaSecreta",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(4.6, 3.6, 4.4),
+		CFrame = cfEn(boca + nFondo * 1.2 + fondoT * 3.2 + Vector3.new(0, 1.0, 0), fondoT),
+		Color = Color3.fromRGB(120, 116, 108),
+		Material = Enum.Material.Slate,
+		CanCollide = true,
+		Parent = folder,
+	})
+	part({
+		Name = "RocaSecreta",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(3.6, 2.8, 3.4),
+		CFrame = cfEn(boca + nFondo * 0.4 - fondoT * 3.0 + Vector3.new(0, 0.8, 0), fondoT),
+		Color = Color3.fromRGB(112, 108, 102),
+		Material = Enum.Material.Slate,
+		CanCollide = true,
+		Parent = folder,
+	})
+	part({
+		Name = "ArbustoSecreto",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(5.2, 4.4, 5.2),
+		CFrame = cfEn(boca + nFondo * 2.1 + Vector3.new(0, 1.5, 0), fondoT),
+		Color = Color3.fromRGB(54, 96, 56),
+		Material = Enum.Material.Grass,
+		CanCollide = false,
+		Parent = folder,
+	})
+	bloque("TapaSecreta", cfEn(boca + nFondo * 1.1 + fondoT * 2.5 + Vector3.new(0, 2.0, 0), fondoT) * CFrame.Angles(math.rad(32), 0, 0), Vector3.new(4.8, 0.35, 3.6), Color3.fromRGB(98, 76, 50), Enum.Material.WoodPlanks)
+
+	-- Torreones del castillo: cuatro esquinas con almenas y su bandera
+	local torreAlto = 16
+	local function torreon(pin)
+		bloque("Torreon", cfEn(pin + Vector3.new(0, torreAlto / 2, 0), izq), Vector3.new(7, torreAlto, 7), FORT_MURO)
+		bloque("TorreonTapa", cfEn(pin + Vector3.new(0, torreAlto + 0.6, 0), izq), Vector3.new(8.2, 1.2, 8.2), FORT_OSCURO, Enum.Material.Slate)
+		for _, d in ipairs({ { -2.6, 0 }, { 2.6, 0 }, { 0, -2.6 }, { 0, 2.6 }, { -2.6, -2.6 }, { 2.6, -2.6 }, { -2.6, 2.6 }, { 2.6, 2.6 } }) do
+			bloque("AlmenaTorre", cfEn(pin + izq * d[1] + haciaCentro * d[2] + Vector3.new(0, torreAlto + 1.8, 0), izq), Vector3.new(1.5, 1.3, 1.5), FORT_OSCURO, Enum.Material.Slate)
+		end
+	end
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			torreon(centro + izq * (H * sx) + haciaCentro * (H * sz))
+		end
+	end
+	local pinBandera = centro - izq * H - haciaCentro * H
+	bloque("Asta", cfEn(pinBandera + Vector3.new(0, torreAlto + 4.4, 0), izq), Vector3.new(0.3, 5.4, 0.3), FORT_OSCURO, Enum.Material.Metal)
+	bloque("Bandera", cfEn(pinBandera + izq * 1.7 + Vector3.new(0, torreAlto + 6.2, 0), izq), Vector3.new(3.2, 1.9, 0.2), Config.Asedio.colorDefend, Enum.Material.Fabric)
+
+	-- Torres del portón (la entrada principal del castillo)
+	for _, lado in ipairs({ -1, 1 }) do
+		local pin = baseFrente + frenteT * (lado * 9.6)
+		bloque("TorrePorton", cfEn(pin + Vector3.new(0, 7, 0), frenteT), Vector3.new(5.6, 14, 6.6), FORT_MURO)
+		bloque("TorrePortonTapa", cfEn(pin + Vector3.new(0, 14.6, 0), frenteT), Vector3.new(6.6, 1.2, 7.6), FORT_OSCURO, Enum.Material.Slate)
+		for _, d in ipairs({ -2.4, 2.4 }) do
+			bloque("AlmenaPorton", cfEn(pin + frenteT * d + Vector3.new(0, 15.8, 0), frenteT), Vector3.new(1.5, 1.3, 1.5), FORT_OSCURO, Enum.Material.Slate)
+			bloque("AlmenaPorton", cfEn(pin + haciaCentro * d + Vector3.new(0, 15.8, 0), frenteT), Vector3.new(1.5, 1.3, 1.5), FORT_OSCURO, Enum.Material.Slate)
+		end
+	end
+
+	-- Antorchas de la muralla (adorno con luz calida)
+	local function antorcha(pos)
+		bloque("Antorcha", cfEn(pos, izq), Vector3.new(0.3, 1.7, 0.3), FORT_OSCURO, Enum.Material.Metal)
+		bloque("AntorchaLlama", cfEn(pos + Vector3.new(0, 1.25, 0), izq), Vector3.new(0.55, 0.8, 0.55), Color3.fromRGB(255, 156, 56), Enum.Material.Neon)
+	end
+	antorcha(baseFrente - haciaCentro * 1.1 + frenteT * 8 + Vector3.new(0, 5.6, 0))
+	antorcha(baseFrente - haciaCentro * 1.1 - frenteT * 8 + Vector3.new(0, 5.6, 0))
+	antorcha(baseFondo + haciaCentro * 1.1 - fondoT * cCulv + Vector3.new(0, 5.2, 0))
+	antorcha(baseFondo + haciaCentro * 1.1 + fondoT * 5 + Vector3.new(0, 5.2, 0))
 
 	-- Barricadas de bolsas de arena
 	local function barricada(pos, t, largo)
@@ -3808,9 +3934,8 @@ function WorldBuilder.buildAsedioFort(arena)
 	barricada(centro + izq * rInt + haciaCentro * 6, haciaCentro, 11)
 	barricada(centro - izq * rInt + haciaCentro * 6, haciaCentro, 11)
 
-	-- Baul de los Cazadores: al lado de su spawn (a ~100 studs del nido)
-	local angAtaque = 0.7
-	local dirAtaque = Vector3.new(math.cos(angAtaque), 0, math.sin(angAtaque))
+	-- Baul de los Cazadores: al lado de su spawn, enfrente del porton
+	local dirAtaque = haciaCentro
 	local radioAtaque = math.min(Config.Asedio.attackSpawn or 100, arena.halfSize - 34)
 	local posAtaque = centro + dirAtaque * radioAtaque
 	posAtaque = arena:clampToBounds(posAtaque)
@@ -3820,14 +3945,66 @@ function WorldBuilder.buildAsedioFort(arena)
 	local baseAtaque = pisoEn(posAtaque.X + tanAtaque.X * 5, posAtaque.Z + tanAtaque.Z * 5)
 	local chestAtaque = chestProp(folder, {}, CFrame.new(baseAtaque), "Baúl Cazadores")
 
-	-- Baul de los Defensores: adentro del bunker, junto a la casa
+	-- Baul de los Defensores: adentro del castillo, junto a la casa
 	local posDefensa = arena:clampToBounds(centro + izq * rInt)
 	local baseDefensa = pisoEn(posDefensa.X, posDefensa.Z)
 	local chestDefensa = chestProp(folder, {}, CFrame.new(baseDefensa), "Baúl Defensores")
 
+	-- Zona de extraccion: adonde los Cazadores tienen que llevar al kiwi
+	-- capturado y aguantarlo 2 minutos. Queda marcada con un haz de luz
+	-- que se ve desde todo el mapa y un anillo.
+	local posZona = arena:clampToBounds(centro + dirAtaque * (H + 26))
+	posZona = pisoEn(posZona.X, posZona.Z)
+	local radioZona = 9
+	part({
+		Name = "ZonaAnillo",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.3, radioZona * 2 + 1.8, radioZona * 2 + 1.8),
+		CFrame = CFrame.new(posZona + Vector3.new(0, 0.35, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Config.Asedio.colorAttack,
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+		Parent = folder,
+	})
+	part({
+		Name = "ZonaPiso",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.5, radioZona * 2, radioZona * 2),
+		CFrame = CFrame.new(posZona + Vector3.new(0, 0.4, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(64, 58, 54),
+		Material = Enum.Material.DiamondPlate,
+		CanCollide = true,
+		Parent = folder,
+	})
+	part({
+		Name = "ZonaHaz",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(90, 5, 5),
+		CFrame = CFrame.new(posZona + Vector3.new(0, 45, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Config.Asedio.colorAttack,
+		Material = Enum.Material.Neon,
+		Transparency = 0.75,
+		CanCollide = false,
+		Parent = folder,
+	})
+	-- Postes con banderin en las esquinas
+	for _, d in ipairs({ { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } }) do
+		local off = haciaCentro * (d[1] * 5.6) + izq * (d[2] * 5.6)
+		bloque("ZonaPoste", cfEn(posZona + off + Vector3.new(0, 2.1, 0), izq), Vector3.new(0.35, 4.2, 0.35), FORT_OSCURO, Enum.Material.Metal)
+		bloque("ZonaBanderin", cfEn(posZona + off + Vector3.new(0, 3.9, 0), izq), Vector3.new(2.0, 1.1, 0.15), Config.Asedio.colorAttack, Enum.Material.Fabric)
+	end
+	-- Barrotes del fondo: el frente queda abierto, mirando al castillo
+	for _, d in ipairs({ { 4.8, 0 }, { 3.4, 3.4 }, { 3.4, -3.4 } }) do
+		local off = haciaCentro * d[1] + izq * d[2]
+		bloque("ZonaBarrote", cfEn(posZona + off + Vector3.new(0, 1.8, 0), izq), Vector3.new(0.3, 3.6, 0.3), FORT_OSCURO, Enum.Material.Metal)
+	end
+
 	return {
 		folder = folder,
 		chests = { attack = chestAtaque, defend = chestDefensa },
+		front = haciaCentro,                              -- direccion del porton
+		half = H,                                         -- media medida del castillo
+		zone = { pos = posZona, radius = radioZona },     -- zona de extraccion del kiwi
 	}
 end
 
@@ -4810,6 +4987,34 @@ function KiwiController:capture(player)
 	self.goalSpot = nil
 	self:emit("capture", { player = player, pos = self.pos })
 	return true
+end
+
+-- Asedio: el kiwi capturado queda en brazos y lo posiciona el modo
+-- cuadro a cuadro (patas encogidas, como cargado)
+function KiwiController:holdAt(cf)
+	self.pos = cf.Position
+	self.facing = cf.LookVector
+	self.held = true
+	self.rig:update(cf, {
+		phase = os.clock() * 3,
+		legSwing = 0,
+		legFold = 0.85,
+		headPitch = 0.12,
+	})
+end
+
+-- Lo sueltan (cayo el portador): queda en el piso donde estaba
+function KiwiController:dropHold()
+	self.held = false
+	if self.pos then
+		local cf = CFrame.lookAt(self.pos, self.pos + self.facing)
+		self.rig:update(cf, {
+			phase = 0,
+			legSwing = 0,
+			legFold = 0.55,
+			headPitch = 0.22,
+		})
+	end
 end
 
 -- ===============================================================
@@ -6024,6 +6229,9 @@ local function buildKnifeTool(parent)
 		Material = Enum.Material.Neon,
 		Parent = tool,
 	})
+	-- El cuchillo tambien entra a la carpeta de plantillas: era el unico
+	-- que se quedaba afuera y por eso no aparecia de fabrica
+	tool.Parent = parent
 	return tool
 end
 
@@ -6431,6 +6639,10 @@ function ToolService.give(player, only)
 	-- Limpia lo que haya quedado de la partida anterior
 	ToolService.clear(player)
 
+	-- Se clona en orden: la red atrapa kiwis va 1, el cuchillo mariposa 2 y
+	-- despues el resto. La barra de Roblox sigue el orden de la mochila, asi
+	-- que con clonarlos en esta secuencia queda ordenada de una.
+	local resto, red, cuchillo = {}, nil, nil
 	for _, template in ipairs(folder:GetChildren()) do
 		local toolId = template:GetAttribute("ToolId")
 		-- pintura, relente y las armas de baul solo se entregan cuando toca
@@ -6451,30 +6663,44 @@ function ToolService.give(player, only)
 			allowed = not locked
 		end
 		if allowed then
-			local clone = template:Clone()
-			wireTool(clone)
-			clone.Parent = backpack
+			if toolId == "cuchillo" then
+				cuchillo = cuchillo or template
+			elseif toolId == "red" then
+				red = red or template
+			else
+				table.insert(resto, template)
+			end
 		end
 	end
 
 	-- Blindaje: el cuchillo mariposa va de fabrica SIEMPRE (en todos los
 	-- modos y para todos los personajes), aunque la lista del modo lo olvide.
-	local tieneCuchillo = false
-	for _, item in ipairs(backpack:GetChildren()) do
-		if item:IsA("Tool") and item:GetAttribute("ToolId") == "cuchillo" then
-			tieneCuchillo = true
-			break
-		end
-	end
-	if not tieneCuchillo then
+	if not cuchillo then
 		for _, template in ipairs(folder:GetChildren()) do
 			if template:GetAttribute("ToolId") == "cuchillo" then
-				local clone = template:Clone()
-				wireTool(clone)
-				clone.Parent = backpack
+				cuchillo = template
 				break
 			end
 		end
+	end
+
+	local orden = {}
+	if red then
+		table.insert(orden, red)
+		if cuchillo then
+			table.insert(orden, cuchillo)
+		end
+	elseif cuchillo then
+		-- Sin red (Defensores, colosal, multi): el cuchillo queda primero
+		table.insert(orden, cuchillo)
+	end
+	for _, template in ipairs(resto) do
+		table.insert(orden, template)
+	end
+	for _, template in ipairs(orden) do
+		local clone = template:Clone()
+		wireTool(clone)
+		clone.Parent = backpack
 	end
 
 	ToolService.cooldowns[player] = {}
@@ -8744,6 +8970,7 @@ Session.__index = Session
 local world
 local sessions = {}
 local playerSession = {}
+local rematchInvites = {}
 local sessionCounter = 0
 
 local COLOR = {
@@ -8861,7 +9088,7 @@ end
 -- ===============================================================
 -- SESION
 -- ===============================================================
-function Session.new(modeId, rng)
+function Session.new(modeId, rng, opts)
 	local self = setmetatable({}, Session)
 	sessionCounter = sessionCounter + 1
 	self.id = sessionCounter
@@ -8887,7 +9114,7 @@ function Session.new(modeId, rng)
 	self.voteDone = false
 	self.knocked = {}
 	self.looted = {}       -- quien ya saco su arma del baul de equipo (asedio)
-	self.fort = nil        -- bunker del asedio (se destruye al terminar)
+	self.fort = nil        -- castillo del asedio (se destruye al terminar)
 	self.fortChests = nil
 
 	if modeId == "asedio" then
@@ -8902,6 +9129,8 @@ function Session.new(modeId, rng)
 		self.teamScore = { attack = 0, defend = 0 }
 		self.asedioRound = 1
 		self.teamsReady = false
+		self.carry = nil
+		self.wipeSince = nil
 		-- Como el multijugador: entre todos votan el mapa y arranca.
 		self.phase = "vote"
 		self.phaseEnds = os.clock() + Config.Vote.multiTime
@@ -8925,6 +9154,18 @@ function Session.new(modeId, rng)
 		-- Modo solo: elige el mapa el jugador y arranca enseguida.
 		self.phase = "vote"
 		self.phaseEnds = os.clock() + Config.Vote.soloTime
+	end
+
+	-- Revancha: si pidieron una arena puntual y esta libre, arranca ahi
+	-- mismo (mismo modo, misma arena, sin votacion)
+	if opts and opts.mapId then
+		for _, arena in ipairs(world.arenas) do
+			if not arena.busy and arena.mapId == opts.mapId then
+				self:allocateArena(opts.mapId)
+				self:startCountdown()
+				break
+			end
+		end
 	end
 
 	return self
@@ -9201,6 +9442,8 @@ function Session:knockout(victim, attacker)
 			-- Igual que cuando te come el kiwi: al lobby con el menu listo
 			Net.get("SessionUpdate"):FireClient(victim, { active = false })
 			Net.get("Notify"):FireClient(victim, Config.Text.KoMenu, Util.colorToTable(COLOR.info), 5)
+			-- Revancha anotada: si no elige otro modo, vuelve a la misma arena
+			GameManager.setRematch(victim, self)
 		end
 	end)
 end
@@ -9325,6 +9568,8 @@ end
 
 -- Limpia la ronda (kiwi, proyectiles, vida) antes de la siguiente
 function Session:asedioReset()
+	self.carry = nil
+	self.wipeSince = nil
 	if self.kiwi then
 		self.kiwi:destroy()
 		self.kiwi = nil
@@ -9359,6 +9604,10 @@ function Session:asedioScore(side, reason)
 
 	if reason == "capture" then
 		self:notifyAll(string.format(Config.Text.AsedioCapture, attackName), Config.Asedio.colorAttack, 6)
+	elseif reason == "wipe" then
+		local loseName = side == "attack" and defendName or attackName
+		local winName = side == "attack" and attackName or defendName
+		self:notifyAll(string.format(Config.Text.AsedioWipe, loseName, winName), Config.Asedio.colorAttack, 6)
 	else
 		self:notifyAll(string.format(Config.Text.AsedioTimeout, defendName), Config.Asedio.colorDefend, 6)
 	end
@@ -9379,6 +9628,182 @@ function Session:asedioScore(side, reason)
 	self.phaseEnds = os.clock() + Config.Asedio.breakTime
 	self:notifyAll(string.format(Config.Text.AsedioNext, self.asedioRound), COLOR.info, Config.Asedio.breakTime)
 	self:sendUpdates(true)
+end
+
+-- Asedio: al atrapar al kiwi los Cazadores lo alzan en brazos y tienen que
+-- llevarlo a la ZONA DE EXTRACCION (marcada con un haz de luz afuera del
+-- castillo). Ahi hay que aguantarlo 2 minutos; los Defensores lo rescatan
+-- acercandose (al portador o al piso donde quedo).
+function Session:asedioCarryStart(player)
+	local nombre = player.DisplayName ~= "" and player.DisplayName or player.Name
+	self.carry = {
+		captor = player,
+		by = player,
+		hold = 0,
+		inZona = false,
+		warned = {},
+	}
+	self:notifyAll(string.format(Config.Text.AsedioCarry, nombre), Config.Asedio.colorAttack, 8)
+	self:sendUpdates(true)
+end
+
+-- El portador cayo: el kiwi queda en el piso, ahi donde estaba
+function Session:asedioCarryDrop()
+	local carry = self.carry
+	if not carry or not carry.by then
+		return
+	end
+	carry.by = nil
+	if self.kiwi then
+		self.kiwi:dropHold()
+	end
+	self:notifyAll(Config.Text.AsedioDropped, COLOR.warn, 5)
+	self:sendUpdates(true)
+end
+
+-- Un Defensor que llega hasta el kiwi capturado lo rescata: vuelve al nido
+function Session:asedioRecover()
+	if not self.carry then
+		return false
+	end
+	self.carry = nil
+	self:notifyAll(string.format(Config.Text.AsedioRecovered, Config.Asedio.teamDefend), Config.Asedio.colorDefend, 6)
+	-- El kiwi vuelve a su nido, sano y salvo
+	self:spawnKiwi()
+	self:sendUpdates(true)
+	return true
+end
+
+-- Pose del kiwi en brazos: adelante del pecho del portador
+local function carryPose(root)
+	return root.CFrame * CFrame.new(0, 1.3, -3.0) * CFrame.Angles(0, math.rad(180), 0)
+end
+
+-- Paso de la extraccion: el kiwi sigue al portador o queda en el piso, se
+-- recoge al toque, los Defensores rescatan por cercania y los 2 minutos
+-- dentro de la zona marcada le dan la ronda a los Cazadores.
+function Session:stepCarry(dt, now)
+	local carry = self.carry
+	local kiwi = self.kiwi
+	if not carry or not kiwi then
+		return
+	end
+	-- Mientras el kiwi esta capturado, el reloj de la ronda se pausa
+	self.startedAt = self.startedAt + dt
+
+	-- 1) En brazos: sigue al portador (si lo noquean, queda en el piso)
+	if carry.by then
+		local root = getRoot(carry.by)
+		if root and self.stats[carry.by] and not self.knocked[carry.by] then
+			kiwi:holdAt(carryPose(root))
+		else
+			self:asedioCarryDrop()
+		end
+	end
+
+	-- 2) Recogida: un Cazador que llega hasta el kiwi en el piso lo levanta
+	if not carry.by then
+		local kpos = kiwi:getPosition()
+		if kpos then
+			for _, player in ipairs(self.players) do
+				if not self.knocked[player] and self:asedioSide(player) == "attack" then
+					local root = getRoot(player)
+					if root and (root.Position - kpos).Magnitude &lt;= 7 then
+						carry.by = player
+						local nombre = player.DisplayName ~= "" and player.DisplayName or player.Name
+						self:notifyAll(string.format(Config.Text.AsedioPickup, nombre), Config.Asedio.colorAttack, 4)
+						kiwi:holdAt(carryPose(root))
+						break
+					end
+				end
+			end
+		end
+	end
+
+	local kpos = kiwi:getPosition()
+	if not kpos then
+		return
+	end
+
+	-- 3) Rescate: un Defensor que se acerca al kiwi lo libera
+	local rango = Config.Asedio.recoveryRange or 7
+	for _, player in ipairs(self.players) do
+		if not self.knocked[player] and self:asedioSide(player) == "defend" then
+			local root = getRoot(player)
+			if root and (root.Position - kpos).Magnitude &lt;= rango then
+				self:asedioRecover()
+				return
+			end
+		end
+	end
+
+	-- 4) Extraccion: los 2 minutos cuentan adentro de la zona marcada
+	local zona = self.fort and self.fort.zone
+	if zona and (kpos - zona.pos).Magnitude &lt;= (zona.radius or 9) then
+		if not carry.inZona then
+			carry.inZona = true
+			self:notifyAll(string.format(Config.Text.AsedioZoneIn, Config.Asedio.recoveryTime or 120), Config.Asedio.colorAttack, 5)
+		end
+		carry.hold = carry.hold + dt
+		local tiempo = Config.Asedio.recoveryTime or 120
+		local left = tiempo - carry.hold
+		for _, marca in ipairs({ 30, 10, 5 }) do
+			if left &lt;= marca and not carry.warned[marca] then
+				carry.warned[marca] = true
+				self:notifyAll(string.format(Config.Text.AsedioHoldWarn, marca), COLOR.warn, 3)
+			end
+		end
+		if carry.hold &gt;= tiempo then
+			local captor = carry.captor
+			self.carry = nil
+			-- Recien aca el Cazador que lo atrapo cobra las monedas
+			local data = captor and self.stats[captor]
+			if data then
+				data.caught = (data.caught or 0) + 1
+				addCaught(captor, 1)
+				addCoins(captor, Config.Asedio.reward or 60)
+			end
+			self:asedioScore("attack", "capture")
+		end
+	else
+		carry.inZona = false
+	end
+end
+
+-- Si a un equipo lo noquean entero a la vez, el otro se lleva la ronda
+function Session:stepWipe(now)
+	if self.asedioWinner or not self.teams then
+		return
+	end
+	local gente, enPie = {}, {}
+	for _, side in ipairs({ "attack", "defend" }) do
+		gente[side], enPie[side] = 0, 0
+		for _, player in ipairs(self.teams[side] or {}) do
+			if self.stats[player] then
+				gente[side] = gente[side] + 1
+				if not self.knocked[player] then
+					enPie[side] = enPie[side] + 1
+				end
+			end
+		end
+	end
+	local barrido
+	if gente.attack &gt; 0 and enPie.attack == 0 and enPie.defend &gt; 0 then
+		barrido = "attack"
+	elseif gente.defend &gt; 0 and enPie.defend == 0 and enPie.attack &gt; 0 then
+		barrido = "defend"
+	end
+	if not barrido then
+		self.wipeSince = nil
+		return
+	end
+	-- Se exige un momento de barrida completa (evita falsos por un parpadeo)
+	self.wipeSince = self.wipeSince or now
+	if now - self.wipeSince &lt; 1.2 then
+		return
+	end
+	self.wipeSince = nil
+	self:asedioScore(barrido == "attack" and "defend" or "attack", "wipe")
 end
 
 -- ---------------- trafico de la ciudad ----------------
@@ -9769,10 +10194,18 @@ function Session:spawnsFor(player)
 		end
 		local count = math.max(1, #list)
 		local angle = (index - 1) / count * math.pi * 2
-		local radius = 24
+		-- Los Defensores aparecen adentro del castillo, cerca de la casa
+		local radius = math.min(24, (self.fort and self.fort.half or 34) - 10)
 		if side == "attack" then
 			radius = math.min(Config.Asedio.attackSpawn, (self.arena.halfSize or 150) - 34)
-			angle = angle + 0.7
+			-- Los Cazadores aparecen afuera, repartidos frente al porton
+			local frente = self.fort and self.fort.front
+			if frente then
+				local base = math.atan2(frente.Z, frente.X)
+				angle = base + (index - (count + 1) / 2) * 0.3
+			else
+				angle = angle + 0.7
+			end
 		end
 
 		-- Busca suelo firme en ese angulo (avisa si el punto esta tapado)
@@ -10095,7 +10528,11 @@ function Session:finish()
 	Actions.clearPickups(self)
 
 	if self.fort then
-		self.fort:Destroy()
+		-- self.fort es la tabla del castillo { folder = ..., chests = ... }:
+		-- hay que destruir la carpeta, no la tabla
+		if self.fort.folder then
+			self.fort.folder:Destroy()
+		end
 		self.fort = nil
 		self.fortChests = nil
 	end
@@ -10104,6 +10541,8 @@ function Session:finish()
 		self:returnAllToLobby()
 	end
 	for _, player in ipairs(self.players) do
+		-- Revancha: se anota el modo y la arena para volver a la misma
+		GameManager.setRematch(player, self)
 		if self.isAsedio then
 			player.Team = nil
 			player.Neutral = true
@@ -10266,11 +10705,10 @@ function Session:capture(player, method)
 			return
 		end
 		self.kiwi:capture(player)
-		data.caught = data.caught + 1
-		addCaught(player, 1)
-		addCoins(player, Config.Asedio.reward or 60)
 		self:event("captured", { pos = self.kiwi and self.kiwi:getPosition() })
-		self:asedioScore("attack", "capture")
+		-- No hay punto instantaneo: el kiwi queda en brazos y hay que
+		-- llevarlo a la zona de extraccion y aguantarlo ahi 2 minutos
+		self:asedioCarryStart(player)
 		return
 	end
 
@@ -10629,7 +11067,15 @@ function Session:step(dt)
 			self:startPlaying()
 		end
 	elseif self.phase == "playing" then
-		if self.timeLimit and now &gt;= self.startedAt + self.timeLimit then
+		if self.isAsedio and self.carry then
+			-- Kiwi capturado: sigue al portador, rescate y cuenta de la zona
+			self:stepCarry(dt, now)
+		end
+		if self.isAsedio and self.phase == "playing" then
+			-- Equipo eliminado entero: punto para el rival
+			self:stepWipe(now)
+		end
+		if self.timeLimit and not self.carry and self.phase == "playing" and now &gt;= self.startedAt + self.timeLimit then
 			if self.isAsedio then
 				-- Se acabó el tiempo: punto para los Defensores
 				self:asedioScore("defend", "timeout")
@@ -10695,16 +11141,42 @@ function Session:sendUpdate(player)
 		end
 	elseif self.isAsedio then
 		local side = self:asedioSide(player)
-		local kiwi = self.kiwi
 		local root = getRoot(player)
-		local near = kiwi and not kiwi.defeated and root
-			and (kiwi:getPosition() - root.Position).Magnitude &lt; 40
-		if side == "attack" then
-			objective = "Entra a la casa del kiwi y atrápalo"
-			progressText = near and "¡El kiwi está cerca!" or "Busca la casa del kiwi"
+		if self.carry then
+			local zona = self.fort and self.fort.zone
+			local kpos = self.kiwi and self.kiwi:getPosition()
+			local enZona = zona and kpos and (kpos - zona.pos).Magnitude &lt;= (zona.radius or 9)
+			if side == "attack" then
+				if enZona then
+					local left = math.max(0, math.ceil((Config.Asedio.recoveryTime or 120) - (self.carry.hold or 0)))
+					objective = "¡Aguanten la extracción!"
+					progressText = string.format("Extracción: %d s", left)
+				elseif self.carry.by then
+					objective = "¡Lleven al kiwi a la ZONA marcada!"
+					progressText = "Sigan el haz de luz frente al castillo"
+				else
+					objective = "¡Levanten al kiwi del piso!"
+					progressText = "Quedó donde cayó el portador"
+				end
+			else
+				objective = "¡Rescaten al kiwi!"
+				if root and kpos then
+					progressText = string.format("Kiwi a %d studs", (kpos - root.Position).Magnitude)
+				else
+					progressText = "Corran hasta el kiwi"
+				end
+			end
 		else
-			objective = "Cuida al kiwi de los Cazadores"
-			progressText = near and "¡El kiwi está contigo! Cúbrelo" or "El kiwi está en su casa"
+			local kiwi = self.kiwi
+			local near = kiwi and not kiwi.defeated and root
+				and (kiwi:getPosition() - root.Position).Magnitude &lt; 40
+			if side == "attack" then
+				objective = "Atrapa al kiwi y llévalo a la ZONA marcada"
+				progressText = near and "¡El kiwi está cerca! Atrapalo" or "Entra al castillo: portón, ductos, subsuelo o techo"
+			else
+				objective = "Cuida al kiwi en su castillo"
+				progressText = near and "¡El kiwi está contigo! Cúbrelo" or "El kiwi está en su castillo"
+			end
 		end
 	elseif self.isColosal then
 		local zone = self.arena and self.arena.safeZone
@@ -10984,13 +11456,21 @@ function GameManager.returnToLobby(player, keepInPlace)
 end
 
 function GameManager.requestJoin(player, modeId)
+	-- Elegir a mano cancela la revancha automatica
+	rematchInvites[player] = nil
+	return GameManager.joinMode(player, modeId)
+end
+
+-- Une al jugador a una partida del modo pedido. Si viene de una revancha
+-- y la arena esta libre, arranca directo en el mismo mapa.
+function GameManager.joinMode(player, modeId, mapId)
 	local current = playerSession[player]
 	if current then
 		if current.phase == "ended" then
 			current:removePlayer(player, true)
 		else
 			Net.get("Notify"):FireClient(player, Config.Text.AlreadyIn, Util.colorToTable(COLOR.warn), 4)
-			return
+			return nil
 		end
 	end
 
@@ -11004,11 +11484,11 @@ function GameManager.requestJoin(player, modeId)
 			end
 		end
 		if not session then
-			session = Session.new("multi", Random.new())
+			session = Session.new("multi", Random.new(), mapId and { mapId = mapId } or nil)
 			table.insert(sessions, session)
 		end
 		session:addPlayer(player)
-		return
+		return session
 	end
 
 	if modeId == "asedio" then
@@ -11021,21 +11501,47 @@ function GameManager.requestJoin(player, modeId)
 			end
 		end
 		if not session then
-			session = Session.new("asedio", Random.new())
+			session = Session.new("asedio", Random.new(), mapId and { mapId = mapId } or nil)
 			table.insert(sessions, session)
 		end
 		session:addPlayer(player)
-		return
+		return session
 	end
 
 	if not Config.Difficulties[modeId] then
-		return
+		return nil
 	end
 
-	local session = Session.new(modeId, Random.new())
+	local session = Session.new(modeId, Random.new(), mapId and { mapId = mapId } or nil)
 	table.insert(sessions, session)
 	session:addPlayer(player)
 	session:sendUpdate(player)
+	return session
+end
+
+-- Revancha: se anota el modo y la arena para que, al terminar la partida
+-- (o al caer noqueado), puedas volver a la misma sin votar mapa de nuevo.
+function GameManager.setRematch(player, session)
+	if not session or not session.arena then
+		return
+	end
+	local wait = Config.Round.RematchTime or 12
+	rematchInvites[player] = {
+		modeId = session.modeId,
+		mapId = session.arena.mapId,
+		name = session.name,
+		at = os.clock() + wait,
+	}
+	Net.get("Notify"):FireClient(
+		player,
+		string.format(Config.Text.RematchOffer, session.name, wait),
+		Util.colorToTable(session.color or COLOR.info),
+		wait
+	)
+end
+
+function GameManager.getRematch(player)
+	return rematchInvites[player]
 end
 
 function GameManager.requestLeave(player)
@@ -11060,6 +11566,23 @@ function GameManager.step(dt)
 		end
 		if session.finished then
 			table.remove(sessions, index)
+		end
+	end
+
+	-- Revancha: si no eligio otro modo, vuelve solo a la misma arena
+	for player, invite in pairs(rematchInvites) do
+		if not player.Parent or playerSession[player] then
+			rematchInvites[player] = nil
+		elseif os.clock() &gt;= invite.at then
+			rematchInvites[player] = nil
+			if GameManager.joinMode(player, invite.modeId, invite.mapId) then
+				Net.get("Notify"):FireClient(
+					player,
+					string.format(Config.Text.RematchStart, invite.name),
+					Util.colorToTable(COLOR.good),
+					5
+				)
+			end
 		end
 	end
 
@@ -15410,7 +15933,7 @@ function ViewModel.setWeapon(id)
 	current = models[id]
 	-- Al sacar el cuchillo mariposa se abre con un giro (estilo CS2)
 	if id == "cuchillo" then
-		FX = { kind = "draw", t = 0, dur = 0.75 }
+		FX = { kind = "draw", t = 0, dur = 0.85 }
 		knifeOpen = 0
 	end
 	-- Fogonazo: una bolita neon en la boca del canon
@@ -15579,10 +16102,15 @@ local function stepUnbound(dt)
 		FX.t = FX.t + dt
 		local raw = math.clamp(FX.t / FX.dur, 0, 1)
 		if FX.kind == "draw" then
-			local e = 1 - (1 - raw) ^ 2.4
-			animCF = CFrame.Angles(0, 0, math.rad(360) * (1 - e))
-				* CFrame.new(0, 0.16 * math.sin(math.pi * e), 0.14 * math.sin(math.pi * e))
-			knifeOpen = math.clamp(e * 1.6, 0, 1)
+			-- Apertura de mariposa: sale desde abajo, la muneca gira y la
+			-- hoja se abre de un latigazo con un rebote corto al final
+			local e = 1 - (1 - raw) ^ 2.2
+			local rebote = math.sin(math.pi * math.min(raw * 1.6, 1)) * (1 - raw)
+			animCF = CFrame.Angles(math.rad(8) * (1 - e), 0,
+					math.rad(560) * (1 - e) + math.rad(18) * rebote)
+				* CFrame.new(0, -0.44 * (1 - e) + 0.10 * math.sin(math.pi * e), 0.32 * (1 - e))
+			local abre = math.clamp(e * 1.9, 0, 1)
+			knifeOpen = math.min(1, abre + math.sin(abre * math.pi) * 0.14)
 		elseif FX.kind == "slash" then
 			local swipe = math.sin(math.pi * raw)
 			animCF = CFrame.Angles(math.rad(-16 * swipe), math.rad(-150 * swipe), math.rad(30 * swipe))
@@ -15593,9 +16121,14 @@ local function stepUnbound(dt)
 			animCF = CFrame.Angles(math.rad(-52 * swipe), 0, math.rad(-18 * swipe))
 				* CFrame.new(0, 0.12 * swipe, -0.5 * swipe)
 		elseif FX.kind == "inspect" then
+			-- Molinete: la mariposa da una vuelta y media, se pliega a mitad
+			-- de giro (truco clasico) y se vuelve a abrir en la atajada
 			local e = raw * raw * (3 - 2 * raw)
-			animCF = CFrame.Angles(0, 0, math.rad(720) * (1 - e))
-				* CFrame.new(0, 0.12 * math.sin(math.pi * raw), 0)
+			local pliegue = math.sin(math.pi * raw)
+			animCF = CFrame.Angles(0, math.rad(16) * math.sin(math.pi * 2 * raw),
+					math.rad(540) * (1 - e))
+				* CFrame.new(0, 0.16 * math.sin(math.pi * raw), 0.06 * pliegue)
+			knifeOpen = 1 - pliegue * 0.9
 		end
 		if raw &gt;= 1 then
 			FX.kind = nil
@@ -15604,6 +16137,11 @@ local function stepUnbound(dt)
 	-- Si un zarpazo interrumpio la apertura, la hoja termina de abrirse sola
 	if FX.kind ~= "draw" and knifeOpen &lt; 1 then
 		knifeOpen = math.min(1, knifeOpen + dt * 5)
+	end
+
+	-- El cuchillo abierto se mece apenas en la mano (vida propia)
+	if currentId == "cuchillo" and not animCF and knifeOpen &gt;= 1 then
+		animCF = CFrame.Angles(0, 0, math.rad(2.0) * math.sin(bobPhase * 0.45))
 	end
 
 	local posed = animCF and final * animCF or final

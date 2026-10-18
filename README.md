@@ -19,7 +19,7 @@ interfaz cuando inicia la partida.
 | **Difícil** | Rapidísimo, desconfiado y solo duerme un momento. Además **no ves su estado** en el HUD. |
 | **Multijugador** | 🪶 ¡Supervivencia! Un **kiwi gigante** caza a todos: va **comiéndose jugadores** uno por uno y **gana el último que quede vivo** (hasta 12 jugadores). Llevas rastreador, **rifle ralentizador** y el **rifle de pintura** para frenar a los rivales. |
 | **Kiwi Colosal** | 🪶 ¡El cazador cazado! Un **kiwi gigante** te huele y te persigue: **escóndete y sobrevive**. A mitad de ronda se activa la **ZONA SEGURA** en el centro: **entra al círculo y ganas al instante**, pero el kiwi te **corta el paso** y ronda el borde — frénalo con el ralentizador, esquívalo y métete. Llevas el rastreador y un **rifle ralentizador** (no lo duerme: lo frena unos segundos). |
-| **Asedio al Kiwi** | ⚔️ **¡5 contra 5!** Un equipo (**Defensores**) cuida al kiwi en su casa y el otro (**Cazadores**) entra a **capturarlo con la red** (o **dormirlo** con el rifle y tocarlo) antes de que se acabe el tiempo. **Al mejor de 3 rondas**: si te noquean, volvés al spawn de tu equipo a los 7 segundos. Los Cazadores llevan red, rifle tranquilizante, rastreador y pintura; todos llevan **revólver de equipo**. |
+| **Asedio al Kiwi** | ⚔️ **¡5 contra 5!** Un equipo (**Defensores**) cuida al kiwi en su **castillo** (portón, ductos de ventilación, un **subterráneo secreto** y una **escalera al techo**) y el otro (**Cazadores**) entra a **capturarlo con la red** (o **dormirlo** con el rifle y tocarlo) antes de que se acabe el tiempo (**5 minutos** por ronda). Si lo atrapan, el Cazador lo **lleva en brazos** y hay que **llevarlo a la zona de extracción** (marcada con una **columna de luz** frente al castillo) y **aguantarlo ahí 2 minutos**; los Defensores lo rescatan acercándose. Si a un equipo lo **noquean entero**, el rival se lleva la ronda. **Al mejor de 3 rondas**: si te noquean, volvés al spawn de tu equipo a los 7 segundos. Los Cazadores aparecen **afuera, frente al portón**; los Defensores, **adentro**. Llevan red, rifle tranquilizante, rastreador y pintura; todos llevan **revólver de equipo**. |
 
 En los modos de un jugador hay que atrapar **3 kiwis** antes de que se acabe el tiempo.
 El juego corre hasta **5 partidas a la vez** (una por arena); si todas están ocupadas, aparece
@@ -42,6 +42,20 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 ### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
 
+> **1.9.5:** el **cuchillo mariposa ya aparece siempre** en el equipamiento de fábrica (ahora
+> en el **puesto 2 de la barra**, justo después de la red) y tiene **animación nueva**: se
+> **abre solo** al sacarlo, con latigazo de muñeca y rebote, y con **F** hace el **molinete**
+> plegándose en el aire. El **asedio** ahora es un **castillo**: almenas, torreones, bandera y
+> el kiwi adentro — con el **portón**, los **ductos de ventilación**, un **subterráneo con
+> entrada secreta** escondida entre las rocas del fondo y una **escalera al techo** con puerta
+> y escotilla. Las rondas duran **5 minutos** y, una vez que atrapan al kiwi, el Cazador lo **lleva en
+> brazos**: hay que **cargarlo hasta la zona de extracción** (una plataforma marcada con una
+> **columna de luz** frente al castillo) y **aguantarlo ahí 2 minutos**, mientras los
+> Defensores lo **rescatan acercándose**. Si a un equipo lo **noquean entero**, el rival se
+> lleva la ronda. Los Defensores aparecen **dentro** del castillo y los Cazadores
+> **afuera, frente al portón**. Si el kiwi te atrapa (o termina la partida), el juego te
+> anota la **revancha en la misma arena**: si no elegís otro modo, a los segundos vuelve a
+> arrancar solo, en el mismo mapa y sin votación (nada de "respawn en cualquier lado").
 > **1.9.4:** las **armas se ven más realistas** en primera persona (miras con punto y alza,
 > cargadores curvados, culatas con tope de goma, cerrojos, rieles y guardamontes). El
 > **molotov abarca mucho más** (radio 15) y el fuego **se ve como fuego de verdad**: tres
@@ -149,7 +163,7 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 | **1 / 2 / 3 / 4 / 5** | Cambiar de herramienta (red / rifle / rastreador / trampa / pintura; en Colosal: rastreador / ralentizador) |
 | **Shift** | Caminar despacio (hacés menos ruido; por defecto corrés, y el kiwi te oye antes) |
 | **Ctrl**, **Alt** o **C** | Agachado en sigilo (casi no te oye; la cámara baja y el arma se afirma: menos dispersión) |
-| **F** | Con el **cuchillo mariposa** (de fábrica para todos): lo hacés **girar en la mano**, estilo CS2 |
+| **F** | Con el **cuchillo mariposa** (de fábrica, barra 2): **molinete** girando en la mano, estilo CS2 |
 | **E** | **Esconderte** en un armario, barril o pajar / **abrir un baúl**. Dentro del escondite, E otra vez te saca |
 | **Tab** | **Tabla estilo Counter** (equipos, marcador y capturas en Asedio) + tabla de jugadores de Roblox |
 
@@ -359,7 +373,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.4 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.5 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):

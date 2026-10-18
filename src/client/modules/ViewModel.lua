@@ -463,7 +463,7 @@ function ViewModel.setWeapon(id)
 	current = models[id]
 	-- Al sacar el cuchillo mariposa se abre con un giro (estilo CS2)
 	if id == "cuchillo" then
-		FX = { kind = "draw", t = 0, dur = 0.75 }
+		FX = { kind = "draw", t = 0, dur = 0.85 }
 		knifeOpen = 0
 	end
 	-- Fogonazo: una bolita neon en la boca del canon
@@ -632,10 +632,15 @@ local function stepUnbound(dt)
 		FX.t = FX.t + dt
 		local raw = math.clamp(FX.t / FX.dur, 0, 1)
 		if FX.kind == "draw" then
-			local e = 1 - (1 - raw) ^ 2.4
-			animCF = CFrame.Angles(0, 0, math.rad(360) * (1 - e))
-				* CFrame.new(0, 0.16 * math.sin(math.pi * e), 0.14 * math.sin(math.pi * e))
-			knifeOpen = math.clamp(e * 1.6, 0, 1)
+			-- Apertura de mariposa: sale desde abajo, la muneca gira y la
+			-- hoja se abre de un latigazo con un rebote corto al final
+			local e = 1 - (1 - raw) ^ 2.2
+			local rebote = math.sin(math.pi * math.min(raw * 1.6, 1)) * (1 - raw)
+			animCF = CFrame.Angles(math.rad(8) * (1 - e), 0,
+					math.rad(560) * (1 - e) + math.rad(18) * rebote)
+				* CFrame.new(0, -0.44 * (1 - e) + 0.10 * math.sin(math.pi * e), 0.32 * (1 - e))
+			local abre = math.clamp(e * 1.9, 0, 1)
+			knifeOpen = math.min(1, abre + math.sin(abre * math.pi) * 0.14)
 		elseif FX.kind == "slash" then
 			local swipe = math.sin(math.pi * raw)
 			animCF = CFrame.Angles(math.rad(-16 * swipe), math.rad(-150 * swipe), math.rad(30 * swipe))
@@ -646,9 +651,14 @@ local function stepUnbound(dt)
 			animCF = CFrame.Angles(math.rad(-52 * swipe), 0, math.rad(-18 * swipe))
 				* CFrame.new(0, 0.12 * swipe, -0.5 * swipe)
 		elseif FX.kind == "inspect" then
+			-- Molinete: la mariposa da una vuelta y media, se pliega a mitad
+			-- de giro (truco clasico) y se vuelve a abrir en la atajada
 			local e = raw * raw * (3 - 2 * raw)
-			animCF = CFrame.Angles(0, 0, math.rad(720) * (1 - e))
-				* CFrame.new(0, 0.12 * math.sin(math.pi * raw), 0)
+			local pliegue = math.sin(math.pi * raw)
+			animCF = CFrame.Angles(0, math.rad(16) * math.sin(math.pi * 2 * raw),
+					math.rad(540) * (1 - e))
+				* CFrame.new(0, 0.16 * math.sin(math.pi * raw), 0.06 * pliegue)
+			knifeOpen = 1 - pliegue * 0.9
 		end
 		if raw >= 1 then
 			FX.kind = nil
@@ -657,6 +667,11 @@ local function stepUnbound(dt)
 	-- Si un zarpazo interrumpio la apertura, la hoja termina de abrirse sola
 	if FX.kind ~= "draw" and knifeOpen < 1 then
 		knifeOpen = math.min(1, knifeOpen + dt * 5)
+	end
+
+	-- El cuchillo abierto se mece apenas en la mano (vida propia)
+	if currentId == "cuchillo" and not animCF and knifeOpen >= 1 then
+		animCF = CFrame.Angles(0, 0, math.rad(2.0) * math.sin(bobPhase * 0.45))
 	end
 
 	local posed = animCF and final * animCF or final

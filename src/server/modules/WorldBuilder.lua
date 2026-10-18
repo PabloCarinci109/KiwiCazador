@@ -2443,8 +2443,9 @@ function WorldBuilder.buildAsedioFort(arena)
 		return Vector3.new(x, centro.Y, z)
 	end
 
-	-- Una pared con sus aberturas ({ c = corrimiento, w = ancho })
-	local function pared(n, aberturas)
+	-- Una pared con sus aberturas ({ c = corrimiento, w = ancho }) y,
+	-- opcionalmente, una brecha sin almenas ({ c = centro, w = ancho })
+	local function pared(n, aberturas, brecha)
 		local base = centro + n * H
 		local t = Vector3.new(-n.Z, 0, n.X)
 		local L = H * 2
@@ -2481,6 +2482,17 @@ function WorldBuilder.buildAsedioFort(arena)
 			end
 		end
 
+		-- Almenas del castillo: remate dentado sobre el muro (la brecha
+		-- deja libre el paso de la escalera al techo)
+		local paso = 3.6
+		for i = 0, math.floor(L / paso) do
+			local cx = -L / 2 + (i + 0.5) * paso
+			local libre = brecha and math.abs(cx - brecha.c) < brecha.w / 2
+			if cx <= L / 2 - 1 and not libre then
+				bloque("Almena", cfEn(base + t * cx + Vector3.new(0, ALTO + 0.7, 0), t), Vector3.new(1.5, 1.4, 1.9), FORT_OSCURO, Enum.Material.Slate)
+			end
+		end
+
 		-- Alero del pasillo de guardia (lado de adentro)
 		bloque("Alero", cfEn(base - n * 2.4 + Vector3.new(0, ALTO + 0.5, 0), t), Vector3.new(L, 0.9, 3.6), FORT_OSCURO, Enum.Material.DiamondPlate)
 
@@ -2499,9 +2511,28 @@ function WorldBuilder.buildAsedioFort(arena)
 	local baseFrente, frenteT = pared(haciaCentro, { { c = 0, w = 12 } })
 	bloque("Dintel", cfEn(baseFrente + Vector3.new(0, 10.4, 0), frenteT), Vector3.new(12.4, 1.4, 2.1), FORT_OSCURO, Enum.Material.DiamondPlate)
 
+	-- Escalera al techo: sube por afuera de la muralla izquierda hasta una
+	-- puerta en lo alto y de ahi se entra al castillo saltando adentro
+	local PASOS_TECHO = 15
+	local PASO_ALTO = ALTO / PASOS_TECHO
+	local PASO_LARGO = 1.45
+	local tEsc = Vector3.new(-izq.Z, 0, izq.X)
+	local c0Techo = 5
+	local cTecho = c0Techo + (PASOS_TECHO - 1) * PASO_LARGO
+	local baseEsc = centro + izq * H
+	for i = 1, PASOS_TECHO do
+		local c = c0Techo + (i - 1) * PASO_LARGO
+		bloque("Escalon", cfEn(baseEsc + izq * 2.3 + tEsc * c + Vector3.new(0, i * PASO_ALTO - 0.35, 0), tEsc), Vector3.new(PASO_LARGO + 0.25, 0.7, 4.6), FORT_MURO)
+	end
+	for _, lado in ipairs({ -1, 1 }) do
+		bloque("PuertaTecho", cfEn(baseEsc + tEsc * (cTecho + lado * 1.7) + Vector3.new(0, ALTO + 2.0, 0), tEsc), Vector3.new(0.55, 4.4, 0.55), FORT_OSCURO, Enum.Material.Wood)
+	end
+	bloque("PuertaTechoDintel", cfEn(baseEsc + tEsc * cTecho + Vector3.new(0, ALTO + 4.0, 0), tEsc), Vector3.new(4.0, 0.6, 0.6), FORT_OSCURO, Enum.Material.Wood)
+	bloque("Escotilla", cfEn(baseEsc + izq * 1.7 + tEsc * (cTecho + 2.6) + Vector3.new(0, ALTO + 2.6, 0), tEsc) * CFrame.Angles(math.rad(-58), 0, 0), Vector3.new(3.0, 0.28, 2.6), Color3.fromRGB(96, 74, 48), Enum.Material.WoodPlanks)
+
 	-- Ductos de ventilacion: se entra agachado, sin pasar por el porton
-	local function ducto(n)
-		local base, t = pared(n, { { c = 0, w = 6 } })
+	local function ducto(n, brecha)
+		local base, t = pared(n, { { c = 0, w = 6 } }, brecha)
 		bloque("DuctoTapa", cfEn(base + Vector3.new(0, 8.9, 0), t), Vector3.new(6.4, 4.2, 1.9), FORT_MURO)
 		local medio = base + n * 3
 		bloque("DuctoPiso", cfEn(medio + Vector3.new(0, 0.25, 0), t), Vector3.new(6, 0.5, 13.5), FORT_OSCURO, Enum.Material.CorrodedMetal)
@@ -2514,11 +2545,13 @@ function WorldBuilder.buildAsedioFort(arena)
 			bloque("Rejilla", cfEn(base + n * 9.5 + t * dx + Vector3.new(0, 5.6, 0), t), Vector3.new(1.2, 2.2, 0.4), FORT_BOLSA, Enum.Material.Metal)
 		end
 	end
-	ducto(izq)
+	ducto(izq, { c = cTecho, w = 4.4 })
 	ducto(-izq)
 
 	-- Tunel cubierto: el "subsuelo", se entra por atras de la muralla
-	local baseFondo, fondoT = pared(-haciaCentro, { { c = 0, w = 7 } })
+	-- (y cerca de la esquina la muralla esconde una gatera baja secreta)
+	local cCulv = H * 0.62
+	local baseFondo, fondoT = pared(-haciaCentro, { { c = 0, w = 7 }, { c = cCulv, w = 4.5 } })
 	local nFondo = -haciaCentro
 	bloque("TunelTapa", cfEn(baseFondo + Vector3.new(0, 9.4, 0), fondoT), Vector3.new(7.4, 3.2, 1.9), FORT_MURO)
 	local medioTunel = baseFondo + nFondo * 10
@@ -2533,6 +2566,87 @@ function WorldBuilder.buildAsedioFort(arena)
 		bloque("TunelMarco", cfEn(baseFondo + nFondo * 23 + fondoT * lado * 4 + Vector3.new(0, 3.7, 0), fondoT), Vector3.new(1.5, 7.4, 1.8), FORT_OSCURO, Enum.Material.CorrodedMetal)
 	end
 	bloque("TunelMarco", cfEn(baseFondo + nFondo * 23 + Vector3.new(0, 7.8, 0), fondoT), Vector3.new(9.5, 1.4, 1.8), FORT_OSCURO, Enum.Material.CorrodedMetal)
+
+	-- Subterraneo secreto: detras de la muralla hay una gatera baja entre
+	-- rocas y arbustos. Se cruza por un paso bajo y desemboca adentro.
+	bloque("CulvertDintel", cfEn(baseFondo + fondoT * cCulv + Vector3.new(0, 8.75, 0), fondoT), Vector3.new(4.9, 4.7, 1.9), FORT_MURO)
+	local medioCulv = baseFondo + nFondo * 8 + fondoT * cCulv
+	bloque("CulvertPiso", cfEn(medioCulv + Vector3.new(0, 0.25, 0), fondoT), Vector3.new(4.5, 0.5, 16), FORT_OSCURO, Enum.Material.CorrodedMetal)
+	bloque("CulvertTecho", cfEn(medioCulv + Vector3.new(0, 6.9, 0), fondoT), Vector3.new(5.6, 0.8, 16), FORT_MURO)
+	for _, lado in ipairs({ -1, 1 }) do
+		bloque("CulvertLado", cfEn(medioCulv + fondoT * lado * 2.7 + Vector3.new(0, 3.3, 0), fondoT), Vector3.new(1.2, 6.6, 16), FORT_MURO)
+	end
+	local boca = medioCulv + nFondo * 8
+	part({
+		Name = "RocaSecreta",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(4.6, 3.6, 4.4),
+		CFrame = cfEn(boca + nFondo * 1.2 + fondoT * 3.2 + Vector3.new(0, 1.0, 0), fondoT),
+		Color = Color3.fromRGB(120, 116, 108),
+		Material = Enum.Material.Slate,
+		CanCollide = true,
+		Parent = folder,
+	})
+	part({
+		Name = "RocaSecreta",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(3.6, 2.8, 3.4),
+		CFrame = cfEn(boca + nFondo * 0.4 - fondoT * 3.0 + Vector3.new(0, 0.8, 0), fondoT),
+		Color = Color3.fromRGB(112, 108, 102),
+		Material = Enum.Material.Slate,
+		CanCollide = true,
+		Parent = folder,
+	})
+	part({
+		Name = "ArbustoSecreto",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(5.2, 4.4, 5.2),
+		CFrame = cfEn(boca + nFondo * 2.1 + Vector3.new(0, 1.5, 0), fondoT),
+		Color = Color3.fromRGB(54, 96, 56),
+		Material = Enum.Material.Grass,
+		CanCollide = false,
+		Parent = folder,
+	})
+	bloque("TapaSecreta", cfEn(boca + nFondo * 1.1 + fondoT * 2.5 + Vector3.new(0, 2.0, 0), fondoT) * CFrame.Angles(math.rad(32), 0, 0), Vector3.new(4.8, 0.35, 3.6), Color3.fromRGB(98, 76, 50), Enum.Material.WoodPlanks)
+
+	-- Torreones del castillo: cuatro esquinas con almenas y su bandera
+	local torreAlto = 16
+	local function torreon(pin)
+		bloque("Torreon", cfEn(pin + Vector3.new(0, torreAlto / 2, 0), izq), Vector3.new(7, torreAlto, 7), FORT_MURO)
+		bloque("TorreonTapa", cfEn(pin + Vector3.new(0, torreAlto + 0.6, 0), izq), Vector3.new(8.2, 1.2, 8.2), FORT_OSCURO, Enum.Material.Slate)
+		for _, d in ipairs({ { -2.6, 0 }, { 2.6, 0 }, { 0, -2.6 }, { 0, 2.6 }, { -2.6, -2.6 }, { 2.6, -2.6 }, { -2.6, 2.6 }, { 2.6, 2.6 } }) do
+			bloque("AlmenaTorre", cfEn(pin + izq * d[1] + haciaCentro * d[2] + Vector3.new(0, torreAlto + 1.8, 0), izq), Vector3.new(1.5, 1.3, 1.5), FORT_OSCURO, Enum.Material.Slate)
+		end
+	end
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			torreon(centro + izq * (H * sx) + haciaCentro * (H * sz))
+		end
+	end
+	local pinBandera = centro - izq * H - haciaCentro * H
+	bloque("Asta", cfEn(pinBandera + Vector3.new(0, torreAlto + 4.4, 0), izq), Vector3.new(0.3, 5.4, 0.3), FORT_OSCURO, Enum.Material.Metal)
+	bloque("Bandera", cfEn(pinBandera + izq * 1.7 + Vector3.new(0, torreAlto + 6.2, 0), izq), Vector3.new(3.2, 1.9, 0.2), Config.Asedio.colorDefend, Enum.Material.Fabric)
+
+	-- Torres del portón (la entrada principal del castillo)
+	for _, lado in ipairs({ -1, 1 }) do
+		local pin = baseFrente + frenteT * (lado * 9.6)
+		bloque("TorrePorton", cfEn(pin + Vector3.new(0, 7, 0), frenteT), Vector3.new(5.6, 14, 6.6), FORT_MURO)
+		bloque("TorrePortonTapa", cfEn(pin + Vector3.new(0, 14.6, 0), frenteT), Vector3.new(6.6, 1.2, 7.6), FORT_OSCURO, Enum.Material.Slate)
+		for _, d in ipairs({ -2.4, 2.4 }) do
+			bloque("AlmenaPorton", cfEn(pin + frenteT * d + Vector3.new(0, 15.8, 0), frenteT), Vector3.new(1.5, 1.3, 1.5), FORT_OSCURO, Enum.Material.Slate)
+			bloque("AlmenaPorton", cfEn(pin + haciaCentro * d + Vector3.new(0, 15.8, 0), frenteT), Vector3.new(1.5, 1.3, 1.5), FORT_OSCURO, Enum.Material.Slate)
+		end
+	end
+
+	-- Antorchas de la muralla (adorno con luz calida)
+	local function antorcha(pos)
+		bloque("Antorcha", cfEn(pos, izq), Vector3.new(0.3, 1.7, 0.3), FORT_OSCURO, Enum.Material.Metal)
+		bloque("AntorchaLlama", cfEn(pos + Vector3.new(0, 1.25, 0), izq), Vector3.new(0.55, 0.8, 0.55), Color3.fromRGB(255, 156, 56), Enum.Material.Neon)
+	end
+	antorcha(baseFrente - haciaCentro * 1.1 + frenteT * 8 + Vector3.new(0, 5.6, 0))
+	antorcha(baseFrente - haciaCentro * 1.1 - frenteT * 8 + Vector3.new(0, 5.6, 0))
+	antorcha(baseFondo + haciaCentro * 1.1 - fondoT * cCulv + Vector3.new(0, 5.2, 0))
+	antorcha(baseFondo + haciaCentro * 1.1 + fondoT * 5 + Vector3.new(0, 5.2, 0))
 
 	-- Barricadas de bolsas de arena
 	local function barricada(pos, t, largo)
@@ -2552,9 +2666,8 @@ function WorldBuilder.buildAsedioFort(arena)
 	barricada(centro + izq * rInt + haciaCentro * 6, haciaCentro, 11)
 	barricada(centro - izq * rInt + haciaCentro * 6, haciaCentro, 11)
 
-	-- Baul de los Cazadores: al lado de su spawn (a ~100 studs del nido)
-	local angAtaque = 0.7
-	local dirAtaque = Vector3.new(math.cos(angAtaque), 0, math.sin(angAtaque))
+	-- Baul de los Cazadores: al lado de su spawn, enfrente del porton
+	local dirAtaque = haciaCentro
 	local radioAtaque = math.min(Config.Asedio.attackSpawn or 100, arena.halfSize - 34)
 	local posAtaque = centro + dirAtaque * radioAtaque
 	posAtaque = arena:clampToBounds(posAtaque)
@@ -2564,14 +2677,66 @@ function WorldBuilder.buildAsedioFort(arena)
 	local baseAtaque = pisoEn(posAtaque.X + tanAtaque.X * 5, posAtaque.Z + tanAtaque.Z * 5)
 	local chestAtaque = chestProp(folder, {}, CFrame.new(baseAtaque), "Baúl Cazadores")
 
-	-- Baul de los Defensores: adentro del bunker, junto a la casa
+	-- Baul de los Defensores: adentro del castillo, junto a la casa
 	local posDefensa = arena:clampToBounds(centro + izq * rInt)
 	local baseDefensa = pisoEn(posDefensa.X, posDefensa.Z)
 	local chestDefensa = chestProp(folder, {}, CFrame.new(baseDefensa), "Baúl Defensores")
 
+	-- Zona de extraccion: adonde los Cazadores tienen que llevar al kiwi
+	-- capturado y aguantarlo 2 minutos. Queda marcada con un haz de luz
+	-- que se ve desde todo el mapa y un anillo.
+	local posZona = arena:clampToBounds(centro + dirAtaque * (H + 26))
+	posZona = pisoEn(posZona.X, posZona.Z)
+	local radioZona = 9
+	part({
+		Name = "ZonaAnillo",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.3, radioZona * 2 + 1.8, radioZona * 2 + 1.8),
+		CFrame = CFrame.new(posZona + Vector3.new(0, 0.35, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Config.Asedio.colorAttack,
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+		Parent = folder,
+	})
+	part({
+		Name = "ZonaPiso",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.5, radioZona * 2, radioZona * 2),
+		CFrame = CFrame.new(posZona + Vector3.new(0, 0.4, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(64, 58, 54),
+		Material = Enum.Material.DiamondPlate,
+		CanCollide = true,
+		Parent = folder,
+	})
+	part({
+		Name = "ZonaHaz",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(90, 5, 5),
+		CFrame = CFrame.new(posZona + Vector3.new(0, 45, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Config.Asedio.colorAttack,
+		Material = Enum.Material.Neon,
+		Transparency = 0.75,
+		CanCollide = false,
+		Parent = folder,
+	})
+	-- Postes con banderin en las esquinas
+	for _, d in ipairs({ { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } }) do
+		local off = haciaCentro * (d[1] * 5.6) + izq * (d[2] * 5.6)
+		bloque("ZonaPoste", cfEn(posZona + off + Vector3.new(0, 2.1, 0), izq), Vector3.new(0.35, 4.2, 0.35), FORT_OSCURO, Enum.Material.Metal)
+		bloque("ZonaBanderin", cfEn(posZona + off + Vector3.new(0, 3.9, 0), izq), Vector3.new(2.0, 1.1, 0.15), Config.Asedio.colorAttack, Enum.Material.Fabric)
+	end
+	-- Barrotes del fondo: el frente queda abierto, mirando al castillo
+	for _, d in ipairs({ { 4.8, 0 }, { 3.4, 3.4 }, { 3.4, -3.4 } }) do
+		local off = haciaCentro * d[1] + izq * d[2]
+		bloque("ZonaBarrote", cfEn(posZona + off + Vector3.new(0, 1.8, 0), izq), Vector3.new(0.3, 3.6, 0.3), FORT_OSCURO, Enum.Material.Metal)
+	end
+
 	return {
 		folder = folder,
 		chests = { attack = chestAtaque, defend = chestDefensa },
+		front = haciaCentro,                              -- direccion del porton
+		half = H,                                         -- media medida del castillo
+		zone = { pos = posZona, radius = radioZona },     -- zona de extraccion del kiwi
 	}
 end
 
