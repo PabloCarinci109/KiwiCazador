@@ -42,7 +42,7 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 ### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
 
-> **1.9.0:** arreglado el **asedio** (un error de teleport hacía que los jugadores quedaran en el
+> **1.9.1:** arreglado el **asedio** (un error de teleport hacía que los jugadores quedaran en el
 > lobby sin armas ni kiwi: el spawn devolvía la posición en vez del CFrame completo). El nido del
 > kiwi ahora es un **bunker de los Defensores**: muralla con **troneras**, **portón** al frente,
 > **dos ductos de ventilación** (se entra agachado) y un **túnel cubierto** por atrás, más
@@ -341,7 +341,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.0 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.1 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):

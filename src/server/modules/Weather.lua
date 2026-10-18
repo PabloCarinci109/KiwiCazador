@@ -29,6 +29,11 @@ local Weather = {}
 
 local SNOW = Config.Weather.snowColor
 
+-- Luau no permite multiplicar Color3 por un numero: se escala a mano.
+local function escala(color, k)
+	return Color3.new(color.R * k, color.G * k, color.B * k)
+end
+
 local state = {
 	clock = 14,      -- hora del mundo (0 a 24)
 	kind = "sol",    -- sol | lluvia | nieve
@@ -76,16 +81,16 @@ function Weather.apply()
 	local lum = dayLum(state.clock)
 	local f = state.force
 
-	local ambient = preset.ambient * (0.35 + 0.65 * lum)
-	local outdoor = preset.outdoor * (0.35 + 0.65 * lum)
+	local ambient = escala(preset.ambient, 0.35 + 0.65 * lum)
+	local outdoor = escala(preset.outdoor, 0.35 + 0.65 * lum)
 	local brightness = preset.brightness * (0.40 + 0.60 * lum)
-	local fog = preset.fog * (0.45 + 0.55 * lum)
+	local fog = escala(preset.fog, 0.45 + 0.55 * lum)
 	local fogStart = preset.fogStart
 	local fogEnd = preset.fogEnd
 
 	if state.kind == "lluvia" then
-		ambient = ambient * (1 - 0.25 * f)
-		outdoor = outdoor * (1 - 0.30 * f)
+		ambient = escala(ambient, 1 - 0.25 * f)
+		outdoor = escala(outdoor, 1 - 0.30 * f)
 		brightness = brightness * (1 - 0.35 * f)
 		fog = fog:Lerp(Color3.fromRGB(100, 108, 122), 0.60 * f)
 		fogStart = fogStart * (1 - 0.45 * f)
@@ -101,8 +106,8 @@ function Weather.apply()
 
 	-- El piso nevado devuelve luz
 	if state.accum > 0 then
-		ambient = ambient * (1 + 0.25 * state.accum)
-		outdoor = outdoor * (1 + 0.20 * state.accum)
+		ambient = escala(ambient, 1 + 0.25 * state.accum)
+		outdoor = escala(outdoor, 1 + 0.20 * state.accum)
 	end
 
 	Lighting.Ambient = ambient
