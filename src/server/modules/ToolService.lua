@@ -684,6 +684,34 @@ end
 ToolService.attachTank = attachFuelTank
 ToolService.detachTank = detachFuelTank
 
+-- La mochila se engancha al clon que recibe el jugador (las conexiones no se
+-- copian al clonar la plantilla)
+local function wireTool(tool)
+	if tool:GetAttribute("ToolId") ~= "lanzallamas" then
+		return
+	end
+	local worn = nil
+	tool.Equipped:Connect(function()
+		local parent = tool.Parent
+		if parent and parent:IsA("Model") then
+			worn = parent
+			attachFuelTank(parent)
+		end
+	end)
+	tool.Unequipped:Connect(function()
+		if worn then
+			detachFuelTank(worn)
+			worn = nil
+		end
+	end)
+	tool.Destroying:Connect(function()
+		if worn then
+			detachFuelTank(worn)
+			worn = nil
+		end
+	end)
+end
+
 local function buildFlamethrowerTool(id)
 	local cfg = Config.Weapons[id]
 	local tool = prepareLootTool(id)
@@ -747,28 +775,6 @@ local function buildFlamethrowerTool(id)
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
-
-	-- Al sacarlo aparece la mochila de combustible en la espalda
-	local worn = nil
-	tool.Equipped:Connect(function()
-		local parent = tool.Parent
-		if parent and parent:IsA("Model") then
-			worn = parent
-			attachFuelTank(parent)
-		end
-	end)
-	tool.Unequipped:Connect(function()
-		if worn then
-			detachFuelTank(worn)
-			worn = nil
-		end
-	end)
-	tool.Destroying:Connect(function()
-		if worn then
-			detachFuelTank(worn)
-			worn = nil
-		end
-	end)
 	return tool
 end
 
@@ -941,6 +947,7 @@ function ToolService.give(player, only)
 		end
 		if allowed then
 			local clone = template:Clone()
+			wireTool(clone)
 			clone.Parent = backpack
 		end
 	end
@@ -992,7 +999,9 @@ function ToolService.giveTool(player, toolId)
 	end
 	for _, template in ipairs(folder:GetChildren()) do
 		if template:GetAttribute("ToolId") == toolId then
-			template:Clone().Parent = backpack
+			local clone = template:Clone()
+			wireTool(clone)
+			clone.Parent = backpack
 			return
 		end
 	end
