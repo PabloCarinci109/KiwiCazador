@@ -2030,6 +2030,10 @@ function GameManager.init()
 		if not session or type(toolId) ~= "string" then
 			return
 		end
+		-- Noqueado: no puede disparar ni usar herramientas hasta volver
+		if session.knocked[player] then
+			return
+		end
 		if toolId ~= "red" and toolId ~= "rifle" and toolId ~= "rastreador"
 			and toolId ~= "trampa" and toolId ~= "pintura" and toolId ~= "relente"
 			and Config.Weapons[toolId] == nil then

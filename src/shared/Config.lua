@@ -551,13 +551,14 @@ Config.Asedio = {
 	nestRadius = 46,        -- el kiwi no se aleja mas de esto de su casa
 	attackSpawn = 100,      -- a que distancia del nido aparecen los Cazadores
 	revolverUses = 40,      -- tiros de revolver que recibe cada cazador
+	paintDamage = 11,       -- la pintura tambien lastima un poco en este modo
 	reward = 60,            -- monedas por capturar al kiwi
 	winBonus = 240,         -- monedas por ganar la partida
 	teamAttack = "Cazadores",
 	teamDefend = "Defensores",
 	colorAttack = Color3.fromRGB(226, 116, 74),
 	colorDefend = Color3.fromRGB(88, 164, 240),
-	toolsAttack = { "red", "rastreador", "pintura" },
+	toolsAttack = { "red", "rifle", "rastreador", "pintura" },
 	toolsDefend = { "pintura", "rastreador" },
 }
 

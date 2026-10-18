@@ -198,6 +198,14 @@ local function applySpeed()
 		return
 	end
 
+	-- Noqueado (asedio y otros modos): quieto hasta volver al combate
+	if state.hp and state.hp <= 0 then
+		hum.WalkSpeed = 0
+		hum.JumpPower = 0
+		hum.UseJumpPower = true
+		return
+	end
+
 	hum.JumpPower = 50
 	hum.UseJumpPower = true
 	if sneaking then
@@ -599,6 +607,7 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 	state.diff = diffFor(newState.modeId)
 	state.hidden = newState.hidden == true
 	state.hideSpot = newState.hideSpot
+	state.hp = newState.hp
 	if newState.vote then
 		HUD.showVote(newState.vote)
 	else
@@ -920,7 +929,11 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 			setScope(false)
 			firstPerson = false
 			sound2D(Config.Sounds.lose, 0.8)
-			HUD.death("¡TE NOQUEARON!", "Vuelves al lobby...")
+			if state.modeId == "asedio" then
+				HUD.death("¡TE NOQUEARON!", "Volvés al combate en unos segundos...")
+			else
+				HUD.death("¡TE NOQUEARON!", "Vuelves al lobby...")
+			end
 		end
 	end
 end)

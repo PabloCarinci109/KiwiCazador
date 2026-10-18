@@ -901,6 +901,10 @@ function Actions.resolvePaint(session, shot, hit, victim)
 	if victim and victim ~= shot.player and session.stats[victim] then
 		Actions.paintPlayer(session, victim, shot.player, hit.Position, shot.color)
 		session:event("painthit", { pos = hit.Position, color = Util.colorToTable(shot.color) })
+		-- En Asedio la pintura tambien lastima un poco (el fuego amigo sigue bloqueado)
+		if session.isAsedio then
+			session:damagePlayer(victim, shot.player, "pintura", Config.Asedio.paintDamage or 11, hit.Position)
+		end
 		return
 	end
 
