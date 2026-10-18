@@ -849,6 +849,18 @@ local function buildCounterTool(id)
 		Material = Enum.Material.Metal,
 		Parent = tool,
 	})
+	-- M4A1: silenciador bien largo al frente del cañón (tiros casi mudos)
+	if id == "m4" then
+		weldPiece(handle, {
+			Name = "Silenciador",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.95, spec.bore + 0.14, spec.bore + 0.14),
+			CFrame = handle.CFrame * CFrame.new(0, 0.62, -(spec.len + 0.8)) * CFrame.Angles(0, math.rad(90), 0),
+			Color = Color3.fromRGB(30, 32, 38),
+			Material = Enum.Material.Metal,
+			Parent = tool,
+		})
+	end
 	weldPiece(handle, {
 		Name = "Culata",
 		Size = Vector3.new(0.22, spec.stockY or 0.42, 0.85),
@@ -868,13 +880,86 @@ local function buildCounterTool(id)
 	return tool
 end
 
+-- Granadas del pack de los baúles (frag, humo, molotov y flash):
+-- cuerpo chico con palanca y, en el molotov, la botella con el trapo.
+local function buildNadeTool(id)
+	local cfg = Config.Grenades[id]
+	local tool = Instance.new("Tool")
+	tool.Name = cfg.name
+	tool.ToolTip = cfg.tooltip or "Granada de baúl: usos limitados"
+	tool.CanBeDropped = false
+	tool.RequiresHandle = true
+	tool.Grip = CFrame.new(0, -0.15, 0.5) * CFrame.Angles(math.rad(-90), 0, 0)
+	tool:SetAttribute("ToolId", id)
+	tool:SetAttribute("Loot", true)
+	tool:SetAttribute("Uses", cfg.uses)
+
+	local handle = newHandle({
+		Size = Vector3.new(0.2, 0.5, 0.2),
+		Color = cfg.color,
+		Material = Enum.Material.Metal,
+		Parent = tool,
+	})
+
+	if id == "molotov" then
+		weldPiece(handle, {
+			Name = "Botella",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.0, 0.48, 0.48),
+			CFrame = handle.CFrame * CFrame.new(0, 0.7, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = cfg.color,
+			Material = Enum.Material.Glass,
+			Parent = tool,
+		})
+		weldPiece(handle, {
+			Name = "Trapo",
+			Size = Vector3.new(0.22, 0.22, 0.3),
+			CFrame = handle.CFrame * CFrame.new(0, 1.28, 0),
+			Color = Color3.fromRGB(255, 176, 70),
+			Material = Enum.Material.Neon,
+			Parent = tool,
+		})
+	else
+		weldPiece(handle, {
+			Name = "Cuerpo",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.62, 0.62, 0.62),
+			CFrame = handle.CFrame * CFrame.new(0, 0.66, 0),
+			Color = cfg.color,
+			Material = Enum.Material.Metal,
+			Parent = tool,
+		})
+		weldPiece(handle, {
+			Name = "Palanca",
+			Size = Vector3.new(0.42, 0.07, 0.09),
+			CFrame = handle.CFrame * CFrame.new(0.06, 1.02, 0),
+			Color = Color3.fromRGB(184, 188, 194),
+			Material = Enum.Material.Metal,
+			Parent = tool,
+		})
+		if id == "flash" then
+			weldPiece(handle, {
+				Name = "Agujeros",
+				Size = Vector3.new(0.4, 0.09, 0.4),
+				CFrame = handle.CFrame * CFrame.new(0, 0.99, 0),
+				Color = Color3.fromRGB(58, 60, 66),
+				Material = Enum.Material.Metal,
+				Parent = tool,
+			})
+		end
+	end
+	return tool
+end
+
 local function buildLootTool(parent, id)
-	if not Config.Weapons[id] then
+	if not Config.Weapons[id] and not (Config.Grenades and Config.Grenades[id]) then
 		return nil
 	end
 
 	local tool
-	if id == "revolver" then
+	if Config.Grenades and Config.Grenades[id] then
+		tool = buildNadeTool(id)
+	elseif id == "revolver" then
 		tool = buildRevolverTool(id)
 	elseif id == "arco" then
 		tool = buildBowTool(id)
@@ -894,6 +979,10 @@ end
 
 local function buildLootTools(parent)
 	for _, entry in ipairs(Config.Loot.weapons) do
+		buildLootTool(parent, entry.id)
+	end
+	-- Las granadas del pack también viven en la carpeta de plantillas
+	for _, entry in ipairs(Config.GrenadePack or {}) do
 		buildLootTool(parent, entry.id)
 	end
 end
@@ -1057,6 +1146,14 @@ function ToolService.giveLoot(player, toolId, uses)
 				end
 			end
 		end
+	end
+end
+
+-- Pack de granadas del baúl: deja el arsenal completo en la mochila
+-- (1 fragmentación, 1 humo, 1 molotov y 2 flashes)
+function ToolService.giveNadePack(player)
+	for _, entry in ipairs(Config.GrenadePack or {}) do
+		ToolService.giveLoot(player, entry.id, entry.uses)
 	end
 end
 

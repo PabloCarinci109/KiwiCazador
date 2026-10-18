@@ -16,6 +16,8 @@ end
 local GameManager = require(modulos.GameManager)
 local Weather = require(modulos.Weather)
 local Destruction = require(modulos.Destruction)
+local Actions = require(modulos.Actions)
+local Config = require(modulos.Shared.Config)
 
 local pruebas, fallos = 0, 0
 
@@ -70,6 +72,19 @@ local function tieneTool(player, toolId)
 		end
 	end
 	return false
+end
+
+local function usosDe(player, toolId)
+	for _, container in ipairs({ player:FindFirstChildOfClass("Backpack"), player.Character }) do
+		if container then
+			for _, item in ipairs(container:GetChildren()) do
+				if item:IsA("Tool") and item:GetAttribute("ToolId") == toolId then
+					return item:GetAttribute("Uses") or 0
+				end
+			end
+		end
+	end
+	return 0
 end
 
 local function correrModo(player, modeId, extra)
@@ -137,6 +152,34 @@ local function extrasSolo(sesion)
 		sesion:openChest(player, chest)
 		check(chest.used == true, "solo: el baul entrega un arma")
 		check(sesion.stats[player].lastLoot ~= nil, "solo: arma asignada")
+		check(tieneTool(player, "frag") and tieneTool(player, "humo")
+			and tieneTool(player, "molotov") and tieneTool(player, "flash"),
+			"solo: el baul entrega el pack de granadas")
+		check(usosDe(player, "flash") == 2, "solo: la flash viene con 2 usos")
+		-- Lanzar una granada de humo: vuela con fisica y detona sola
+		local rootGranada = raizDe(player)
+		if rootGranada then
+			local okTiro = pcall(function()
+				Actions.throwNade(sesion, player, "humo", Config.Grenades.humo,
+					rootGranada.Position + Vector3.new(0, 2, 0), Vector3.new(0, 0.35, -1).Unit)
+			end)
+			check(okTiro, "solo: la granada se lanza sin errores")
+			local volando = false
+			for _, p in ipairs(sesion.projectiles or {}) do
+				if p.kind == "grenade" then
+					volando = true
+				end
+			end
+			check(volando, "solo: la granada quedo volando con fisica")
+			task.wait(2.4)
+			local quedo = false
+			for _, p in ipairs(sesion.projectiles or {}) do
+				if p.kind == "grenade" then
+					quedo = true
+				end
+			end
+			check(not quedo, "solo: la granada detono sola con la mecha")
+		end
 	end
 	local antes = sesion.stats[player].hp
 	sesion:damagePlayer(player, nil, "prueba", 15, nil, "prueba")

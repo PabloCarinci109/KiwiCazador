@@ -220,7 +220,13 @@ local function buildAK()
 end
 
 local function buildM4()
-	return buildRifle(Color3.fromRGB(72, 80, 94), Color3.fromRGB(90, 130, 190))
+	local model = buildRifle(Color3.fromRGB(72, 80, 94), Color3.fromRGB(90, 130, 190))
+	-- M4A1 con silenciador: caño grueso y largo al frente del cañón
+	piece(model, Vector3.new(0.42, 0.42, 0.22), CFrame.new(0, 0.06, -4.05), Color3.fromRGB(52, 55, 62))
+	piece(model, Vector3.new(0.34, 0.34, 1.45), CFrame.new(0, 0.06, -4.88), Color3.fromRGB(30, 32, 36))
+	piece(model, Vector3.new(0.4, 0.4, 0.16), CFrame.new(0, 0.06, -5.66), Color3.fromRGB(48, 50, 56))
+	model.muzzle = Vector3.new(0, 0.06, -5.78)
+	return model
 end
 
 local function buildMP5()
@@ -258,6 +264,44 @@ local function buildEscopeta()
 	return model
 end
 
+-- Granadas del pack de los baúles (se ven en la mano y se lanzan con clic)
+local function buildFrag()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.46, 0.56, 0.46), CFrame.new(0, 0, 0), Color3.fromRGB(110, 122, 84))
+	piece(model, Vector3.new(0.14, 0.14, 0.14), CFrame.new(0, 0.34, 0), Color3.fromRGB(64, 68, 54))
+	piece(model, Vector3.new(0.4, 0.06, 0.08), CFrame.new(0.1, 0.34, 0), Color3.fromRGB(190, 192, 198))
+	model.muzzle = Vector3.new(0, 0.3, -0.2)
+	return model
+end
+
+local function buildHumo()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.4, 0.62, 0.4), CFrame.new(0, 0, 0), Color3.fromRGB(148, 156, 164))
+	piece(model, Vector3.new(0.16, 0.1, 0.16), CFrame.new(0, 0.36, 0), Color3.fromRGB(96, 102, 110))
+	piece(model, Vector3.new(0.44, 0.06, 0.44), CFrame.new(0, 0.1, 0), Color3.fromRGB(120, 190, 220), Enum.Material.SmoothPlastic)
+	piece(model, Vector3.new(0.44, 0.06, 0.44), CFrame.new(0, -0.14, 0), Color3.fromRGB(120, 190, 220), Enum.Material.SmoothPlastic)
+	model.muzzle = Vector3.new(0, 0.3, -0.2)
+	return model
+end
+
+local function buildMolotov()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.34, 0.7, 0.34), CFrame.new(0, 0, 0), Color3.fromRGB(196, 108, 54))
+	piece(model, Vector3.new(0.16, 0.24, 0.16), CFrame.new(0, 0.46, 0), Color3.fromRGB(168, 92, 46))
+	piece(model, Vector3.new(0.26, 0.26, 0.26), CFrame.new(0, 0.7, 0), Color3.fromRGB(255, 176, 70), Enum.Material.Neon)
+	model.muzzle = Vector3.new(0, 0.5, -0.2)
+	return model
+end
+
+local function buildFlash()
+	local model = { pieces = {} }
+	piece(model, Vector3.new(0.38, 0.6, 0.38), CFrame.new(0, 0, 0), Color3.fromRGB(206, 208, 214))
+	piece(model, Vector3.new(0.3, 0.16, 0.3), CFrame.new(0, 0.38, 0), Color3.fromRGB(120, 124, 132))
+	piece(model, Vector3.new(0.12, 0.12, 0.12), CFrame.new(0, 0.52, 0), Color3.fromRGB(90, 94, 102))
+	model.muzzle = Vector3.new(0, 0.4, -0.2)
+	return model
+end
+
 local BUILDERS = {
 	rifle = function() return buildRifle(nil, nil) end,
 	pintura = function() return buildRifle(Color3.fromRGB(120, 84, 108), Color3.fromRGB(230, 120, 190)) end,
@@ -274,6 +318,11 @@ local BUILDERS = {
 	mp5 = buildMP5,
 	glock = buildGlock,
 	escopeta = buildEscopeta,
+	-- Granadas del pack de los baúles
+	frag = buildFrag,
+	humo = buildHumo,
+	molotov = buildMolotov,
+	flash = buildFlash,
 }
 
 -- ===============================================================
@@ -395,6 +444,13 @@ function ViewModel.slash()
 	end
 end
 
+-- Lanzar granada: el brazo va para adelante y suelta la granada
+function ViewModel.toss()
+	if visible and not hiddenByScope then
+		FX = { kind = "toss", t = 0, dur = 0.3 }
+	end
+end
+
 function ViewModel.hasWeapon(id)
 	return BUILDERS[id or currentId] ~= nil
 end
@@ -501,6 +557,11 @@ local function stepUnbound(dt)
 			local swipe = math.sin(math.pi * raw)
 			animCF = CFrame.Angles(math.rad(-16 * swipe), math.rad(-150 * swipe), math.rad(30 * swipe))
 				* CFrame.new(0, 0.05 * swipe, -0.35 * swipe)
+		elseif FX.kind == "toss" then
+			-- Tiro de granada: el brazo sube y va para adelante
+			local swipe = math.sin(math.pi * raw)
+			animCF = CFrame.Angles(math.rad(-52 * swipe), 0, math.rad(-18 * swipe))
+				* CFrame.new(0, 0.12 * swipe, -0.5 * swipe)
 		elseif FX.kind == "inspect" then
 			local e = raw * raw * (3 - 2 * raw)
 			animCF = CFrame.Angles(0, 0, math.rad(720) * (1 - e))

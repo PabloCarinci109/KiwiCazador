@@ -419,6 +419,42 @@ function Session:damagePlayer(victim, attacker, weaponName, amount, pos, sourceL
 	end
 end
 
+-- Dardo tranquilizante: deja inmovil al cazador unos segundos. El estado
+-- viaja como atributo "Dormido" en el Humanoid: asi el gobernador de
+-- velocidad (cliente y servidor) lo respeta y no puede esquivarlo.
+function Session:stun(victim, seconds, attacker)
+	if not self.stats[victim] or self.knocked[victim] then
+		return false
+	end
+	local character = victim.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return false
+	end
+
+	seconds = seconds or (Config.Tranq and Config.Tranq.stunTime) or 3
+	humanoid:SetAttribute("Dormido", true)
+	setFrozen(victim, true)
+
+	task.delay(seconds, function()
+		if humanoid.Parent then
+			humanoid:SetAttribute("Dormido", false)
+			if not self.knocked[victim] then
+				setFrozen(victim, false)
+			end
+		end
+	end)
+
+	local vname = victim.DisplayName ~= "" and victim.DisplayName or victim.Name
+	if attacker and attacker ~= victim then
+		local aname = attacker.DisplayName ~= "" and attacker.DisplayName or attacker.Name
+		self:notifyAll(string.format(Config.Text.TranqShout, aname, vname), Color3.fromRGB(160, 230, 170), 3)
+	else
+		self:notifyAll(string.format(Config.Text.TranqShout, "El dardo", vname), Color3.fromRGB(160, 230, 170), 3)
+	end
+	return true
+end
+
 function Session:knockout(victim, attacker)
 	if self.knocked[victim] or not self.stats[victim] then
 		return
@@ -1697,8 +1733,12 @@ function Session:lootChest(player, chest)
 	end
 	ToolService.giveLoot(player, pick.id, pick.uses or Config.Loot.uses)
 
+	-- Ademas del arma, cada baul suelta el pack de granadas
+	ToolService.giveNadePack(player)
+
 	local cfg = Config.Weapons[pick.id]
 	self:notify(player, string.format(Config.Text.ChestLoot, cfg.name, pick.uses or Config.Loot.uses), cfg.color, 5)
+	self:notify(player, Config.Text.ChestPack, Color3.fromRGB(188, 198, 210), 5)
 	self:event("chestopen", { pos = chest.center })
 	self:sendUpdate(player)
 end
@@ -2132,7 +2172,8 @@ function GameManager.init()
 		end
 		if toolId ~= "red" and toolId ~= "rifle" and toolId ~= "rastreador"
 			and toolId ~= "trampa" and toolId ~= "pintura" and toolId ~= "relente"
-			and Config.Weapons[toolId] == nil then
+			and Config.Weapons[toolId] == nil
+			and (Config.Grenades == nil or Config.Grenades[toolId] == nil) then
 			return
 		end
 		local ok, err = pcall(Actions.run, session, player, toolId, data)

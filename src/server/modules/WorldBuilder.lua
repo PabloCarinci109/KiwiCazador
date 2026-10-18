@@ -2294,16 +2294,9 @@ local function buildArena(index, zone, cfg, parent, rng)
 
 	self.kiwiSpawn = center + Vector3.new(rng:NextNumber(-45, 45), 0, rng:NextNumber(-45, 45))
 
-	local sign = part({
-		Name = "LetreroZona",
-		Size = Vector3.new(1, 12, 22),
-		CFrame = CFrame.new(center + Vector3.new(0, 6, -half + 26)),
-		Color = Color3.fromRGB(42, 38, 34),
-		Material = Enum.Material.WoodPlanks,
-		CanCollide = true,
-		Parent = folder,
-	})
-	billboardText(sign, zone.name, Color3.fromRGB(236, 230, 214), 16)
+	-- Leyenda del mapa: era un cartel gigante con el nombre de la zona
+	-- ("Alpes del Sur", etc.) plantado en la arena. Se saco de todos los
+	-- mapas: una vez que arranca el juego no tiene que verse mas.
 
 	-- Zona segura (meta del modo Colosal): el refugio circular del centro
 	local zoneRadius = (cfg.SafeZone and cfg.SafeZone.radius) or 15

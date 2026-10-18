@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.9.2"
+Config.Version = "1.9.3"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -280,6 +280,65 @@ Config.Loot = {
 	},
 }
 
+-- Granadas del pack de los baúles (humo, fragmentación, molotov y flash).
+-- Se lanzan con clic: el proyectil vuela con gravedad, rebota y detona
+-- solo con la mecha; el molotov se rompe al primer golpe.
+Config.Grenades = {
+	frag = {
+		name = "Granada de fragmentación",
+		tooltip = "Explota y empuja a quien esté cerca",
+		color = Color3.fromRGB(110, 122, 84),
+		uses = 1,
+		cooldown = 0.9,    -- espera entre lanzamientos
+		speed = 80,        -- velocidad de salida
+		lift = 0.30,       -- cuanto sube el brazo al tirar
+		fuse = 2.2,        -- mecha antes de explotar
+		radius = 17,       -- radio de la explosion
+		damage = 62,       -- daño en el centro (baja con la distancia)
+		knockback = 44,    -- empujon a quien este cerca
+		slowFactor = 0.5, slowTime = 1.2,
+	},
+	humo = {
+		name = "Granada de humo",
+		tooltip = "Levanta una nube que tapa la vista",
+		color = Color3.fromRGB(148, 156, 164),
+		uses = 1,
+		cooldown = 0.9,
+		speed = 80, lift = 0.30,
+		fuse = 1.6,
+		radius = 13, time = 14,
+	},
+	molotov = {
+		name = "Molotov",
+		tooltip = "Se rompe al golpear y prende fuego el piso",
+		color = Color3.fromRGB(194, 108, 54),
+		uses = 1,
+		cooldown = 0.9,
+		speed = 76, lift = 0.28,
+		radius = 10, time = 6.5,
+		burnDamage = 9, burnEvery = 1,
+	},
+	flash = {
+		name = "Flashbang",
+		tooltip = "Ciega a quien la mire de cerca",
+		color = Color3.fromRGB(214, 216, 222),
+		uses = 2,
+		cooldown = 0.8,
+		speed = 84, lift = 0.30,
+		fuse = 1.5,
+		radius = 30, maxTime = 4,
+	},
+}
+
+-- Lo que suelta cada baúl ademas del arma (el pack pedido):
+-- 1 fragmentación, 1 humo, 1 molotov y 2 flashes
+Config.GrenadePack = {
+	{ id = "frag", uses = 1 },
+	{ id = "humo", uses = 1 },
+	{ id = "molotov", uses = 1 },
+	{ id = "flash", uses = 2 },
+}
+
 Config.Weapons = {
 	cohete = {
 		name = "Lanzamisiles",
@@ -337,6 +396,7 @@ Config.Weapons = {
 		life = 5,
 		blast = 0,
 		damage = 100,   -- estilo Counter (AWP): un disparo y a la lona
+		oneShot = true, -- a los rivales los noquea de un solo disparo
 		knockback = 58,
 		slowFactor = 0.30,
 		slowTime = 2.0,
@@ -443,6 +503,9 @@ Config.Weapons = {
 		slowFactor = 0.55,
 		slowTime = 1.3,
 		size = Vector3.new(0.30, 0.30, 1.2),
+		-- Clic derecho: modo ráfaga de 3 tiros (estilo CS2). La Glock no
+		-- tiene mira: solo los rifles apuntan.
+		burst = { shots = 3, gap = 0.07, cooldown = 0.95, cone = 1.2 },
 	},
 	escopeta = {
 		name = "Escopeta",
@@ -471,6 +534,12 @@ Config.KiwiPeck = {
 	range = 7,         -- distancia para que te alcance el pico
 	cooldown = 1.5,    -- cada cuanto puede picar si seguis encima
 	knockback = 34,    -- empujon al jugador picoteado
+}
+
+-- Dardo tranquilizante: al kiwi lo duerme; a un cazador rival lo deja
+-- inmovil unos segundos (tiempo pedido: 3)
+Config.Tranq = {
+	stunTime = 3,      -- segundos sin poder moverse al recibir un dardo
 }
 
 -- Vida de la ciudad (solo el mapa Ciudad de Auckland): calles con autos,
@@ -767,10 +836,17 @@ Config.Text = {
 	HideBusy = "¡Ya hay alguien escondido ahí!",
 	HideEscape = "¡El kiwi husmeó tu escondite y escapaste! +%d monedas",
 	ChestLoot = "¡Encontraste: %s! (%d usos)",
+	ChestPack = "¡Pack de granadas: fragmentación, humo, molotov y 2 flashes!",
 	AsedioChests = "Cada equipo tiene su baúl: una sola arma por jugador y por ronda",
 	ChestTeamWrong = "Ese es el baúl de los %s: busca el de tu equipo",
 	ChestTeamDone = "Ya sacaste tu arma de este baúl (una por ronda)",
 	WeaponOut = "Se te acabó: %s",
+	GlockBurstOn = "Glock-18: MODO RÁFAGA de 3 (clic derecho para volver a tiro a tiro)",
+	GlockBurstOff = "Glock-18: tiro a tiro (clic derecho para ráfaga de 3, estilo CS2)",
+	TranqHit = "¡Dardo tranquilizante a %s! Queda inmovil 3 segundos.",
+	TranqVictim = "¡Te dio un dardo tranquilizante! No te podes mover 3 segundos.",
+	TranqShout = "¡%s durmió a %s de un dardo!",
+	FlashHit = "¡TE CEGÓ LA FLASH! (%d s)",
 	BoomShout = "¡%s disparó el %s!",
 	TankBoom = "¡%s le voló la mochila de combustible a %s!",
 	BoomHit = "¡Le diste con el %s!",

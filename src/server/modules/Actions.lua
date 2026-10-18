@@ -237,9 +237,20 @@ function Actions.rifle(session, player, data)
 
 	if hit then
 		local kiwi = session.kiwi
+		local other = hit.Instance:FindFirstAncestorOfClass("Model")
+		local victim = other and Players:GetPlayerFromCharacter(other)
 		if kiwi and not kiwi.defeated and hit.Instance:IsDescendantOf(kiwi.model) then
 			if kiwi:sedate(session.diff.kiwi.sedateTime, player) then
 				session:notify(player, Config.Text.DartHit, Color3.fromRGB(160, 230, 170))
+				session:event("darthit", { pos = hit.Position })
+			end
+		elseif victim and victim ~= player and not friendlyShot(session, player, victim) then
+			-- Dardo a un cazador rival: lo deja inmovil unos segundos
+			local stunTime = (Config.Tranq and Config.Tranq.stunTime) or 3
+			if session:stun(victim, stunTime, player) then
+				local vname = victim.DisplayName ~= "" and victim.DisplayName or victim.Name
+				session:notify(player, string.format(Config.Text.TranqHit, vname), Color3.fromRGB(160, 230, 170))
+				session:notify(victim, Config.Text.TranqVictim, Color3.fromRGB(160, 230, 170))
 				session:event("darthit", { pos = hit.Position })
 			end
 		else
@@ -304,9 +315,54 @@ end
 -- ===============================================================
 -- ARMAS DE BAUL (lanzamisiles, revolver, arco): proyectiles con empujon
 -- ===============================================================
+-- Un disparo suelto de arma de baul (lo usan los 3 tiros de la Glock).
+-- extraCone: grados de apertura extra para los tiros 2 y 3 de la rafaga.
+function Actions.spawnWeaponDart(session, player, weaponId, cfg, root, data, extraCone)
+	local character = player.Character
+	if not character or not root then
+		return
+	end
+	local muzzle, dir = aimDirection(player, root, data)
+	dir = Actions.applySpread(dir, weaponId, root, data)
+	if extraCone and extraCone > 0 then
+		dir = Actions.coneDirection(dir, extraCone)
+	end
+
+	local dartPart = Util.makePart({
+		Name = "Proyectil",
+		ClassName = "Part",
+		Size = cfg.size or Vector3.new(0.4, 0.4, 1.6),
+		Color = cfg.color,
+		Material = Enum.Material.Neon,
+		Anchored = true,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CFrame = CFrame.lookAt(muzzle + dir * 1.2, muzzle + dir * 2.2),
+		Parent = workspace,
+	})
+	Util.destroyAfter(dartPart, 6)
+
+	table.insert(session.projectiles, {
+		kind = "weapon",
+		weaponId = weaponId,
+		part = dartPart,
+		pos = muzzle + dir * 1.2,
+		dir = dir,
+		speed = cfg.speed,
+		life = cfg.life,
+		player = player,
+		params = Actions.makeDartParams(character, dartPart),
+	})
+
+	session:event("dartshot", { pos = muzzle, dir = dir, weapon = weaponId })
+	session:event("weaponfx", { weapon = weaponId, pos = muzzle, dir = dir })
+end
+
 function Actions.fireWeapon(session, player, weaponId, data)
+	local nadeCfg = Config.Grenades and Config.Grenades[weaponId]
 	local cfg = Config.Weapons[weaponId]
-	if not cfg then
+	if not cfg and not nadeCfg then
 		return
 	end
 
@@ -327,6 +383,12 @@ function Actions.fireWeapon(session, player, weaponId, data)
 	end
 
 	local muzzle, dir = aimDirection(player, root, data)
+
+	-- Granadas del pack de los baules: se lanzan con arco y detonan solas
+	if nadeCfg then
+		Actions.throwNade(session, player, weaponId, nadeCfg, muzzle, dir)
+		return
+	end
 
 	-- Cuchillo: zarpazo cuerpo a cuerpo (sin proyectil)
 	if cfg.melee then
@@ -350,6 +412,29 @@ function Actions.fireWeapon(session, player, weaponId, data)
 	if weaponId == "sniper" then
 		Actions.sniperShot(session, player, cfg, muzzle, dir, data)
 		ToolService.startCooldown(player, weaponId, cfg.cooldown)
+		ToolService.consumeLoot(player, weaponId)
+		return
+	end
+
+	-- Glock-18 en ráfaga de 3 (estilo CS2): el clic derecho manda
+	-- data.burst y salen tres tiros en cadencia corta por gatillo.
+	if weaponId == "glock" and data.burst then
+		local burst = cfg.burst or {}
+		local shots = math.max(2, burst.shots or 3)
+		Actions.spawnWeaponDart(session, player, weaponId, cfg, root, data, 0)
+		for i = 2, shots do
+			task.delay((burst.gap or 0.07) * (i - 1), function()
+				if session.phase ~= "playing" or not player.Parent then
+					return
+				end
+				local _, nowRoot = getRoot(player)
+				if nowRoot then
+					Actions.spawnWeaponDart(session, player, weaponId, cfg, nowRoot, data,
+						(burst.cone or 1.2) * (i - 1))
+				end
+			end)
+		end
+		ToolService.startCooldown(player, weaponId, burst.cooldown or 0.95)
 		ToolService.consumeLoot(player, weaponId)
 		return
 	end
@@ -473,7 +558,9 @@ function Actions.sniperShot(session, player, cfg, muzzle, dir, data)
 	end
 
 	if victim and victim ~= player then
-		session:damagePlayer(victim, player, cfg.name, cfg.damage, pos)
+		-- El francotirador noquea de un solo disparo al rival (regla pedida)
+		local damage = cfg.oneShot and 999 or cfg.damage
+		session:damagePlayer(victim, player, cfg.name, damage, pos)
 		local _, vroot = getRoot(victim)
 		if vroot then
 			local push = flat(dir).Unit * (cfg.knockback or 58)
@@ -861,80 +948,342 @@ function Actions.weaponHit(session, dart, pos, victim, hitPart)
 	end
 end
 
+-- ===============================================================
+-- GRANADAS DEL PACK (fragmentacion, humo, molotov y flash)
+-- ===============================================================
+local GRENADE_GRAVITY = (Config.World and Config.World.Gravity) or 165
+
+-- Nube de humo: esferas ancladas que tapan la vista pero dejan pasar los
+-- tiros (los rayos las ignoran). Se disipa sola a los pocos segundos.
+local function smokeCloud(pos)
+	local cfg = Config.Grenades.humo
+	local parts = {}
+	for i = 1, 20 do
+		local angle = math.random() * math.pi * 2
+		local dist = math.sqrt(math.random()) * cfg.radius
+		local size = math.random(80, 150) / 10
+		local part = Util.makePart({
+			Name = "Humo",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(size, size, size),
+			Color = Color3.fromRGB(212, 216, 220),
+			Material = Enum.Material.SmoothPlastic,
+			Transparency = 0.42,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.new(pos + Vector3.new(math.cos(angle) * dist, math.random(0, 9) - 1, math.sin(angle) * dist)),
+			Parent = workspace,
+		})
+		table.insert(parts, part)
+	end
+	task.delay(cfg.time, function()
+		for _ = 1, 12 do
+			task.wait(0.12)
+			for _, p in ipairs(parts) do
+				if p and p.Parent then
+					p.Transparency = math.min(1, p.Transparency + 0.05)
+				end
+			end
+		end
+		for _, p in ipairs(parts) do
+			if p and p.Parent then
+				p:Destroy()
+			end
+		end
+	end)
+end
+
+-- Molotov: lengua de fuego en el piso que quema a quien se quede adentro
+local function fireZone(session, thrower, pos)
+	local cfg = Config.Grenades.molotov
+	local parts = {}
+	for i = 1, 12 do
+		local angle = math.random() * math.pi * 2
+		local dist = math.sqrt(math.random()) * (cfg.radius * 0.6)
+		local size = math.random(20, 34) / 10
+		local part = Util.makePart({
+			Name = "Llama",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(size, size * 1.7, size),
+			Color = Color3.fromRGB(255, 128, 48),
+			Material = Enum.Material.Neon,
+			Transparency = 0.15,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.new(pos + Vector3.new(math.cos(angle) * dist, 0.7, math.sin(angle) * dist)),
+			Parent = workspace,
+		})
+		table.insert(parts, part)
+	end
+
+	local endsAt = os.clock() + cfg.time
+	local nextBurn = 0
+	task.spawn(function()
+		while os.clock() < endsAt do
+			task.wait(0.22)
+			for _, p in ipairs(parts) do
+				if p and p.Parent then
+					p.Transparency = 0.05 + math.random() * 0.4
+				end
+			end
+			if os.clock() >= nextBurn then
+				nextBurn = os.clock() + cfg.burnEvery
+				for _, other in ipairs(session.players) do
+					local _, otherRoot = getRoot(other)
+					if otherRoot and not session.knocked[other] then
+						local away = otherRoot.Position - pos
+						local flatAway = Vector3.new(away.X, 0, away.Z)
+						if math.abs(away.Y) < 8 and flatAway.Magnitude <= cfg.radius then
+							if other == thrower or not friendlyShot(session, thrower, other) then
+								session:damagePlayer(other, thrower, cfg.name, cfg.burnDamage, pos)
+							end
+						end
+					end
+				end
+			end
+		end
+		for _, p in ipairs(parts) do
+			if p and p.Parent then
+				p:Destroy()
+			end
+		end
+	end)
+end
+
+-- Flashbang: pantalla blanca para quienes la ven sin pared en el medio
+local function flashBlast(session, pos)
+	local cfg = Config.Grenades.flash
+	for _, other in ipairs(session.players) do
+		local _, otherRoot = getRoot(other)
+		if otherRoot then
+			local away = otherRoot.Position - pos
+			local dist = away.Magnitude
+			if dist <= cfg.radius then
+				local params = Actions.makeDartParams(other.Character)
+				local blocked = workspace:Raycast(pos, away, params)
+				local dur = 0
+				if blocked then
+					-- Tapada por una pared: casi no molesta
+					dur = cfg.maxTime * 0.12
+				else
+					dur = math.clamp(cfg.maxTime * (1 - dist / cfg.radius), 0.8, cfg.maxTime)
+				end
+				if dur > 0.5 then
+					Net.get("WorldEvent"):FireClient(other, "flash", { dur = dur, pos = pos })
+				end
+			end
+		end
+	end
+end
+
+-- Fragmentación: daño con caída y empujón (también frena al kiwi)
+local function fragBlast(session, thrower, pos)
+	local cfg = Config.Grenades.frag
+	for _, other in ipairs(session.players) do
+		local _, otherRoot = getRoot(other)
+		if otherRoot then
+			local away = otherRoot.Position - pos
+			local dist = away.Magnitude
+			if dist <= cfg.radius then
+				local falloff = math.clamp(1 - (dist / cfg.radius) * 0.6, 0.4, 1)
+				if other == thrower or not friendlyShot(session, thrower, other) then
+					-- El que la tiró se lleva menos (55%) si se quedó encima
+					local amount = cfg.damage * falloff * (other == thrower and 0.55 or 1)
+					session:damagePlayer(other, thrower, cfg.name, amount, pos)
+				end
+				local pushDir = away.Magnitude > 0.05 and away.Unit or Vector3.new(0, 1, 0)
+				local push = pushDir * (cfg.knockback * falloff)
+				otherRoot.AssemblyLinearVelocity = Vector3.new(push.X, 22, push.Z)
+			end
+		end
+	end
+
+	local kiwi = session.kiwi
+	if kiwi and not kiwi.defeated and (kiwi:getPosition() - pos).Magnitude <= cfg.radius then
+		kiwi:slow(cfg.slowFactor or 0.5, cfg.slowTime or 1.2)
+	end
+end
+
+-- Detona la granada según su tipo y avisa a los clientes del efecto
+local function grenadeBoom(session, nade)
+	local pos = nade.pos
+	if nade.tipo == "frag" then
+		fragBlast(session, nade.player, pos)
+	elseif nade.tipo == "humo" then
+		smokeCloud(pos)
+	elseif nade.tipo == "molotov" then
+		fireZone(session, nade.player, pos)
+	elseif nade.tipo == "flash" then
+		flashBlast(session, pos)
+	end
+	session:event("nade", { pos = pos, tipo = nade.tipo })
+end
+
+-- Paso de una granada voladora: gravedad, rebotes y mecha
+function Actions.stepGrenade(session, nade, dt)
+	nade.vel = nade.vel + Vector3.new(0, -GRENADE_GRAVITY * dt, 0)
+	local move = nade.vel * dt
+	local pop = false
+	local pos = nade.pos + move
+	local hit = workspace:Raycast(nade.pos, move, nade.params)
+	if hit then
+		pos = hit.Position
+		if nade.rompe then
+			-- El molotov se rompe al primer golpe
+			pop = true
+		else
+			local n = hit.Normal
+			local v = nade.vel
+			nade.vel = (v - 2 * v:Dot(n) * n) * 0.4
+			pos = hit.Position + n * 0.3
+		end
+	end
+
+	nade.pos = pos
+	nade.fuse = (nade.fuse or 1.6) - dt
+	nade.spin = (nade.spin or 0) + dt * 9
+	if nade.part and nade.part.Parent then
+		nade.part.CFrame = CFrame.new(pos) * CFrame.Angles(nade.spin, nade.spin * 0.7, nade.spin * 1.3)
+	end
+
+	if nade.fuse <= 0 or pop then
+		grenadeBoom(session, nade)
+		nade.done = true
+	end
+end
+
+-- Lanzar una granada del pack: sale de la mano con un arco y cae sola
+function Actions.throwNade(session, player, weaponId, cfg, muzzle, dir)
+	local character = player.Character
+	if not character then
+		return
+	end
+	local startPos = muzzle + dir * 1.1 + Vector3.new(0, 0.15, 0)
+	local nade = Util.makePart({
+		Name = cfg.name,
+		ClassName = "Part",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.52, 0.52, 0.52),
+		Color = cfg.color,
+		Material = Enum.Material.Metal,
+		Anchored = true,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CFrame = CFrame.new(startPos),
+		Parent = workspace,
+	})
+	Util.destroyAfter(nade, (cfg.fuse or 2) + 2)
+
+	local vel = (dir + Vector3.new(0, cfg.lift or 0.3, 0)).Unit * (cfg.speed or 80)
+	table.insert(session.projectiles, {
+		kind = "grenade",
+		tipo = weaponId,
+		rompe = weaponId == "molotov",
+		part = nade,
+		pos = startPos,
+		vel = vel,
+		fuse = cfg.fuse or 2.2,
+		spin = 0,
+		player = player,
+		params = Actions.makeDartParams(character, nade),
+	})
+
+	ToolService.startCooldown(player, weaponId, cfg.cooldown or 0.9)
+	ToolService.consumeLoot(player, weaponId)
+	session:event("nadethrow", { pos = startPos, tipo = weaponId })
+end
+
 function Actions.stepProjectiles(session, dt)
 	local projectiles = session.projectiles
 	for i = #projectiles, 1, -1 do
 		local dart = projectiles[i]
-		local stepLen = dart.speed * dt
-		dart.life = dart.life - dt
 
-		local hit = workspace:Raycast(dart.pos, dart.dir * stepLen, dart.params)
-		local remove = false
-
-		if hit then
-			remove = true
-			if dart.kind == "paint" then
-				local character = hit.Instance:FindFirstAncestorOfClass("Model")
-				local victim = character and Players:GetPlayerFromCharacter(character)
-				Actions.resolvePaint(session, dart, hit, victim)
-			elseif dart.kind == "slow" then
-				local kiwi = session.kiwi
-				if kiwi and not kiwi.defeated and hit.Instance:IsDescendantOf(kiwi.model) then
-					kiwi:slow(Config.Relente.factor, Config.Relente.time)
-					local shooterName = dart.player.DisplayName ~= "" and dart.player.DisplayName or dart.player.Name
-					session:notify(dart.player, string.format(Config.Text.SlowHit, Config.Relente.time), Config.Tools.relente.color)
-					session:notifyAll(string.format(Config.Text.SlowAll, shooterName), Config.Tools.relente.color)
-					session:event("slowhit", { pos = hit.Position })
-				else
-					session:event("dartmiss", { pos = hit.Position, normal = hit.Normal })
-					session:notify(dart.player, Config.Text.SlowMiss, Color3.fromRGB(200, 200, 200))
+		-- Las granadas del pack vuelan aparte: gravedad, rebotes y mecha
+		if dart.kind == "grenade" then
+			Actions.stepGrenade(session, dart, dt)
+			if dart.done then
+				if dart.part and dart.part.Parent then
+					dart.part:Destroy()
 				end
-			elseif dart.kind == "weapon" then
-				local character = hit.Instance:FindFirstAncestorOfClass("Model")
-				local victim = character and Players:GetPlayerFromCharacter(character)
-				local cfg = Config.Weapons[dart.weaponId]
-				if cfg and cfg.stick then
-					-- La flecha queda clavada donde pego (se puede recoger)
-					Actions.stickArrow(session, dart, hit.Position, hit.Normal)
-				end
-				Actions.weaponHit(session, dart, hit.Position, victim, hit.Instance)
-			else
-				local kiwi = session.kiwi
-				if kiwi and not kiwi.defeated and hit.Instance:IsDescendantOf(kiwi.model) then
-					if kiwi:sedate(session.diff.kiwi.sedateTime, dart.player) then
-						session:notify(dart.player, Config.Text.DartHit, Color3.fromRGB(160, 230, 170))
-						session:event("darthit", { pos = hit.Position })
-					end
-				else
-					session:event("dartmiss", { pos = hit.Position, normal = hit.Normal })
-					session:notify(dart.player, Config.Text.DartMiss, Color3.fromRGB(200, 200, 200))
-					ToolService.startCooldown(dart.player, "rifle", session.diff.rifle.cooldownOnMiss)
-				end
+				table.remove(projectiles, i)
 			end
 		else
-			dart.pos = dart.pos + dart.dir * stepLen
-			if dart.life <= 0 then
-				-- Flechas: si se les acaba el vuelo, caen y se clavan en el piso
-				local cfg = dart.weaponId and Config.Weapons[dart.weaponId]
-				if cfg and cfg.stick then
-					local ground = workspace:Raycast(dart.pos, Vector3.new(0, -90, 0), dart.params)
-					if ground then
-						Actions.stickArrow(session, dart, ground.Position, ground.Normal)
+			local stepLen = dart.speed * dt
+			dart.life = dart.life - dt
+
+			local hit = workspace:Raycast(dart.pos, dart.dir * stepLen, dart.params)
+			local remove = false
+
+			if hit then
+				remove = true
+				if dart.kind == "paint" then
+					local character = hit.Instance:FindFirstAncestorOfClass("Model")
+					local victim = character and Players:GetPlayerFromCharacter(character)
+					Actions.resolvePaint(session, dart, hit, victim)
+				elseif dart.kind == "slow" then
+					local kiwi = session.kiwi
+					if kiwi and not kiwi.defeated and hit.Instance:IsDescendantOf(kiwi.model) then
+						kiwi:slow(Config.Relente.factor, Config.Relente.time)
+						local shooterName = dart.player.DisplayName ~= "" and dart.player.DisplayName or dart.player.Name
+						session:notify(dart.player, string.format(Config.Text.SlowHit, Config.Relente.time), Config.Tools.relente.color)
+						session:notifyAll(string.format(Config.Text.SlowAll, shooterName), Config.Tools.relente.color)
+						session:event("slowhit", { pos = hit.Position })
+					else
+						session:event("dartmiss", { pos = hit.Position, normal = hit.Normal })
+						session:notify(dart.player, Config.Text.SlowMiss, Color3.fromRGB(200, 200, 200))
+					end
+				elseif dart.kind == "weapon" then
+					local character = hit.Instance:FindFirstAncestorOfClass("Model")
+					local victim = character and Players:GetPlayerFromCharacter(character)
+					local cfg = Config.Weapons[dart.weaponId]
+					if cfg and cfg.stick then
+						-- La flecha queda clavada donde pego (se puede recoger)
+						Actions.stickArrow(session, dart, hit.Position, hit.Normal)
+					end
+					Actions.weaponHit(session, dart, hit.Position, victim, hit.Instance)
+				else
+					local kiwi = session.kiwi
+					if kiwi and not kiwi.defeated and hit.Instance:IsDescendantOf(kiwi.model) then
+						if kiwi:sedate(session.diff.kiwi.sedateTime, dart.player) then
+							session:notify(dart.player, Config.Text.DartHit, Color3.fromRGB(160, 230, 170))
+							session:event("darthit", { pos = hit.Position })
+						end
+					else
+						session:event("dartmiss", { pos = hit.Position, normal = hit.Normal })
+						session:notify(dart.player, Config.Text.DartMiss, Color3.fromRGB(200, 200, 200))
+						ToolService.startCooldown(dart.player, "rifle", session.diff.rifle.cooldownOnMiss)
 					end
 				end
-				remove = true
-			elseif dart.kind == "paint" then
-				dart.part.CFrame = CFrame.new(dart.pos)
-			elseif dart.kind == "weapon" then
-				dart.part.CFrame = CFrame.lookAt(dart.pos, dart.pos + dart.dir)
 			else
-				dart.part.CFrame = CFrame.lookAt(dart.pos, dart.pos + dart.dir) * CFrame.Angles(0, math.rad(90), 0)
+				dart.pos = dart.pos + dart.dir * stepLen
+				if dart.life <= 0 then
+					-- Flechas: si se les acaba el vuelo, caen y se clavan en el piso
+					local cfg = dart.weaponId and Config.Weapons[dart.weaponId]
+					if cfg and cfg.stick then
+						local ground = workspace:Raycast(dart.pos, Vector3.new(0, -90, 0), dart.params)
+						if ground then
+							Actions.stickArrow(session, dart, ground.Position, ground.Normal)
+						end
+					end
+					remove = true
+				elseif dart.kind == "paint" then
+					dart.part.CFrame = CFrame.new(dart.pos)
+				elseif dart.kind == "weapon" then
+					dart.part.CFrame = CFrame.lookAt(dart.pos, dart.pos + dart.dir)
+				else
+					dart.part.CFrame = CFrame.lookAt(dart.pos, dart.pos + dart.dir) * CFrame.Angles(0, math.rad(90), 0)
+				end
 			end
-		end
 
-		if remove then
-			dart.part:Destroy()
-			table.remove(projectiles, i)
+			if remove then
+				dart.part:Destroy()
+				table.remove(projectiles, i)
+			end
 		end
 	end
 end
@@ -1292,7 +1641,8 @@ function Actions.run(session, player, toolId, data)
 		Actions.paint(session, player, data)
 	elseif toolId == "relente" then
 		Actions.relente(session, player, data)
-	elseif Config.Weapons[toolId] then
+	elseif Config.Weapons[toolId] or (Config.Grenades and Config.Grenades[toolId]) then
+		-- Armas de baúl y granadas del pack comparten el mismo caño de salida
 		Actions.fireWeapon(session, player, toolId, data)
 	end
 end

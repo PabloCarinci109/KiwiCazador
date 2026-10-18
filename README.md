@@ -42,6 +42,13 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 ### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
 
+> **1.9.3:** llegaron las **granadas**: cada baúl suelta un **pack** (1 fragmentación, 1 humo,
+> 1 molotov y 2 flashes) que se lanza con clic y vuela con física real. La **Glock-18 ya no
+> tiene mira**: su clic derecho cambia entre tiro a tiro y **ráfaga de 3 (estilo CS2)**. El
+> **rifle tranquilizante inmoviliza 3 s** al rival que toca y el **francotirador noquea de un
+> solo disparo**. La **M4A1 ahora tiene silenciador** (en la mano y en el modelo) y sus tiros
+> **apenas se escuchan**. Además se sacó de todos los mapas el **cartel gigante con el nombre
+> de la zona** ("Alpes del Sur", etc.) que se veía durante la partida.
 > **1.9.2:** el **lanzamisiles destroza el mapa** (vuela casas y graneros, autos y el tren, tira
 > árboles; todo se recompone solo a los ~30 s), ya no tapa la mira al apuntar, el **arco y la flecha
 > se ven con el zoom** (la flecha sale volando y se recupera clavada), el **recoil es mucho más suave**
@@ -346,7 +353,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.2 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.3 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):

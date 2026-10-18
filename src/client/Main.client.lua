@@ -36,6 +36,7 @@ WeatherFX.start()
 local state = { active = false, phase = "none", diff = nil }
 local sprinting = false
 local sneaking = false
+local glockBurst = false -- la Glock-18 arranca tiro a tiro; el clic derecho la pone en ráfaga
 local shotBloom = 0 -- el punto de mira se abre un toque al disparar
 local speedFov = nil -- al correr la camara abre un poco el FOV (se siente mas rapido)
 local cooldowns = {
@@ -523,6 +524,14 @@ local function applySpeed()
 		return
 	end
 
+	-- Dardo tranquilizante: dormido unos segundos, no te podes mover
+	if hum:GetAttribute("Dormido") then
+		hum.WalkSpeed = 0
+		hum.JumpPower = 0
+		hum.UseJumpPower = true
+		return
+	end
+
 	if not state.active then
 		if hum.WalkSpeed ~= Config.Player.sprintSpeed then
 			hum.WalkSpeed = Config.Player.sprintSpeed
@@ -600,11 +609,13 @@ local function setWeaponHidden(hidden)
 	end
 end
 
--- Armas que apuntan (y que por lo tanto muestran la vista de arma)
+-- Armas que apuntan (y que por lo tanto muestran la vista de arma).
+-- La Glock-18 no tiene mira (solo los rifles apuntan): su clic derecho
+-- sirve para cambiar a ráfaga de 3.
 local SCOPE_WEAPONS = {
-	rifle = true, pintura = true, relente = true, revolver = true,
+	rifle = true, pintura = true, relente = true,
 	arco = true, sniper = true, lanzallamas = true, cohete = true,
-	ak = true, m4 = true, mp5 = true, glock = true, escopeta = true,
+	ak = true, m4 = true, mp5 = true,
 }
 
 -- Vista de arma estilo Counter: se ve en primera persona y al apuntar.
@@ -745,7 +756,13 @@ local function fireTool(toolId)
 		return
 	end
 
-	remotes.ToolAction:FireServer(toolId, { aim = aimPoint(), scoped = scoped, sneak = sneaking })
+	remotes.ToolAction:FireServer(toolId, {
+		aim = aimPoint(),
+		scoped = scoped,
+		sneak = sneaking,
+		-- La ráfaga de la Glock viaja al servidor (3 tiros por gatillo)
+		burst = (toolId == "glock") and glockBurst or nil,
+	})
 
 	local total = cooldown and cooldown.total or 1
 	if cooldown then
@@ -753,7 +770,14 @@ local function fireTool(toolId)
 	end
 
 	-- Sonido del arma: capas de boom + chasquido + cola segun el estilo
-	if GUN_STYLE[toolId] then
+	if Config.Grenades[toolId] then
+		-- Granada: quien tira avisa con un silbido corto; la mecha corre sola
+		sound2D(Config.Sounds.netSwing, 0.6, 1.35)
+		ViewModel.toss()
+	elseif toolId == "m4" then
+		-- M4A1 con silenciador: apenas un tic seco (casi no se escucha)
+		gunPlay(Config.Sounds.gunCrack, 0.14, 1.75, 0)
+	elseif GUN_STYLE[toolId] then
 		gunshot(GUN_STYLE[toolId])
 	elseif toolId == "red" then
 		sound2D(Config.Sounds.netSwing, 0.8)
@@ -781,6 +805,8 @@ local function fireTool(toolId)
 	if toolId == "cuchillo" then
 		-- Cuchillo mariposa: pega un zarpazo (sin fogonazo ni patada de arma)
 		ViewModel.slash()
+	elseif Config.Grenades[toolId] then
+		-- La granada ya se tiró: sin patada de arma
 	else
 		ViewModel.recoil(RECOIL[toolId] or 0)
 		ViewModel.flash()
@@ -885,6 +911,15 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		return
 	end
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		-- La Glock-18 no tiene mira: su clic derecho pasa a ráfaga de 3
+		-- tiros (estilo CS2) y avisa por el HUD.
+		if equippedId == "glock" and state.active and state.phase == "playing" then
+			glockBurst = not glockBurst
+			HUD.notify(glockBurst and Config.Text.GlockBurstOn or Config.Text.GlockBurstOff,
+				Color3.fromRGB(238, 196, 92), 3)
+			sound2D(Config.Sounds.ui, 0.4, glockBurst and 1.5 or 1.05)
+			return
+		end
 		-- Clic derecho: mira estilo Counter. El francotirador va ciclando
 		-- la telescopica: 5x -> 10x -> sin mira.
 		if SCOPE_WEAPONS[equippedId] and state.active and state.phase == "playing" then
@@ -1216,6 +1251,47 @@ local function paintBlind(duration, color)
 	end)
 end
 
+-- Flashbang: pantallazo blanco que se apaga solo (con el zumbido del ring)
+local flashGui
+local function flashBlind(duration)
+	local plrGui = player:FindFirstChildOfClass("PlayerGui") or player:WaitForChild("PlayerGui")
+	if not flashGui or not flashGui.Parent then
+		flashGui = Instance.new("ScreenGui")
+		flashGui.Name = "KiwiFlash"
+		flashGui.IgnoreGuiInset = true
+		flashGui.DisplayOrder = 70
+		flashGui.ResetOnSpawn = false
+		flashGui.Parent = plrGui
+	end
+	for _, child in ipairs(flashGui:GetChildren()) do
+		child:Destroy()
+	end
+	duration = math.max(duration or 2, 0.4)
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.fromScale(1, 1)
+	frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	frame.BackgroundTransparency = 0
+	frame.BorderSizePixel = 0
+	frame.ZIndex = 1
+	frame.Parent = flashGui
+	-- Primero baja apenas (el flash de verdad), despues se aclara la vista
+	TweenService:Create(frame, TweenInfo.new(duration * 0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 0.32,
+	}):Play()
+	task.delay(duration * 0.3, function()
+		if frame.Parent then
+			TweenService:Create(frame, TweenInfo.new(duration * 0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+				BackgroundTransparency = 1,
+			}):Play()
+		end
+	end)
+	task.delay(duration + 0.3, function()
+		if frame.Parent then
+			frame:Destroy()
+		end
+	end)
+end
+
 remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 	data = data or {}
 	local position = data.pos
@@ -1229,11 +1305,46 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 		if position and distanceToLocal(position) < 90 then
 			soundAt(Config.Sounds.netSwing, position, 0.7)
 		end
+	elseif kind == "nadethrow" then
+		-- Alguien tiró una granada: silbido corto si estas cerca
+		if position and distanceToLocal(position) < 80 then
+			soundAt(Config.Sounds.netSwing, position, 0.7, 1.45)
+		end
+	elseif kind == "nade" then
+		-- Detonación de una granada del pack: cada tipo suena distinto
+		local tipo = data.tipo
+		if position then
+			if tipo == "frag" then
+				soundAt(Config.Sounds.gunBoom, position, 1, 0.55)
+				burst(position, Color3.fromRGB(255, 180, 90), 46)
+			elseif tipo == "humo" then
+				soundAt(Config.Sounds.dartHit, position, 0.7, 0.6)
+				burst(position, Color3.fromRGB(210, 214, 220), 36)
+			elseif tipo == "molotov" then
+				soundAt(Config.Sounds.gunBoom, position, 0.8, 0.9)
+				soundAt(Config.Sounds.flame, position, 0.8, 0.75)
+				burst(position, Color3.fromRGB(255, 140, 60), 34)
+			elseif tipo == "flash" then
+				soundAt(Config.Sounds.gunBoom, position, 0.9, 1.35)
+				soundAt(Config.Sounds.flush, position, 0.7, 1.5)
+				burst(position, Color3.fromRGB(255, 255, 240), 40)
+			end
+		end
+	elseif kind == "flash" then
+		-- Flashbang: te cegó (pantalla blanca + zumbido que se van solos)
+		local dur = data.dur or 2
+		flashBlind(dur)
+		sound2D(Config.Sounds.flush, 0.5, 0.6)
+		HUD.notify(string.format(Config.Text.FlashHit, math.max(1, math.floor(dur + 0.5))),
+			Color3.fromRGB(245, 245, 245), math.max(1, dur))
 	elseif kind == "dartshot" then
 		if position then
 			-- Sonido segun el arma: rifles graves, pistolas secas, dardos suaves
 			local style = GUN_STYLE[data.weapon] or "rifle"
-			if style == "dart" then
+			if data.weapon == "m4" then
+				-- M4A1 con silenciador: apenas se escucha (tic seco y corto)
+				soundAt(Config.Sounds.gunCrack, position, 0.14, 1.75)
+			elseif style == "dart" then
 				soundAt(Config.Sounds.dartShot, position, 0.8, 1.15)
 			elseif style == "shotgun" or style == "sniper" or style == "rocket" then
 				soundAt(Config.Sounds.gunBoom, position, 0.9,
