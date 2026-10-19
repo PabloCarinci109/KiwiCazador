@@ -278,6 +278,37 @@ local function burst(position, color, count)
 	Debris:AddItem(holder, 2)
 end
 
+-- Fogonazo de luz que se apaga solo (explosiones y el molotov)
+local function lightFlash(position, color, brillo, alcance)
+	local holder = Instance.new("Part")
+	holder.Name = "FxLuz"
+	holder.Size = Vector3.new(0.2, 0.2, 0.2)
+	holder.Anchored = true
+	holder.CanCollide = false
+	holder.CanQuery = false
+	holder.CanTouch = false
+	holder.Transparency = 1
+	holder.Position = position
+	holder.Parent = workspace
+
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Brightness = brillo
+	light.Range = alcance
+	light.Shadows = false
+	light.Parent = holder
+
+	Debris:AddItem(holder, 0.6)
+	task.spawn(function()
+		for i = 1, 9 do
+			task.wait(0.05)
+			if light and light.Parent then
+				light.Brightness = brillo * (1 - i / 9)
+			end
+		end
+	end)
+end
+
 -- ===============================================================
 -- Lanzallamas: chorro de fuego visible (todo por codigo, sin assets)
 -- ===============================================================
@@ -962,21 +993,24 @@ local function fireTool(toolId)
 		revolver = 0.38, cohete = 0.55, arco = 0.28, cuchillo = 0.35, lanzallamas = 0.08,
 		ak = 0.44, m4 = 0.38, mp5 = 0.28, glock = 0.28, escopeta = 0.52,
 	}
+	local shootCfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[toolId]
+	-- Con la mira puesta el arma se afirma: menos patada de vista y de
+	-- camara (el AK-47 apuntado es mucho mas estable, como pidio el jefe)
+	local adsSoft = (scoped and shootCfg and shootCfg.adsRecoil) or 1
 	if toolId == "cuchillo" then
 		-- Cuchillo mariposa: pega un zarpazo (sin fogonazo ni patada de arma)
 		ViewModel.slash()
 	elseif Config.Grenades[toolId] then
 		-- La granada ya se tiró: sin patada de arma
 	else
-		ViewModel.recoil(RECOIL[toolId] or 0)
+		ViewModel.recoil((RECOIL[toolId] or 0) * adsSoft)
 		ViewModel.flash()
 	end
 
 	-- Patada de camara estilo Counter Blox: 0.9 * (1 - control) grados
 	-- (mas suave que la de Counter original: sube y vuelve sola)
-	local shootCfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[toolId]
 	local control = shootCfg and shootCfg.recoil or 72
-	local kick = math.rad(0.9 * (1 - control / 100))
+	local kick = math.rad(0.9 * (1 - control / 100)) * adsSoft
 	ViewModel.kickCamera(kick * (1 + math.random() * 0.4), kick * (math.random() * 2 - 1))
 
 	-- El chorro de fuego no abre la cruz como un balazo
@@ -1147,7 +1181,8 @@ local function spreadErrorLocal(weaponId)
 	end
 	local error = math.max(cfg.spread or 0, 0) + speed * (cfg.vel or 0)
 	if scoped then
-		error = cfg.adsPerfect and 0 or error * ((Config.Shoot and Config.Shoot.adsDiv) or 0.35)
+		-- adsDiv del arma: el AK-47 apuntado entra mucho mas fino
+		error = cfg.adsPerfect and 0 or error * (cfg.adsDiv or (Config.Shoot and Config.Shoot.adsDiv) or 0.35)
 	elseif sneaking then
 		error = error / ((Config.Shoot and Config.Shoot.crouchDiv) or 1.6)
 	end
@@ -1477,13 +1512,15 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 			if tipo == "frag" then
 				soundAt(Config.Sounds.gunBoom, position, 1, 0.55)
 				burst(position, Color3.fromRGB(255, 180, 90), 46)
+				lightFlash(position, Color3.fromRGB(255, 188, 120), 7, 34)
 			elseif tipo == "humo" then
 				soundAt(Config.Sounds.dartHit, position, 0.7, 0.6)
-				burst(position, Color3.fromRGB(210, 214, 220), 36)
+				burst(position, Color3.fromRGB(210, 214, 220), 44)
 			elseif tipo == "molotov" then
 				soundAt(Config.Sounds.gunBoom, position, 0.8, 0.9)
 				soundAt(Config.Sounds.flame, position, 0.8, 0.75)
 				burst(position, Color3.fromRGB(255, 140, 60), 34)
+				lightFlash(position, Color3.fromRGB(255, 150, 60), 6, 28)
 			elseif tipo == "flash" then
 				soundAt(Config.Sounds.gunBoom, position, 0.9, 1.35)
 				soundAt(Config.Sounds.flush, position, 0.7, 1.5)

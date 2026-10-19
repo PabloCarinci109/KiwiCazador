@@ -180,6 +180,7 @@ function Session.new(modeId, rng, opts)
 	self.fort = nil        -- castillo del asedio (se destruye al terminar)
 	self.fortChests = nil
 	self.safeZoneFolder = nil -- zona segura del colosal (solo en su partida)
+	self.fires = {}        -- fuegos de molotov vivos (se apagan al terminar)
 
 	if modeId == "asedio" then
 		self.isMulti = false
@@ -1313,19 +1314,39 @@ function Session:spawnsFor(player)
 			end
 		end
 
-		-- Busca suelo firme en ese angulo (avisa si el punto esta tapado)
-		local function punto(radio)
-			local p = nest + Vector3.new(math.cos(angle) * radio, 0, math.sin(angle) * radio)
+		-- Suelo firme en un angulo/radio: si el rayo cae sobre una pared o
+		-- un techo (o no hay piso) devuelve nil y se prueba otro punto.
+		local params = RaycastParams.new()
+		params.IgnoreWater = true
+		local function sueloFirme(ang, radio)
+			local p = nest + Vector3.new(math.cos(ang) * radio, 0, math.sin(ang) * radio)
 			p = self.arena:clampToBounds(p)
-			local params = RaycastParams.new()
-			params.IgnoreWater = true
 			local ray = workspace:Raycast(Vector3.new(p.X, nest.Y + 70, p.Z), Vector3.new(0, -220, 0), params)
 			if ray then
 				local dy = ray.Position.Y - nest.Y
 				if dy >= -1 and dy <= 2.5 then
-					return ray.Position, true
+					return ray.Position
 				end
 			end
+			return nil
+		end
+
+		-- Busca suelo firme barriendo angulos y radios cercanos: asi nadie
+		-- aparece enterrado en una loma, arriba de un techo ni dentro de
+		-- una pared cuando el mapa tiene desniveles.
+		local function punto(radio)
+			for _, r in ipairs({ radio, radio - 8, radio + 8, radio - 16, radio + 16 }) do
+				if r > 6 then
+					for _, da in ipairs({ 0, 0.2, -0.2, 0.4, -0.4, 0.6, -0.6 }) do
+						local hit = sueloFirme(angle + da, r)
+						if hit then
+							return hit, true
+						end
+					end
+				end
+			end
+			local p = nest + Vector3.new(math.cos(angle) * radio, 0, math.sin(angle) * radio)
+			p = self.arena:clampToBounds(p)
 			return Vector3.new(p.X, self.arena.floorY or nest.Y, p.Z), false
 		end
 
@@ -1637,6 +1658,13 @@ function Session:finish()
 	self:clearTraps()
 	Actions.clearPickups(self)
 
+	-- Los fuegos del molotov que sigan prendidos se apagan con la partida:
+	-- asi no queda ningun fuego suelto vivo en el modo siguiente
+	for _, apagar in ipairs(self.fires or {}) do
+		pcall(apagar)
+	end
+	self.fires = {}
+
 	if self.fort then
 		-- self.fort es la tabla del castillo { folder = ..., chests = ... }:
 		-- hay que destruir la carpeta, no la tabla
@@ -1689,12 +1717,17 @@ function Session:spawnKiwi()
 	local cfg = self.diff.kiwi
 	local opts
 	if self.isAsedio then
-		-- El kiwi vive en su casa: no se aleja del nido (modo 5 vs 5)
-		opts = { brain = "hider" }
-		local nest = self.arena and self.arena.nest
-		if nest then
-			opts.spawn = nest.pos
-			opts.leash = { pos = nest.pos, radius = Config.Asedio.nestRadius }
+		-- El kiwi espera quieto en su corral, adentro de su casa (5 vs 5)
+		opts = { brain = "hider", estatico = true }
+		local arena = self.arena
+		local spot = arena and arena.corral and arena.corral.pos
+		if not spot and arena and arena.nest then
+			spot = arena.nest.pos
+		end
+		if spot then
+			opts.spawn = spot
+			opts.floorY = spot.Y
+			opts.leash = { pos = spot, radius = (Config.Asedio.corralRadius or 4.2) + 1 }
 		end
 	elseif self.isColosal or self.isMulti then
 		if self.isMulti then

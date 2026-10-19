@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.9.6"
+Config.Version = "1.9.8"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -166,6 +166,7 @@ Config.Tracker = {
 Config.Scope = {
 	fov = 30,          -- campo de vision mientras apuntas (mas chico = mas zoom)
 	weapons = {
+		ak = 30,       -- AK-47: mira de clic derecho (mismo aumento que los rifles)
 		sniper = 14,   -- 5x (70 / 14)
 		sniper2 = 7,   -- 10x (segundo clic derecho)
 		revolver = 34,
@@ -176,10 +177,13 @@ Config.Scope = {
 -- Estilo Counter: los disparos son instantaneos (rayo) y el error sale de
 -- la formula de Counter Blox: Sauce - Restored (MIT, ver LICENSE-CB.md):
 --   error = spread del arma + velocidad * vel
---   con la mira puesta el error se divide (el francotirador es perfecto)
+--   con la mira puesta el error se divide (adsDiv del arma o el general;
+--   el francotirador es perfecto)
 --   si el error queda por debajo del minimo, el disparo sale perfecto
 -- La patada de camara tambien es la de Counter:
 --   grados = 0.9 * (1 - recoil/100), sube y vuelve sola (mas suave).
+-- Con la mira puesta, adsRecoil del arma multiplica esa patada (el AK-47
+-- apuntado se afirma: mas precision y menos retroceso).
 Config.Shoot = {
 	div = 6,            -- divisor del error (mas alto = mas preciso)
 	dead = 1.3,         -- por debajo de esto, disparo perfecto
@@ -200,7 +204,9 @@ Config.Shoot = {
 		cohete = { recoil = 18 },
 		-- Arsenal estilo Counter Blox (baules): automaticas, MP5, pistola
 		-- y escopeta de perdigones.
-		ak = { vel = 0.55, spread = 1.1, dead = 1.6, recoil = 62 },
+		-- El AK-47 con mira (clic derecho) entra mucho mas fino y patea
+		-- menos: mas precision y menos retroceso, como pidio el jefe.
+		ak = { vel = 0.55, spread = 1.1, dead = 1.6, recoil = 62, adsDiv = 0.22, adsRecoil = 0.45 },
 		m4 = { vel = 0.45, spread = 0.8, dead = 1.4, recoil = 70 },
 		mp5 = { vel = 0.50, spread = 0.9, dead = 1.5, recoil = 78 },
 		glock = { vel = 0.42, spread = 0.5, dead = 1.5, recoil = 55 },
@@ -734,7 +740,8 @@ Config.Asedio = {
 	breakTime = 7,          -- descanso entre rondas
 	roundsToWin = 2,        -- primero a 2 rondas gana la partida
 	respawn = 7,            -- segundos para volver tras un noqueo
-	nestRadius = 20,        -- el kiwi no se aleja mas de esto de su casa (queda dentro del bunker)
+	nestRadius = 20,        -- radio historico del nido (el corral actual es mas chico)
+	corralRadius = 4.2,     -- radio del corralito del kiwi: espera quieto adentro
 	bunkerHalf = 34,        -- media medida del bunker de los Defensores (lo arma el asedio)
 	attackSpawn = 100,      -- a que distancia del nido aparecen los Cazadores
 	revolverUses = 40,      -- tiros de revolver que recibe cada cazador

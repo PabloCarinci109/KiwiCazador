@@ -56,6 +56,26 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 ### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
 
+> **1.9.8:** en el **asedio el kiwi ahora espera quieto en un corralito** de madera adentro de
+> su casa, plantado en el castillo: se acabó el paseo por el fuerte y los Cazadores ya saben
+> dónde ir a buscarlo (el comedero y el pasto son de adorno, pero el picotazo sigue de pie).
+> El **AK-47 tiene mira de clic derecho de verdad**: apuntado entra **mucho más fino** (casi
+> sin dispersión, incluso caminando) y **patea bastante menos la cámara**. Además se revisaron
+> **los respawns de todos los modos**: los puntos de aparición ahora **se eligen con el suelo
+> real del mapa** — antes caían adentro de las **colinas** o arriba de un **techo** en varios
+> mapas y el jugador aparecía enterrado en cualquier lado; el **respawn del asedio** también
+> busca piso firme y el **fuego del molotov nunca queda prendido** al terminar una partida
+> (se apaga solo y con la partida, con red de seguridad).
+>
+> **1.9.7:** el **cuchillo mariposa se saca como en CS2**: sale cerrado desde abajo con un giro
+> de muñeca, la mano le da un **latigazo** y la hoja **salta abierta con inercia**, se asienta
+> con una ondita y suena el **clic del pestillo** al trabarse (y también al plegarlo en el
+> molinete de la tecla F). El **molotov ahora es fuego de partículas de verdad**: **lenguas**
+> que suben y titilan desde varios focos, **núcleo brillante**, **chispas que saltan y caen**,
+> **brasas latiendo** sobre el piso y **humo gris que se abre** al subir, más el **fogonazo**
+> al romperse la botella. La **granada de humo** también cambió: la nube **brota y se hincha**
+> y después se disipa sola, como humo real.
+>
 > **1.9.6:** la **zona segura ya no aparece marcada en todos los mapas**: el círculo, el haz de
 > luz y el cartel se arman **solo cuando arranca una partida de Kiwi Colosal** (el modo del kiwi
 > gigante) y se borran al terminar. En el **asedio**, cuando el Cazador llega con el kiwi a la
@@ -403,7 +423,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.5 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.8 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):

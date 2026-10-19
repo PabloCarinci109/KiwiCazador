@@ -205,7 +205,53 @@ local function correrModo(player, modeId, extra)
 end
 
 -- Pruebas extra por modo ------------------------------------------------
+-- Revisa que todos los puntos de aparicion de la arena caigan en el piso
+-- firme del mapa: nada de colinas, techos ni paredes (es el chequeo del
+-- respawn en todos los modos). Ignora personajes y al kiwi: si uno esta
+-- parado arriba del punto no significa que el piso este mal.
+local function spawnsEnPiso(arena, label, ignoreModel)
+	if not arena or not arena.spawns then
+		check(false, label .. ": la arena tiene spawns")
+		return
+	end
+	local params = RaycastParams.new()
+	params.IgnoreWater = true
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local ignorar = {}
+	for _, pl in ipairs(Players:GetPlayers()) do
+		if pl.Character then
+			table.insert(ignorar, pl.Character)
+		end
+	end
+	if ignoreModel then
+		table.insert(ignorar, ignoreModel)
+	end
+	params.FilterDescendantsInstances = ignorar
+	local malos, total = 0, 0
+	local idxMalo, dyMalo, tocaMalo = nil, nil, nil
+	for idx, spawn in ipairs(arena.spawns) do
+		total = total + 1
+		local p = spawn.Position
+		local ray = workspace:Raycast(Vector3.new(p.X, arena.floorY + 120, p.Z), Vector3.new(0, -300, 0), params)
+		local dy = ray and (ray.Position.Y - arena.floorY) or -999
+		if not ray or dy < -1.5 or dy > 3 then
+			malos = malos + 1
+			if not idxMalo then
+				idxMalo = idx
+				dyMalo = dy
+				tocaMalo = ray and (ray.Instance.Name .. " de " .. tostring(ray.Instance.Parent and ray.Instance.Parent.Name)) or "nada"
+			end
+		end
+	end
+	local detalle = "malos=" .. malos .. "/" .. total
+	if idxMalo then
+		detalle = detalle .. " #" .. idxMalo .. " dy=" .. string.format("%.1f", dyMalo) .. " toca=" .. tocaMalo
+	end
+	check(total >= 4 and malos == 0, label .. ": los spawns caen en piso firme", detalle)
+end
+
 local function extrasSolo(sesion)
+	spawnsEnPiso(sesion.arena, sesion.modeId or "solo", sesion.kiwi and sesion.kiwi.model)
 	local chest = sesion.arena and sesion.arena.chests and sesion.arena.chests[1]
 	check(chest ~= nil, "solo: hay baul en el mapa")
 	if chest then
@@ -245,6 +291,17 @@ local function extrasSolo(sesion)
 			end
 			check(not quedo, "solo: la granada detono sola con la mecha")
 
+			-- La nube de humo: esferas que brotan y focos de particulas
+			local hayBola, hayNube = false, false
+			for _, parte in ipairs(workspace:GetChildren()) do
+				if parte.Name == "HumoBola" then
+					hayBola = true
+				elseif parte.Name == "Humo" and parte:FindFirstChild("Nube") then
+					hayNube = true
+				end
+			end
+			check(hayBola and hayNube, "solo: la nube de humo brota de verdad")
+
 			-- Molotov: al romperse arma el fuego de verdad (llamas, brasas,
 			-- humo y mancha quemada) que despues se limpia solo
 			local okFuego = pcall(function()
@@ -263,6 +320,17 @@ local function extrasSolo(sesion)
 				"solo: el molotov prende fuego real",
 				string.format("llamas=%d brasas=%d humo=%d", cuenta.Llama, cuenta.Brasa, cuenta.Humo))
 			check(cuenta.Quemado > 0, "solo: el fuego deja mancha quemada")
+			-- El fuego y su humo ahora son de particulas (textura de llama)
+			local fuegoParticulas, humoParticulas = false, false
+			for _, parte in ipairs(workspace:GetChildren()) do
+				if parte.Name == "Llama" and parte:FindFirstChild("Fuego") then
+					fuegoParticulas = true
+				elseif parte.Name == "Humo" and parte:FindFirstChild("HumoGris") then
+					humoParticulas = true
+				end
+			end
+			check(fuegoParticulas, "solo: el fuego del molotov usa particulas")
+			check(humoParticulas, "solo: el humo del fuego usa particulas")
 		end
 	end
 	local antes = sesion.stats[player].hp
@@ -272,6 +340,7 @@ local function extrasSolo(sesion)
 end
 
 local function extrasColosal(sesion)
+	spawnsEnPiso(sesion.arena, "colosal", sesion.kiwi and sesion.kiwi.model)
 	check(sesion.isColosal, "colosal: modo marcado")
 	check(sesion.arena and sesion.arena.safeZone ~= nil, "colosal: zona segura existe")
 	check(sesion.safeZoneFolder ~= nil and sesion.safeZoneFolder.Name == "ZonaSeguraColosal",
@@ -280,6 +349,7 @@ local function extrasColosal(sesion)
 end
 
 local function extrasMulti(sesion)
+	spawnsEnPiso(sesion.arena, "multi", sesion.kiwi and sesion.kiwi.model)
 	check(sesion.isMulti, "multi: modo marcado")
 	check(#sesion.players >= 1, "multi: jugador dentro")
 	check(sesion.arena and sesion.arena.safeZone == nil, "multi: sin zona segura de colosal en el mapa")
@@ -293,6 +363,49 @@ local function extrasAsedio(sesion)
 	check(Config.Asedio.roundTime == 300 and Config.Asedio.recoveryTime == 120, "asedio: reglas 5 min / 2 min de extraccion")
 	check(sesion.fortChests ~= nil, "asedio: baules de equipo")
 	check(sesion.kiwi ~= nil and sesion.kiwi.leash ~= nil, "asedio: kiwi con nido")
+
+	-- El kiwi ahora espera quieto en su corralito adentro de la casa
+	check(sesion.kiwi ~= nil and sesion.kiwi.estatico == true, "asedio: el kiwi espera quieto")
+	check(sesion.fort ~= nil and sesion.fort.corral ~= nil and sesion.fort.corral.pos ~= nil, "asedio: el corral del kiwi esta armado")
+	check(sesion.fort ~= nil and sesion.fort.folder:FindFirstChild("CorralPoste") ~= nil, "asedio: el cerco del corral existe")
+	if sesion.kiwi ~= nil and sesion.fort ~= nil and sesion.fort.corral ~= nil then
+		local p1 = sesion.kiwi:getPosition()
+		local dist = (p1 - sesion.fort.corral.pos).Magnitude
+		check(dist < (Config.Asedio.corralRadius + 3), "asedio: el kiwi arranca adentro del corral", string.format("%.1f", dist))
+		task.wait(1.2)
+		local p2 = sesion.kiwi:getPosition()
+		check((p1 - p2).Magnitude < 1.5, "asedio: el kiwi no se pasea (sigue en el corral)")
+	end
+
+	-- El respawn de los equipos tambien tiene que caer en piso firme
+	local okSp, sp = pcall(function()
+		return sesion:spawnsFor(player)
+	end)
+	local raySp = nil
+	local tocaSp = "nada"
+	if okSp and sp then
+		local params = RaycastParams.new()
+		params.IgnoreWater = true
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local ignorar = {}
+		for _, pl in ipairs(Players:GetPlayers()) do
+			if pl.Character then
+				table.insert(ignorar, pl.Character)
+			end
+		end
+		if sesion.kiwi and sesion.kiwi.model then
+			table.insert(ignorar, sesion.kiwi.model)
+		end
+		params.FilterDescendantsInstances = ignorar
+		raySp = workspace:Raycast(Vector3.new(sp.Position.X, sp.Position.Y + 60, sp.Position.Z), Vector3.new(0, -160, 0), params)
+		if raySp then
+			tocaSp = raySp.Instance.Name .. " de " .. tostring(raySp.Instance.Parent and raySp.Instance.Parent.Name)
+		end
+	end
+	local dySp = raySp and (raySp.Position.Y - (sesion.arena.floorY or 0)) or -999
+	check(okSp and raySp ~= nil and dySp >= -1.5 and dySp <= 3, "asedio: el respawn del equipo cae en piso firme",
+		"dy=" .. string.format("%.1f", dySp) .. " toca=" .. tocaSp)
+
 	check(sesion.teamsReady and sesion.teamOf[player] ~= nil, "asedio: equipos repartidos")
 
 	-- La captura no da el punto al instante: el Cazador alza al kiwi y hay
@@ -473,5 +586,16 @@ for _, caso in ipairs(casos) do
 		task.wait(1)
 	end
 end
+
+-- El fuego de los molotovs no deja restos: al terminar las partidas no
+-- puede quedar ninguna llama, brasa ni mancha prendida en el mundo.
+local restosFuego = 0
+for _, item in ipairs(workspace:GetChildren()) do
+	local nombre = item.Name
+	if nombre == "Llama" or nombre == "Brasa" or nombre == "Humo" or nombre == "Quemado" or nombre == "LuzFuego" then
+		restosFuego = restosFuego + 1
+	end
+end
+check(restosFuego == 0, "molotov: el fuego no queda prendido al terminar", "restos=" .. restosFuego)
 
 print(string.format("[AUTO-TEST] FIN: %d pruebas, %d fallos", pruebas, fallos))

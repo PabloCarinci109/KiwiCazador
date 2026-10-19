@@ -12,6 +12,9 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("KiwiShared")
+local Config = require(Shared.Config)
+
 local player = Players.LocalPlayer
 
 local ViewModel = {}
@@ -35,6 +38,24 @@ local reparentDirty = true -- hay que reacomodar piezas (arma/visibilidad)
 -- Animacion del cuchillo mariposa (estilo CS2): giro al equiparlo, F = inspeccion
 local FX = { kind = nil, t = 0, dur = 0 }
 local knifeOpen = 1    -- 1 = hoja abierta, 0 = plegada
+
+-- Sonidos del cuchillo mariposa: el latigazo de muneca al sacarlo y el
+-- clic del pestillo cuando la hoja se traba abierta (como en CS2)
+local knifeSounds = {}
+local function knifeSound(clave, id, velocidad, volumen)
+	local sonido = knifeSounds[clave]
+	if not sonido then
+		sonido = Instance.new("Sound")
+		sonido.Name = "Mariposa" .. clave
+		sonido.SoundId = id
+		sonido.Parent = player:FindFirstChildOfClass("PlayerGui") or workspace
+		knifeSounds[clave] = sonido
+	end
+	sonido.PlaybackSpeed = velocidad
+	sonido.Volume = volumen
+	sonido:Stop()
+	sonido:Play()
+end
 
 -- Posicion del arma respecto de la camara (estilo Counter Blox: al costado,
 -- bien abajo a la derecha y con una leve inclinacion, para no tapar la vista)
@@ -503,10 +524,11 @@ function ViewModel.setWeapon(id)
 		models[id] = BUILDERS[id]()
 	end
 	current = models[id]
-	-- Al sacar el cuchillo mariposa se abre con un giro (estilo CS2)
+	-- Al sacar el cuchillo mariposa se abre de un latigazo (estilo CS2)
 	if id == "cuchillo" then
-		FX = { kind = "draw", t = 0, dur = 0.85 }
+		FX = { kind = "draw", t = 0, dur = 0.7 }
 		knifeOpen = 0
+		knifeSound("Latigazo", Config.Sounds.netSwing, 1.35, 0.32)
 	end
 	-- Fogonazo: una bolita neon en la boca del canon
 	if current and not current.flash then
@@ -559,6 +581,7 @@ end
 function ViewModel.spin()
 	if currentId == "cuchillo" and visible and not hiddenByScope then
 		FX = { kind = "inspect", t = 0, dur = 1.1 }
+		knifeSound("Latigazo", Config.Sounds.netSwing, 1.1, 0.3)
 	end
 end
 
@@ -674,15 +697,29 @@ local function stepUnbound(dt)
 		FX.t = FX.t + dt
 		local raw = math.clamp(FX.t / FX.dur, 0, 1)
 		if FX.kind == "draw" then
-			-- Apertura de mariposa: sale desde abajo, la muneca gira y la
-			-- hoja se abre de un latigazo con un rebote corto al final
-			local e = 1 - (1 - raw) ^ 2.2
-			local rebote = math.sin(math.pi * math.min(raw * 1.6, 1)) * (1 - raw)
-			animCF = CFrame.Angles(math.rad(8) * (1 - e), 0,
-					math.rad(560) * (1 - e) + math.rad(18) * rebote)
-				* CFrame.new(0, -0.44 * (1 - e) + 0.10 * math.sin(math.pi * e), 0.32 * (1 - e))
-			local abre = math.clamp(e * 1.9, 0, 1)
-			knifeOpen = math.min(1, abre + math.sin(abre * math.pi) * 0.14)
+			-- Saque estilo CS2: el cuchillo cerrado sube de abajo a la
+			-- derecha con un giro de muneca, la mano le da un latigazo y
+			-- la hoja salta abierta con inercia; al trabarse suena el
+			-- pestillo y la mano se asienta con una ondita que se apaga
+			local subida = math.clamp(raw / 0.42, 0, 1)
+			local eSubida = 1 - (1 - subida) ^ 3
+			local latigo = math.clamp((raw - 0.38) / 0.2, 0, 1)
+			local eLatigo = latigo * latigo * (3 - 2 * latigo)
+			knifeOpen = math.min(1, eLatigo + math.sin(math.pi * latigo) * 0.05)
+			local asentar = math.clamp((raw - 0.58) / 0.42, 0, 1)
+			local ondita = math.sin(math.pi * 3.4 * asentar) * (1 - asentar) * (1 - asentar)
+			animCF = CFrame.Angles(
+					math.rad(-15) * (1 - eSubida) + math.rad(10) * math.sin(math.pi * latigo) + math.rad(3.5) * ondita,
+					math.rad(36) * (1 - eSubida) + math.rad(9) * ondita,
+					math.rad(430) * (1 - eSubida) - math.rad(42) * math.sin(math.pi * latigo) + math.rad(7) * ondita)
+				* CFrame.new(
+					0.10 * (1 - eSubida),
+					-0.52 * (1 - eSubida) + 0.07 * math.sin(math.pi * subida) + 0.028 * ondita,
+					0.32 * (1 - eSubida) - 0.05 * math.sin(math.pi * latigo))
+			if not FX.golpe and knifeOpen > 0.9 then
+				FX.golpe = true
+				knifeSound("Pestillo", Config.Sounds.netHit, 1.5, 0.5)
+			end
 		elseif FX.kind == "slash" then
 			local swipe = math.sin(math.pi * raw)
 			animCF = CFrame.Angles(math.rad(-16 * swipe), math.rad(-150 * swipe), math.rad(30 * swipe))
@@ -701,6 +738,11 @@ local function stepUnbound(dt)
 					math.rad(540) * (1 - e))
 				* CFrame.new(0, 0.16 * math.sin(math.pi * raw), 0.06 * pliegue)
 			knifeOpen = 1 - pliegue * 0.9
+			-- El pestillo vuelve a trabarse cuando la hoja cae en la atajada
+			if not FX.golpe and raw > 0.6 and knifeOpen > 0.82 then
+				FX.golpe = true
+				knifeSound("Pestillo", Config.Sounds.netHit, 1.45, 0.45)
+			end
 		end
 		if raw >= 1 then
 			FX.kind = nil

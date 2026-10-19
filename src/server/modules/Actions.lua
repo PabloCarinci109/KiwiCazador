@@ -60,7 +60,8 @@ function Actions.spreadError(weaponId, root, data)
 		if cfg.adsPerfect then
 			error = 0
 		else
-			error = error * (shoot.adsDiv or 0.35)
+			-- adsDiv del arma (el AK-47 apuntado es mucho mas fino)
+			error = error * (cfg.adsDiv or shoot.adsDiv or 0.35)
 		end
 	end
 	local dead = cfg.dead or shoot.dead or 0
@@ -953,41 +954,117 @@ end
 -- ===============================================================
 local GRENADE_GRAVITY = (Config.World and Config.World.Gravity) or 165
 
--- Nube de humo: esferas ancladas que tapan la vista pero dejan pasar los
--- tiros (los rayos las ignoran). Se disipa sola a los pocos segundos.
+-- Nube de humo: esferas que brotan, se hinchan y se disipan, mas focos de
+-- particulas que le dan textura (tapa la vista pero deja pasar los tiros:
+-- los rayos la ignoran). Se disipa sola a los pocos segundos.
 local function smokeCloud(pos)
 	local cfg = Config.Grenades.humo
-	local parts = {}
-	for i = 1, 20 do
+	local FUEGO = "rbxasset://textures/particles/fire_main.dds"
+	local partes = {}
+	local bolas = {}
+	-- El cuerpo de la nube: esferas que nacen chicas y crecen al brotar
+	for i = 1, 22 do
 		local angle = math.random() * math.pi * 2
 		local dist = math.sqrt(math.random()) * cfg.radius
-		local size = math.random(80, 150) / 10
+		local size = math.random(90, 160) / 10
 		local part = Util.makePart({
-			Name = "Humo",
+			Name = "HumoBola",
 			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(size, size, size),
-			Color = Color3.fromRGB(212, 216, 220),
+			Size = Vector3.new(size * 0.3, size * 0.3, size * 0.3),
+			Color = Color3.fromRGB(206, 210, 214),
 			Material = Enum.Material.SmoothPlastic,
-			Transparency = 0.42,
+			Transparency = 0.88,
 			Anchored = true,
 			CanCollide = false,
 			CanQuery = false,
 			CanTouch = false,
-			CFrame = CFrame.new(pos + Vector3.new(math.cos(angle) * dist, math.random(0, 9) - 1, math.sin(angle) * dist)),
+			CFrame = CFrame.new(pos + Vector3.new(math.cos(angle) * dist * 0.45,
+				math.random(0, 6) - 0.5, math.sin(angle) * dist * 0.45)),
 			Parent = workspace,
 		})
-		table.insert(parts, part)
+		table.insert(partes, part)
+		table.insert(bolas, { part = part, tam = size, brote = 0 })
 	end
-	task.delay(cfg.time, function()
-		for _ = 1, 12 do
-			task.wait(0.12)
-			for _, p in ipairs(parts) do
+	-- Focos de particulas: el humo sube y se abre con textura de verdad
+	for i = 1, 3 do
+		local angle = math.random() * math.pi * 2
+		local dist = math.sqrt(math.random()) * cfg.radius * 0.45
+		local base = pos + Vector3.new(math.cos(angle) * dist, 1 + math.random() * 3, math.sin(angle) * dist)
+		local foco = Util.makePart({
+			Name = "Humo",
+			Size = Vector3.new(0.5, 0.5, 0.5),
+			Transparency = 1,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.new(base),
+			Parent = workspace,
+		})
+		table.insert(partes, foco)
+		local humo = Instance.new("ParticleEmitter")
+		humo.Name = "Nube"
+		humo.Texture = FUEGO -- La textura de llama, apagada a gris claro
+		humo.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(214, 218, 222)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(148, 152, 156)),
+		})
+		humo.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.8),
+			NumberSequenceKeypoint.new(0.5, 0.88),
+			NumberSequenceKeypoint.new(1, 0.98),
+		})
+		humo.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 4),
+			NumberSequenceKeypoint.new(1, 11),
+		})
+		humo.Lifetime = NumberRange.new(1.4, 2.6)
+		humo.Speed = NumberRange.new(2.5, 5.5)
+		humo.SpreadAngle = Vector2.new(20, 20)
+		humo.Acceleration = Vector3.new(0, 1.6, 0)
+		humo.Rotation = NumberRange.new(-180, 180)
+		humo.RotSpeed = NumberRange.new(-25, 25)
+		humo.LightEmission = 0
+		humo.LightInfluence = 1
+		humo.Rate = 10
+		humo.Parent = foco
+	end
+
+	-- Brota: en el primer segundo la nube se hincha y se pone densa
+	task.spawn(function()
+		for _ = 1, 9 do
+			task.wait(0.1)
+			for _, b in ipairs(bolas) do
+				local p = b.part
 				if p and p.Parent then
-					p.Transparency = math.min(1, p.Transparency + 0.05)
+					b.brote = math.min(1, b.brote + 0.11)
+					local e = 1 - (1 - b.brote) ^ 2
+					local tam = b.tam * (0.3 + 0.7 * e)
+					p.Size = Vector3.new(tam, tam, tam)
+					p.Transparency = 0.88 - 0.42 * e
 				end
 			end
 		end
-		for _, p in ipairs(parts) do
+	end)
+
+	-- Se disipa: las esferas se abren y se van, y todo se limpia solo
+	task.delay(cfg.time, function()
+		for _ = 1, 14 do
+			task.wait(0.12)
+			for _, p in ipairs(partes) do
+				if p and p.Parent then
+					p.Transparency = math.min(1, p.Transparency + 0.06)
+				end
+			end
+			for _, b in ipairs(bolas) do
+				local p = b.part
+				if p and p.Parent then
+					local tam = p.Size.X + 0.5
+					p.Size = Vector3.new(tam, tam, tam)
+				end
+			end
+		end
+		for _, p in ipairs(partes) do
 			if p and p.Parent then
 				p:Destroy()
 			end
@@ -995,95 +1072,23 @@ local function smokeCloud(pos)
 	end)
 end
 
--- Molotov: lengua de fuego en el piso que quema a quien se quede adentro.
--- Tres capas (brasa roja, llama naranja y punta amarilla) que suben y
--- titilan cada una a su ritmo: se ve como fuego de verdad, no bolitas.
+-- Molotov: charco de fuego en el piso que quema a quien se quede adentro.
+-- Ahora el fuego es de particulas de verdad (la misma textura del
+-- lanzallamas): focos repartidos por el charco con lenguas que suben, un
+-- nucleo brillante, chispas que saltan en parabola y humo gris que se
+-- abre; abajo quedan brasas neon latiendo y la mancha quemada.
 local function fireZone(session, thrower, pos)
 	local cfg = Config.Grenades.molotov
-	local flames = {}
-	local function capa(cantidad, radio, altura, tamano, color, transparencia)
-		for i = 1, cantidad do
-			local angle = math.random() * math.pi * 2
-			local dist = math.sqrt(math.random()) * radio
-			local size = tamano * (0.72 + math.random() * 0.56)
-			local alto = altura * (0.8 + math.random() * 0.4)
-			local base = pos + Vector3.new(math.cos(angle) * dist, 0, math.sin(angle) * dist)
-			local part = Util.makePart({
-				Name = "Llama",
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.new(size, size, size),
-				Color = color,
-				Material = Enum.Material.Neon,
-				Transparency = transparencia,
-				Anchored = true,
-				CanCollide = false,
-				CanQuery = false,
-				CanTouch = false,
-				CFrame = CFrame.new(base + Vector3.new(0, alto * 0.4, 0)),
-				Parent = workspace,
-			})
-			table.insert(flames, {
-				part = part, base = base, alto = alto, tamano = size, trans = transparencia,
-				speed = 1.6 + math.random() * 2.2, fase = math.random() * 6.28,
-			})
-		end
+	local FUEGO = "rbxasset://textures/particles/fire_main.dds"
+	local CHISPA = "rbxasset://textures/particles/sparkles_main.dds"
+	local piezas = {}
+	local function guardar(part)
+		table.insert(piezas, part)
+		return part
 	end
-	capa(14, cfg.radius * 0.78, 1.2, 2.5, Color3.fromRGB(168, 44, 16), 0.2)
-	capa(18, cfg.radius * 0.66, 2.0, 1.9, Color3.fromRGB(255, 116, 30), 0.12)
-	capa(10, cfg.radius * 0.44, 2.8, 1.2, Color3.fromRGB(255, 214, 96), 0.08)
-	-- Punta blanca del fuego: chispas brillantes bien arriba
-	capa(6, cfg.radius * 0.24, 3.6, 0.8, Color3.fromRGB(255, 246, 214), 0.04)
 
-	-- Luz calida: de noche la fogata se ve desde lejos
-	local glow = Instance.new("PointLight")
-	glow.Color = Color3.fromRGB(255, 138, 58)
-	glow.Brightness = 3.2
-	glow.Range = math.max(24, cfg.radius * 2)
-	glow.Parent = flames[1].part
-
-	-- Brasas que saltan y humo que se abre por encima: es lo que hace que
-	-- el fuego se vea vivo de verdad, no una calcomania
-	local brasas = {}
-	for i = 1, 10 do
-		local part = Util.makePart({
-			Name = "Brasa",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(0.24, 0.24, 0.24),
-			Color = Color3.fromRGB(255, 198, 96),
-			Material = Enum.Material.Neon,
-			Transparency = 0.1,
-			Anchored = true,
-			CanCollide = false,
-			CanQuery = false,
-			CanTouch = false,
-			CFrame = CFrame.new(pos + Vector3.new(0, 0.6, 0)),
-			Parent = workspace,
-		})
-		table.insert(brasas, { part = part, t = 99, vida = 1, vel = Vector3.new(0, 8, 0), origen = pos })
-	end
-	local humos = {}
-	for i = 1, 6 do
-		local part = Util.makePart({
-			Name = "Humo",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(2, 2, 2),
-			Color = Color3.fromRGB(58, 54, 52),
-			Material = Enum.Material.SmoothPlastic,
-			Transparency = 0.62,
-			Anchored = true,
-			CanCollide = false,
-			CanQuery = false,
-			CanTouch = false,
-			CFrame = CFrame.new(pos + Vector3.new(0, 1.4, 0)),
-			Parent = workspace,
-		})
-		table.insert(humos, {
-			part = part, t = math.random() * 2.4, vida = 2.4,
-			origen = pos, deriva = Vector3.new(0, 2.2, 0),
-		})
-	end
 	-- Mancha quemada en el piso bajo el fuego
-	local mancha = Util.makePart({
+	guardar(Util.makePart({
 		Name = "Quemado",
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(0.08, cfg.radius * 2.1, cfg.radius * 2.1),
@@ -1096,102 +1101,258 @@ local function fireZone(session, thrower, pos)
 		CanTouch = false,
 		CFrame = CFrame.new(pos + Vector3.new(0, 0.06, 0)) * CFrame.Angles(0, 0, math.rad(90)),
 		Parent = workspace,
-	})
+	}))
+
+	-- Focos de llama: cada uno larga lenguas, nucleo y chispas. Cuanto mas
+	-- cerca del centro, mas altas y mas fuertes salen.
+	local FOCOS = 7
+	for i = 1, FOCOS do
+		local ang = (i - 1) / FOCOS * math.pi * 2 + math.random() * 0.5
+		local dist = math.sqrt(math.random()) * cfg.radius * 0.72
+		local fuerza = 1.25 - (dist / cfg.radius) * 0.6
+		local base = pos + Vector3.new(math.cos(ang) * dist, 0, math.sin(ang) * dist)
+		local foco = guardar(Util.makePart({
+			Name = "Llama",
+			Size = Vector3.new(0.4, 0.4, 0.4),
+			Transparency = 1,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.new(base + Vector3.new(0, 0.5, 0)),
+			Parent = workspace,
+		}))
+
+		-- Lenguas: suben estirandose y pasan de amarillo a rojo oscuro
+		local llama = Instance.new("ParticleEmitter")
+		llama.Name = "Fuego"
+		llama.Texture = FUEGO
+		llama.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 238, 176)),
+			ColorSequenceKeypoint.new(0.35, Color3.fromRGB(255, 150, 54)),
+			ColorSequenceKeypoint.new(0.75, Color3.fromRGB(226, 82, 22)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(112, 22, 8)),
+		})
+		llama.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.08),
+			NumberSequenceKeypoint.new(0.65, 0.45),
+			NumberSequenceKeypoint.new(1, 0.9),
+		})
+		llama.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1.3 * fuerza),
+			NumberSequenceKeypoint.new(0.55, 2.6 * fuerza),
+			NumberSequenceKeypoint.new(1, 4.4 * fuerza),
+		})
+		llama.Lifetime = NumberRange.new(0.55, 1)
+		llama.Speed = NumberRange.new(2.6, 6.2)
+		llama.SpreadAngle = Vector2.new(24, 24)
+		llama.Acceleration = Vector3.new(0, 8.5, 0)
+		llama.Rotation = NumberRange.new(-180, 180)
+		llama.RotSpeed = NumberRange.new(-80, 80)
+		llama.LightEmission = 1
+		llama.LightInfluence = 0
+		llama.Rate = (14 + math.random() * 8) * fuerza
+		llama.Parent = foco
+
+		-- Nucleo: la parte mas caliente, corta y casi blanca
+		local nucleo = Instance.new("ParticleEmitter")
+		nucleo.Name = "Nucleo"
+		nucleo.Texture = FUEGO
+		nucleo.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 252, 236)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 232, 158)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 178, 80)),
+		})
+		nucleo.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.25),
+			NumberSequenceKeypoint.new(1, 0.95),
+		})
+		nucleo.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.5),
+			NumberSequenceKeypoint.new(1, 1.5),
+		})
+		nucleo.Lifetime = NumberRange.new(0.25, 0.5)
+		nucleo.Speed = NumberRange.new(3, 7)
+		nucleo.SpreadAngle = Vector2.new(14, 14)
+		nucleo.Acceleration = Vector3.new(0, 9, 0)
+		nucleo.LightEmission = 1
+		nucleo.LightInfluence = 0
+		nucleo.Rate = 8 * fuerza
+		nucleo.Parent = foco
+
+		-- Chispas: saltan del fuego y caen en parabola
+		local chispas = Instance.new("ParticleEmitter")
+		chispas.Name = "Chispas"
+		chispas.Texture = CHISPA
+		chispas.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 216, 140)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 108, 28)),
+		})
+		chispas.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.1),
+			NumberSequenceKeypoint.new(0.7, 0.4),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		chispas.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.34),
+			NumberSequenceKeypoint.new(1, 0.06),
+		})
+		chispas.Lifetime = NumberRange.new(0.5, 1.1)
+		chispas.Speed = NumberRange.new(9, 17)
+		chispas.SpreadAngle = Vector2.new(34, 34)
+		chispas.Acceleration = Vector3.new(0, -26, 0)
+		chispas.LightEmission = 1
+		chispas.LightInfluence = 0
+		chispas.Rate = 3 + math.random() * 3
+		chispas.Parent = foco
+	end
+
+	-- Brasas vivas sobre el piso: bolitas naranjas que laten y dan el
+	-- rescoldo caliente (de noche se ve la fogata desde lejos)
+	local brasas = {}
+	for i = 1, 12 do
+		local ang = math.random() * math.pi * 2
+		local dist = math.sqrt(math.random()) * cfg.radius * 0.85
+		local base = pos + Vector3.new(math.cos(ang) * dist, 0, math.sin(ang) * dist)
+		local tam = 0.28 + math.random() * 0.3
+		local part = guardar(Util.makePart({
+			Name = "Brasa",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(tam, tam, tam),
+			Color = Color3.fromRGB(255, 132 + math.random(0, 60), 60),
+			Material = Enum.Material.Neon,
+			Transparency = 0.15,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.new(base + Vector3.new(0, tam * 0.4, 0)),
+			Parent = workspace,
+		}))
+		table.insert(brasas, { part = part, tam = tam, fase = math.random() * 6.28, vel = 1.2 + math.random() })
+	end
+
+	-- Humo gris que sale del fuego: sube, se abre y se va
+	for i = 1, 3 do
+		local ang = math.random() * math.pi * 2
+		local dist = math.sqrt(math.random()) * cfg.radius * 0.5
+		local base = pos + Vector3.new(math.cos(ang) * dist, 0, math.sin(ang) * dist)
+		local foco = guardar(Util.makePart({
+			Name = "Humo",
+			Size = Vector3.new(0.5, 0.5, 0.5),
+			Transparency = 1,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.new(base + Vector3.new(0, 2, 0)),
+			Parent = workspace,
+		}))
+		local humo = Instance.new("ParticleEmitter")
+		humo.Name = "HumoGris"
+		humo.Texture = FUEGO -- La misma textura de llama, apagada a gris
+		humo.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(96, 90, 84)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(46, 42, 40)),
+		})
+		humo.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.72),
+			NumberSequenceKeypoint.new(0.6, 0.86),
+			NumberSequenceKeypoint.new(1, 0.97),
+		})
+		humo.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 2.4),
+			NumberSequenceKeypoint.new(1, 7.2),
+		})
+		humo.Lifetime = NumberRange.new(1.4, 2.4)
+		humo.Speed = NumberRange.new(2.4, 4.8)
+		humo.SpreadAngle = Vector2.new(16, 16)
+		humo.Acceleration = Vector3.new(0, 2.4, 0)
+		humo.Rotation = NumberRange.new(-180, 180)
+		humo.RotSpeed = NumberRange.new(-30, 30)
+		humo.LightEmission = 0
+		humo.LightInfluence = 1
+		humo.Rate = 6 + math.random() * 4
+		humo.Parent = foco
+	end
+
+	-- Luz calida que titila, como una fogata de verdad
+	local luzFoco = guardar(Util.makePart({
+		Name = "LuzFuego",
+		Size = Vector3.new(0.3, 0.3, 0.3),
+		Transparency = 1,
+		Anchored = true,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CFrame = CFrame.new(pos + Vector3.new(0, 2.2, 0)),
+		Parent = workspace,
+	}))
+	local glow = Instance.new("PointLight")
+	glow.Color = Color3.fromRGB(255, 138, 58)
+	glow.Brightness = 3.2
+	glow.Range = math.max(26, cfg.radius * 2)
+	glow.Parent = luzFoco
 
 	local endsAt = os.clock() + cfg.time
 	local nextBurn = 0
+	local apagado = false
+	local function apagar()
+		if apagado then
+			return
+		end
+		apagado = true
+		for _, p in ipairs(piezas) do
+			if p and p.Parent then
+				p:Destroy()
+			end
+		end
+	end
 	task.spawn(function()
 		local t0 = os.clock()
-		while os.clock() < endsAt do
+		while os.clock() < endsAt and not session.finished do
 			task.wait(0.09)
-			local t = os.clock() - t0
-			for _, f in ipairs(flames) do
-				local p = f.part
-				if p and p.Parent then
-					-- Cada lengua late distinto y se estira hacia arriba
-					local onda = math.sin(t * f.speed * 3.1 + f.fase)
-					local subida = (math.sin(t * f.speed + f.fase) * 0.5 + 0.5) * f.alto
-					local alto = f.alto * (0.75 + math.random() * 0.5)
-					p.CFrame = CFrame.new(f.base + Vector3.new(0, alto * 0.4 + subida * 0.5, 0))
-					p.Size = Vector3.new(f.tamano * (0.9 + onda * 0.12), alto * 1.6, f.tamano * (0.9 + onda * 0.12))
-					p.Transparency = math.clamp(f.trans + math.abs(onda) * 0.08 + math.random() * 0.06, 0, 0.7)
-				end
-			end
-			-- Brasas: salen del fuego, suben en parabola y se apagan
-			for _, b in ipairs(brasas) do
-				local p = b.part
-				if p and p.Parent then
-					b.t = b.t + 0.09
-					if b.t >= b.vida then
-						b.t = 0
-						b.vida = 0.7 + math.random() * 0.6
-						local ang = math.random() * math.pi * 2
-						local d = math.sqrt(math.random()) * cfg.radius * 0.55
-						b.origen = pos + Vector3.new(math.cos(ang) * d, 0.5 + math.random() * 1.3, math.sin(ang) * d)
-						b.vel = Vector3.new((math.random() - 0.5) * 5.5, 7 + math.random() * 4.5, (math.random() - 0.5) * 5.5)
+			-- Todo el latido va protegido: si la partida termino o algo dejo
+			-- de existir, el fuego igual se apaga solo (nunca queda prendido)
+			pcall(function()
+				local t = os.clock() - t0
+				-- El rescoldo late: las particulas del fuego se animan solas
+				for _, b in ipairs(brasas) do
+					local p = b.part
+					if p and p.Parent then
+						local latido = math.sin(t * b.vel * 2.6 + b.fase) * 0.5 + 0.5
+						local tam = b.tam * (0.82 + latido * 0.4)
+						p.Size = Vector3.new(tam, tam * 0.8, tam)
+						p.Transparency = 0.1 + (1 - latido) * 0.35
 					end
-					local esc = 1 - (b.t / b.vida) * 0.55
-					p.CFrame = CFrame.new(b.origen + b.vel * b.t + Vector3.new(0, -4.6 * b.t * b.t, 0))
-					p.Size = Vector3.new(0.24 * esc, 0.24 * esc, 0.24 * esc)
-					p.Transparency = math.clamp(0.08 + (b.t / b.vida) * 0.85, 0, 0.92)
 				end
-			end
-			-- Humo: sube abriendose y se va desvaneciendo
-			for _, h in ipairs(humos) do
-				local p = h.part
-				if p and p.Parent then
-					h.t = h.t + 0.09
-					if h.t >= h.vida then
-						h.t = 0
-						h.vida = 2.1 + math.random() * 1.3
-						local ang = math.random() * math.pi * 2
-						local d = math.sqrt(math.random()) * cfg.radius * 0.45
-						h.origen = pos + Vector3.new(math.cos(ang) * d, 1.2 + math.random() * 1.6, math.sin(ang) * d)
-						h.deriva = Vector3.new((math.random() - 0.5) * 1.8, 2.2 + math.random() * 1.2, (math.random() - 0.5) * 1.8)
-					end
-					local crecer = 1.9 + h.t * 2.3
-					p.Size = Vector3.new(crecer, crecer, crecer)
-					p.CFrame = CFrame.new(h.origen + h.deriva * h.t)
-					p.Transparency = math.clamp(0.58 + (h.t / h.vida) * 0.4, 0, 0.96)
-				end
-			end
-			-- La luz tambien titila, como una fogata de verdad
-			glow.Brightness = 2.8 + math.random() * 1.6
-			if os.clock() >= nextBurn then
-				nextBurn = os.clock() + cfg.burnEvery
-				for _, other in ipairs(session.players) do
-					local _, otherRoot = getRoot(other)
-					if otherRoot and not session.knocked[other] then
-						local away = otherRoot.Position - pos
-						local flatAway = Vector3.new(away.X, 0, away.Z)
-						if math.abs(away.Y) < 8 and flatAway.Magnitude <= cfg.radius then
-							if other == thrower or not friendlyShot(session, thrower, other) then
-								session:damagePlayer(other, thrower, cfg.name, cfg.burnDamage, pos)
+				-- La luz titila con rafagas, como una fogata de verdad
+				glow.Brightness = 2.8 + math.random() * 1.7
+				if os.clock() >= nextBurn then
+					nextBurn = os.clock() + cfg.burnEvery
+					for _, other in ipairs(session.players) do
+						local _, otherRoot = getRoot(other)
+						if otherRoot and not session.knocked[other] then
+							local away = otherRoot.Position - pos
+							local flatAway = Vector3.new(away.X, 0, away.Z)
+							if math.abs(away.Y) < 8 and flatAway.Magnitude <= cfg.radius then
+								if other == thrower or not friendlyShot(session, thrower, other) then
+									session:damagePlayer(other, thrower, cfg.name, cfg.burnDamage, pos)
+								end
 							end
 						end
 					end
 				end
-			end
+			end)
 		end
-		for _, f in ipairs(flames) do
-			if f.part and f.part.Parent then
-				f.part:Destroy()
-			end
-		end
-		for _, b in ipairs(brasas) do
-			if b.part and b.part.Parent then
-				b.part:Destroy()
-			end
-		end
-		for _, h in ipairs(humos) do
-			if h.part and h.part.Parent then
-				h.part:Destroy()
-			end
-		end
-		if mancha and mancha.Parent then
-			mancha:Destroy()
-		end
+		apagar()
 	end)
+	-- Red de seguridad: aunque el latido se corte por un error, a los pocos
+	-- segundos el fuego se limpia igual (nunca queda una molotov prendida)
+	task.delay(cfg.time + 2, apagar)
+	-- Y la partida se lleva sus fuegos al terminar
+	session.fires = session.fires or {}
+	table.insert(session.fires, apagar)
 end
 
 -- Flashbang: pantalla blanca para quienes la ven sin pared en el medio.

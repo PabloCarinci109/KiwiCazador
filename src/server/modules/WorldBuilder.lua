@@ -2268,31 +2268,74 @@ local function buildArena(index, zone, cfg, parent, rng)
 	-- ===============================================================
 	-- Spawns y punto de aparicion del kiwi
 	-- ===============================================================
+	-- El piso real se consulta con el mundo ya armado: un rayo vertical
+	-- que ignora el terreno base. Si toca algo (colina, casa, arbol,
+	-- techo...) ese punto no sirve. Antes los spawns se ponian a ciegas
+	-- con la altura fija del mapa y el jugador aparecia enterrado
+	-- adentro de las colinas o arriba de los techos en varios mapas.
+	local sueloParams = RaycastParams.new()
+	sueloParams.IgnoreWater = true
+	sueloParams.FilterType = Enum.RaycastFilterType.Exclude
+	sueloParams.FilterDescendantsInstances = { self.ground }
+	local function sueloLibre(x, z)
+		local ray = workspace:Raycast(Vector3.new(x, floorY + 140, z), Vector3.new(0, -320, 0), sueloParams)
+		if ray then
+			return nil
+		end
+		return Vector3.new(x, floorY, z)
+	end
+
 	for i = 1, 4 do
 		local baseAngle = (i - 1) * math.pi * 0.5 + math.rad(45)
 		local dist = half - 45
-		-- Busca un angulo donde no haya props solidos cerca (roca, cabana, etc.)
-		local bestAngle = baseAngle
-		for attempt = 0, 11 do
-			local angle = baseAngle + attempt * math.rad(9)
-			local candidate = center + Vector3.new(math.cos(angle) * dist, 0, math.sin(angle) * dist)
-			local clear = true
-			for _, other in ipairs(occupied) do
-				if (Vector3.new(other.X, 0, other.Z) - candidate).Magnitude < 24 then
-					clear = false
-					break
+		local pos = nil
+		-- Barre angulos y distancias hasta encontrar un claro de verdad:
+		-- lejos de los props y con el piso limpio (sin colinas ni techos)
+		for attempt = 0, 23 do
+			local angle = baseAngle + attempt * math.rad(8)
+			for _, radio in ipairs({ dist, dist - 14, dist - 28, dist + 14, dist + 28 }) do
+				if radio > 60 and radio < half - 30 then
+					local candidate = center + Vector3.new(math.cos(angle) * radio, 0, math.sin(angle) * radio)
+					local clear = true
+					for _, other in ipairs(occupied) do
+						if (Vector3.new(other.X, 0, other.Z) - candidate).Magnitude < 24 then
+							clear = false
+							break
+						end
+					end
+					if clear then
+						local suelo = sueloLibre(candidate.X, candidate.Z)
+						if suelo then
+							pos = Vector3.new(candidate.X, suelo.Y + 4, candidate.Z)
+							break
+						end
+					end
 				end
 			end
-			if clear then
-				bestAngle = angle
+			if pos then
 				break
 			end
 		end
-		local pos = center + Vector3.new(math.cos(bestAngle) * dist, 4, math.sin(bestAngle) * dist)
+		if not pos then
+			-- Ultimo recurso: el punto de siempre (mejor que no tener spawn)
+			pos = center + Vector3.new(math.cos(baseAngle) * dist, floorY + 4, math.sin(baseAngle) * dist)
+		end
 		table.insert(self.spawns, CFrame.lookAt(pos, Vector3.new(center.X, pos.Y, center.Z)))
 	end
 
-	self.kiwiSpawn = center + Vector3.new(rng:NextNumber(-45, 45), 0, rng:NextNumber(-45, 45))
+	-- Punto donde arranca el kiwi: tambien sobre piso limpio (nada de
+	-- aparecer adentro de una colina o de una casa)
+	local kiwiSpawn = nil
+	for attempt = 1, 24 do
+		local dx = rng:NextNumber(-45, 45)
+		local dz = rng:NextNumber(-45, 45)
+		local suelo = sueloLibre(center.X + dx, center.Z + dz)
+		if suelo then
+			kiwiSpawn = suelo
+			break
+		end
+	end
+	self.kiwiSpawn = kiwiSpawn or (center + Vector3.new(rng:NextNumber(-45, 45), 0, rng:NextNumber(-45, 45)))
 
 	-- Leyenda del mapa: era un cartel gigante con el nombre de la zona
 	-- ("Alpes del Sur", etc.) plantado en la arena. Se saco de todos los
@@ -2706,6 +2749,38 @@ function WorldBuilder.buildAsedioFort(arena)
 	local baseDefensa = pisoEn(posDefensa.X, posDefensa.Z)
 	local chestDefensa = chestProp(folder, {}, CFrame.new(baseDefensa), "Baúl Defensores")
 
+	-- Corralito del kiwi: un cerco de madera adentro de su casa, en la
+	-- planta baja. El kiwi espera quieto ahi (los Cazadores ya saben
+	-- donde ir a buscarlo) y los Defensores lo cuidan desde el castillo.
+	local corralR = Config.Asedio.corralRadius or 4.2
+	local corralPos = centro + izq * 3.4 + haciaCentro * 1.6 + Vector3.new(0, 0.6, 0)
+	local corralY = corralPos.Y
+	local corralFence = corralR + 0.35
+	local colorCorral = Color3.fromRGB(152, 112, 68)
+	local postesCorral = 14
+	for i = 1, postesCorral do
+		local a = (i - 1) / postesCorral * math.pi * 2
+		local d = haciaCentro * math.cos(a) + izq * math.sin(a)
+		local poste = corralPos + Vector3.new(d.X, 0, d.Z) * corralFence
+		bloque("CorralPoste", cfEn(poste + Vector3.new(0, 0.9, 0), izq), Vector3.new(0.32, 1.8, 0.32), colorCorral, Enum.Material.WoodPlanks)
+		-- Se deja abierto el tramo que mira a la puerta de la casa
+		if math.abs(a) > 0.45 and math.abs(a) < math.pi * 2 - 0.45 then
+			local a2 = i / postesCorral * math.pi * 2
+			local d2 = haciaCentro * math.cos(a2) + izq * math.sin(a2)
+			local mitad = corralPos + Vector3.new(d.X + d2.X, 0, d.Z + d2.Z) * (corralFence * 0.5)
+			local t = Vector3.new(d2.X - d.X, 0, d2.Z - d.Z) * corralFence
+			if t.Magnitude > 0.05 then
+				for _, h in ipairs({ 0.55, 1.25 }) do
+					bloque("CorralTabla", cfEn(mitad + Vector3.new(0, h, 0), t.Unit), Vector3.new(t.Magnitude + 0.2, 0.24, 0.16), colorCorral, Enum.Material.WoodPlanks)
+				end
+			end
+		end
+	end
+	-- Comedero y pasto para el kiwi (adorno del corral)
+	bloque("Comedero", cfEn(corralPos + izq * 2.6 + haciaCentro * 1.4 + Vector3.new(0, 0.35, 0), izq), Vector3.new(2.4, 0.7, 0.9), Color3.fromRGB(110, 82, 52), Enum.Material.WoodPlanks)
+	bloque("PastoCorral", cfEn(corralPos - izq * 2.4 - haciaCentro * 1.8 + Vector3.new(0, 0.25, 0), izq), Vector3.new(2.0, 0.5, 1.6), Color3.fromRGB(198, 178, 92), Enum.Material.Grass)
+	arena.corral = { pos = corralPos, radius = corralR }
+
 	-- Zona de extraccion: adonde los Cazadores tienen que llevar al kiwi
 	-- capturado y aguantarlo 2 minutos. Queda marcada con un haz de luz
 	-- que se ve desde todo el mapa y un anillo.
@@ -2760,6 +2835,7 @@ function WorldBuilder.buildAsedioFort(arena)
 		chests = { attack = chestAtaque, defend = chestDefensa },
 		front = haciaCentro,                              -- direccion del porton
 		half = H,                                         -- media medida del castillo
+		corral = arena.corral,                            -- corralito del kiwi en su casa
 		zone = { pos = posZona, radius = radioZona },     -- zona de extraccion del kiwi
 	}
 end

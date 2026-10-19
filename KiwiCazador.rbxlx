@@ -43,7 +43,7 @@
 
 local Config = {}
 
-Config.Version = "1.9.6"
+Config.Version = "1.9.8"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -199,6 +199,7 @@ Config.Tracker = {
 Config.Scope = {
 	fov = 30,          -- campo de vision mientras apuntas (mas chico = mas zoom)
 	weapons = {
+		ak = 30,       -- AK-47: mira de clic derecho (mismo aumento que los rifles)
 		sniper = 14,   -- 5x (70 / 14)
 		sniper2 = 7,   -- 10x (segundo clic derecho)
 		revolver = 34,
@@ -209,10 +210,13 @@ Config.Scope = {
 -- Estilo Counter: los disparos son instantaneos (rayo) y el error sale de
 -- la formula de Counter Blox: Sauce - Restored (MIT, ver LICENSE-CB.md):
 --   error = spread del arma + velocidad * vel
---   con la mira puesta el error se divide (el francotirador es perfecto)
+--   con la mira puesta el error se divide (adsDiv del arma o el general;
+--   el francotirador es perfecto)
 --   si el error queda por debajo del minimo, el disparo sale perfecto
 -- La patada de camara tambien es la de Counter:
 --   grados = 0.9 * (1 - recoil/100), sube y vuelve sola (mas suave).
+-- Con la mira puesta, adsRecoil del arma multiplica esa patada (el AK-47
+-- apuntado se afirma: mas precision y menos retroceso).
 Config.Shoot = {
 	div = 6,            -- divisor del error (mas alto = mas preciso)
 	dead = 1.3,         -- por debajo de esto, disparo perfecto
@@ -233,7 +237,9 @@ Config.Shoot = {
 		cohete = { recoil = 18 },
 		-- Arsenal estilo Counter Blox (baules): automaticas, MP5, pistola
 		-- y escopeta de perdigones.
-		ak = { vel = 0.55, spread = 1.1, dead = 1.6, recoil = 62 },
+		-- El AK-47 con mira (clic derecho) entra mucho mas fino y patea
+		-- menos: mas precision y menos retroceso, como pidio el jefe.
+		ak = { vel = 0.55, spread = 1.1, dead = 1.6, recoil = 62, adsDiv = 0.22, adsRecoil = 0.45 },
 		m4 = { vel = 0.45, spread = 0.8, dead = 1.4, recoil = 70 },
 		mp5 = { vel = 0.50, spread = 0.9, dead = 1.5, recoil = 78 },
 		glock = { vel = 0.42, spread = 0.5, dead = 1.5, recoil = 55 },
@@ -767,7 +773,8 @@ Config.Asedio = {
 	breakTime = 7,          -- descanso entre rondas
 	roundsToWin = 2,        -- primero a 2 rondas gana la partida
 	respawn = 7,            -- segundos para volver tras un noqueo
-	nestRadius = 20,        -- el kiwi no se aleja mas de esto de su casa (queda dentro del bunker)
+	nestRadius = 20,        -- radio historico del nido (el corral actual es mas chico)
+	corralRadius = 4.2,     -- radio del corralito del kiwi: espera quieto adentro
 	bunkerHalf = 34,        -- media medida del bunker de los Defensores (lo arma el asedio)
 	attackSpawn = 100,      -- a que distancia del nido aparecen los Cazadores
 	revolverUses = 40,      -- tiros de revolver que recibe cada cazador
@@ -3538,31 +3545,74 @@ local function buildArena(index, zone, cfg, parent, rng)
 	-- ===============================================================
 	-- Spawns y punto de aparicion del kiwi
 	-- ===============================================================
+	-- El piso real se consulta con el mundo ya armado: un rayo vertical
+	-- que ignora el terreno base. Si toca algo (colina, casa, arbol,
+	-- techo...) ese punto no sirve. Antes los spawns se ponian a ciegas
+	-- con la altura fija del mapa y el jugador aparecia enterrado
+	-- adentro de las colinas o arriba de los techos en varios mapas.
+	local sueloParams = RaycastParams.new()
+	sueloParams.IgnoreWater = true
+	sueloParams.FilterType = Enum.RaycastFilterType.Exclude
+	sueloParams.FilterDescendantsInstances = { self.ground }
+	local function sueloLibre(x, z)
+		local ray = workspace:Raycast(Vector3.new(x, floorY + 140, z), Vector3.new(0, -320, 0), sueloParams)
+		if ray then
+			return nil
+		end
+		return Vector3.new(x, floorY, z)
+	end
+
 	for i = 1, 4 do
 		local baseAngle = (i - 1) * math.pi * 0.5 + math.rad(45)
 		local dist = half - 45
-		-- Busca un angulo donde no haya props solidos cerca (roca, cabana, etc.)
-		local bestAngle = baseAngle
-		for attempt = 0, 11 do
-			local angle = baseAngle + attempt * math.rad(9)
-			local candidate = center + Vector3.new(math.cos(angle) * dist, 0, math.sin(angle) * dist)
-			local clear = true
-			for _, other in ipairs(occupied) do
-				if (Vector3.new(other.X, 0, other.Z) - candidate).Magnitude &lt; 24 then
-					clear = false
-					break
+		local pos = nil
+		-- Barre angulos y distancias hasta encontrar un claro de verdad:
+		-- lejos de los props y con el piso limpio (sin colinas ni techos)
+		for attempt = 0, 23 do
+			local angle = baseAngle + attempt * math.rad(8)
+			for _, radio in ipairs({ dist, dist - 14, dist - 28, dist + 14, dist + 28 }) do
+				if radio &gt; 60 and radio &lt; half - 30 then
+					local candidate = center + Vector3.new(math.cos(angle) * radio, 0, math.sin(angle) * radio)
+					local clear = true
+					for _, other in ipairs(occupied) do
+						if (Vector3.new(other.X, 0, other.Z) - candidate).Magnitude &lt; 24 then
+							clear = false
+							break
+						end
+					end
+					if clear then
+						local suelo = sueloLibre(candidate.X, candidate.Z)
+						if suelo then
+							pos = Vector3.new(candidate.X, suelo.Y + 4, candidate.Z)
+							break
+						end
+					end
 				end
 			end
-			if clear then
-				bestAngle = angle
+			if pos then
 				break
 			end
 		end
-		local pos = center + Vector3.new(math.cos(bestAngle) * dist, 4, math.sin(bestAngle) * dist)
+		if not pos then
+			-- Ultimo recurso: el punto de siempre (mejor que no tener spawn)
+			pos = center + Vector3.new(math.cos(baseAngle) * dist, floorY + 4, math.sin(baseAngle) * dist)
+		end
 		table.insert(self.spawns, CFrame.lookAt(pos, Vector3.new(center.X, pos.Y, center.Z)))
 	end
 
-	self.kiwiSpawn = center + Vector3.new(rng:NextNumber(-45, 45), 0, rng:NextNumber(-45, 45))
+	-- Punto donde arranca el kiwi: tambien sobre piso limpio (nada de
+	-- aparecer adentro de una colina o de una casa)
+	local kiwiSpawn = nil
+	for attempt = 1, 24 do
+		local dx = rng:NextNumber(-45, 45)
+		local dz = rng:NextNumber(-45, 45)
+		local suelo = sueloLibre(center.X + dx, center.Z + dz)
+		if suelo then
+			kiwiSpawn = suelo
+			break
+		end
+	end
+	self.kiwiSpawn = kiwiSpawn or (center + Vector3.new(rng:NextNumber(-45, 45), 0, rng:NextNumber(-45, 45)))
 
 	-- Leyenda del mapa: era un cartel gigante con el nombre de la zona
 	-- ("Alpes del Sur", etc.) plantado en la arena. Se saco de todos los
@@ -3976,6 +4026,38 @@ function WorldBuilder.buildAsedioFort(arena)
 	local baseDefensa = pisoEn(posDefensa.X, posDefensa.Z)
 	local chestDefensa = chestProp(folder, {}, CFrame.new(baseDefensa), "Baúl Defensores")
 
+	-- Corralito del kiwi: un cerco de madera adentro de su casa, en la
+	-- planta baja. El kiwi espera quieto ahi (los Cazadores ya saben
+	-- donde ir a buscarlo) y los Defensores lo cuidan desde el castillo.
+	local corralR = Config.Asedio.corralRadius or 4.2
+	local corralPos = centro + izq * 3.4 + haciaCentro * 1.6 + Vector3.new(0, 0.6, 0)
+	local corralY = corralPos.Y
+	local corralFence = corralR + 0.35
+	local colorCorral = Color3.fromRGB(152, 112, 68)
+	local postesCorral = 14
+	for i = 1, postesCorral do
+		local a = (i - 1) / postesCorral * math.pi * 2
+		local d = haciaCentro * math.cos(a) + izq * math.sin(a)
+		local poste = corralPos + Vector3.new(d.X, 0, d.Z) * corralFence
+		bloque("CorralPoste", cfEn(poste + Vector3.new(0, 0.9, 0), izq), Vector3.new(0.32, 1.8, 0.32), colorCorral, Enum.Material.WoodPlanks)
+		-- Se deja abierto el tramo que mira a la puerta de la casa
+		if math.abs(a) &gt; 0.45 and math.abs(a) &lt; math.pi * 2 - 0.45 then
+			local a2 = i / postesCorral * math.pi * 2
+			local d2 = haciaCentro * math.cos(a2) + izq * math.sin(a2)
+			local mitad = corralPos + Vector3.new(d.X + d2.X, 0, d.Z + d2.Z) * (corralFence * 0.5)
+			local t = Vector3.new(d2.X - d.X, 0, d2.Z - d.Z) * corralFence
+			if t.Magnitude &gt; 0.05 then
+				for _, h in ipairs({ 0.55, 1.25 }) do
+					bloque("CorralTabla", cfEn(mitad + Vector3.new(0, h, 0), t.Unit), Vector3.new(t.Magnitude + 0.2, 0.24, 0.16), colorCorral, Enum.Material.WoodPlanks)
+				end
+			end
+		end
+	end
+	-- Comedero y pasto para el kiwi (adorno del corral)
+	bloque("Comedero", cfEn(corralPos + izq * 2.6 + haciaCentro * 1.4 + Vector3.new(0, 0.35, 0), izq), Vector3.new(2.4, 0.7, 0.9), Color3.fromRGB(110, 82, 52), Enum.Material.WoodPlanks)
+	bloque("PastoCorral", cfEn(corralPos - izq * 2.4 - haciaCentro * 1.8 + Vector3.new(0, 0.25, 0), izq), Vector3.new(2.0, 0.5, 1.6), Color3.fromRGB(198, 178, 92), Enum.Material.Grass)
+	arena.corral = { pos = corralPos, radius = corralR }
+
 	-- Zona de extraccion: adonde los Cazadores tienen que llevar al kiwi
 	-- capturado y aguantarlo 2 minutos. Queda marcada con un haz de luz
 	-- que se ve desde todo el mapa y un anillo.
@@ -4030,6 +4112,7 @@ function WorldBuilder.buildAsedioFort(arena)
 		chests = { attack = chestAtaque, defend = chestDefensa },
 		front = haciaCentro,                              -- direccion del porton
 		half = H,                                         -- media medida del castillo
+		corral = arena.corral,                            -- corralito del kiwi en su casa
 		zone = { pos = posZona, radius = radioZona },     -- zona de extraccion del kiwi
 	}
 end
@@ -4346,15 +4429,20 @@ function KiwiController.new(arena, kiwiCfg, rng, callbacks, opts)
 	self.brain = opts.brain or "hider"
 	self.giant = self.brain == "seeker"
 	self.leash = opts.leash
+	-- Kiwi de corral (asedio): espera plantado en su casa, girando apenas
+	-- para mirar a quien se arrima; no se pasea por el mapa.
+	self.estatico = opts.estatico and true or false
 
 	self.rig = KiwiModel.build(arena.folder, opts.scale)
 	self.model = self.rig.model
 	self.rideHeight = self.rig.rideHeight or KiwiModel.RideHeight
 
 	self.pos = opts.spawn or arena.kiwiSpawn or arena.center
-	self.pos = Vector3.new(self.pos.X, arena.floorY + self.rideHeight, self.pos.Z)
+	-- Piso local: el corral del asedio esta sobre el piso de la casa
+	self.baseY = opts.floorY or arena.floorY
+	self.pos = Vector3.new(self.pos.X, self.baseY + self.rideHeight, self.pos.Z)
 	self.facing = Vector3.new(0, 0, 1)
-	self.lastGroundY = arena.floorY
+	self.lastGroundY = self.baseY
 	self.animPhase = 0
 	self.alert = 0
 	self.stamina = kiwiCfg.stamina or 10
@@ -5134,6 +5222,48 @@ function KiwiController:step(dt, players, baits)
 		if self.sedateLeft &lt;= 0 then
 			self:wake()
 		end
+		return
+	end
+
+	if self.estatico then
+		-- Kiwi del corral: quieto en su casa. Solo gira despacio para
+		-- mirar al que se arrima y pega el picotazo defensivo si lo
+		-- acorralan contra una pared (stepPeck se encarga del resto).
+		local best, bestDist = nil, math.huge
+		for _, entry in ipairs(players) do
+			if entry.pos and not entry.hidden then
+				local d = (entry.pos - self.pos).Magnitude
+				if d &lt; bestDist then
+					best, bestDist = entry, d
+				end
+			end
+		end
+		self.threat = best
+		self.threatDist = bestDist
+		if best and bestDist &lt; 24 then
+			local to = flat(best.pos - self.pos)
+			if to.Magnitude &gt; 0.6 then
+				local goal = to.Unit
+				local paso = math.min(1, dt * 1.8)
+				local girado = flat(self.facing) * (1 - paso) + goal * paso
+				if girado.Magnitude &gt; 0.01 then
+					self.facing = girado.Unit
+				end
+			end
+		end
+		self:stepPeck(dt)
+		self.animPhase = self.animPhase + dt * 2.5
+		local peck = 0
+		if self.peckAnim &gt; 0 then
+			peck = math.sin((1 - self.peckAnim / 0.5) * math.pi)
+		end
+		local cabeza = 0.18 + math.sin(self.stateTime * 1.5) * 0.08
+		self.rig:update(CFrame.lookAt(self.pos, self.pos + self.facing), {
+			phase = 0,
+			legSwing = 0,
+			headPitch = cabeza + peck * 0.8,
+			beak = peck * 0.9,
+		})
 		return
 	end
 
@@ -7069,7 +7199,8 @@ function Actions.spreadError(weaponId, root, data)
 		if cfg.adsPerfect then
 			error = 0
 		else
-			error = error * (shoot.adsDiv or 0.35)
+			-- adsDiv del arma (el AK-47 apuntado es mucho mas fino)
+			error = error * (cfg.adsDiv or shoot.adsDiv or 0.35)
 		end
 	end
 	local dead = cfg.dead or shoot.dead or 0
@@ -7962,41 +8093,117 @@ end
 -- ===============================================================
 local GRENADE_GRAVITY = (Config.World and Config.World.Gravity) or 165
 
--- Nube de humo: esferas ancladas que tapan la vista pero dejan pasar los
--- tiros (los rayos las ignoran). Se disipa sola a los pocos segundos.
+-- Nube de humo: esferas que brotan, se hinchan y se disipan, mas focos de
+-- particulas que le dan textura (tapa la vista pero deja pasar los tiros:
+-- los rayos la ignoran). Se disipa sola a los pocos segundos.
 local function smokeCloud(pos)
 	local cfg = Config.Grenades.humo
-	local parts = {}
-	for i = 1, 20 do
+	local FUEGO = "rbxasset://textures/particles/fire_main.dds"
+	local partes = {}
+	local bolas = {}
+	-- El cuerpo de la nube: esferas que nacen chicas y crecen al brotar
+	for i = 1, 22 do
 		local angle = math.random() * math.pi * 2
 		local dist = math.sqrt(math.random()) * cfg.radius
-		local size = math.random(80, 150) / 10
+		local size = math.random(90, 160) / 10
 		local part = Util.makePart({
-			Name = "Humo",
+			Name = "HumoBola",
 			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(size, size, size),
-			Color = Color3.fromRGB(212, 216, 220),
+			Size = Vector3.new(size * 0.3, size * 0.3, size * 0.3),
+			Color = Color3.fromRGB(206, 210, 214),
 			Material = Enum.Material.SmoothPlastic,
-			Transparency = 0.42,
+			Transparency = 0.88,
 			Anchored = true,
 			CanCollide = false,
 			CanQuery = false,
 			CanTouch = false,
-			CFrame = CFrame.new(pos + Vector3.new(math.cos(angle) * dist, math.random(0, 9) - 1, math.sin(angle) * dist)),
+			CFrame = CFrame.new(pos + Vector3.new(math.cos(angle) * dist * 0.45,
+				math.random(0, 6) - 0.5, math.sin(angle) * dist * 0.45)),
 			Parent = workspace,
 		})
-		table.insert(parts, part)
+		table.insert(partes, part)
+		table.insert(bolas, { part = part, tam = size, brote = 0 })
 	end
-	task.delay(cfg.time, function()
-		for _ = 1, 12 do
-			task.wait(0.12)
-			for _, p in ipairs(parts) do
+	-- Focos de particulas: el humo sube y se abre con textura de verdad
+	for i = 1, 3 do
+		local angle = math.random() * math.pi * 2
+		local dist = math.sqrt(math.random()) * cfg.radius * 0.45
+		local base = pos + Vector3.new(math.cos(angle) * dist, 1 + math.random() * 3, math.sin(angle) * dist)
+		local foco = Util.makePart({
+			Name = "Humo",
+			Size = Vector3.new(0.5, 0.5, 0.5),
+			Transparency = 1,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.new(base),
+			Parent = workspace,
+		})
+		table.insert(partes, foco)
+		local humo = Instance.new("ParticleEmitter")
+		humo.Name = "Nube"
+		humo.Texture = FUEGO -- La textura de llama, apagada a gris claro
+		humo.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(214, 218, 222)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(148, 152, 156)),
+		})
+		humo.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.8),
+			NumberSequenceKeypoint.new(0.5, 0.88),
+			NumberSequenceKeypoint.new(1, 0.98),
+		})
+		humo.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 4),
+			NumberSequenceKeypoint.new(1, 11),
+		})
+		humo.Lifetime = NumberRange.new(1.4, 2.6)
+		humo.Speed = NumberRange.new(2.5, 5.5)
+		humo.SpreadAngle = Vector2.new(20, 20)
+		humo.Acceleration = Vector3.new(0, 1.6, 0)
+		humo.Rotation = NumberRange.new(-180, 180)
+		humo.RotSpeed = NumberRange.new(-25, 25)
+		humo.LightEmission = 0
+		humo.LightInfluence = 1
+		humo.Rate = 10
+		humo.Parent = foco
+	end
+
+	-- Brota: en el primer segundo la nube se hincha y se pone densa
+	task.spawn(function()
+		for _ = 1, 9 do
+			task.wait(0.1)
+			for _, b in ipairs(bolas) do
+				local p = b.part
 				if p and p.Parent then
-					p.Transparency = math.min(1, p.Transparency + 0.05)
+					b.brote = math.min(1, b.brote + 0.11)
+					local e = 1 - (1 - b.brote) ^ 2
+					local tam = b.tam * (0.3 + 0.7 * e)
+					p.Size = Vector3.new(tam, tam, tam)
+					p.Transparency = 0.88 - 0.42 * e
 				end
 			end
 		end
-		for _, p in ipairs(parts) do
+	end)
+
+	-- Se disipa: las esferas se abren y se van, y todo se limpia solo
+	task.delay(cfg.time, function()
+		for _ = 1, 14 do
+			task.wait(0.12)
+			for _, p in ipairs(partes) do
+				if p and p.Parent then
+					p.Transparency = math.min(1, p.Transparency + 0.06)
+				end
+			end
+			for _, b in ipairs(bolas) do
+				local p = b.part
+				if p and p.Parent then
+					local tam = p.Size.X + 0.5
+					p.Size = Vector3.new(tam, tam, tam)
+				end
+			end
+		end
+		for _, p in ipairs(partes) do
 			if p and p.Parent then
 				p:Destroy()
 			end
@@ -8004,95 +8211,23 @@ local function smokeCloud(pos)
 	end)
 end
 
--- Molotov: lengua de fuego en el piso que quema a quien se quede adentro.
--- Tres capas (brasa roja, llama naranja y punta amarilla) que suben y
--- titilan cada una a su ritmo: se ve como fuego de verdad, no bolitas.
+-- Molotov: charco de fuego en el piso que quema a quien se quede adentro.
+-- Ahora el fuego es de particulas de verdad (la misma textura del
+-- lanzallamas): focos repartidos por el charco con lenguas que suben, un
+-- nucleo brillante, chispas que saltan en parabola y humo gris que se
+-- abre; abajo quedan brasas neon latiendo y la mancha quemada.
 local function fireZone(session, thrower, pos)
 	local cfg = Config.Grenades.molotov
-	local flames = {}
-	local function capa(cantidad, radio, altura, tamano, color, transparencia)
-		for i = 1, cantidad do
-			local angle = math.random() * math.pi * 2
-			local dist = math.sqrt(math.random()) * radio
-			local size = tamano * (0.72 + math.random() * 0.56)
-			local alto = altura * (0.8 + math.random() * 0.4)
-			local base = pos + Vector3.new(math.cos(angle) * dist, 0, math.sin(angle) * dist)
-			local part = Util.makePart({
-				Name = "Llama",
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.new(size, size, size),
-				Color = color,
-				Material = Enum.Material.Neon,
-				Transparency = transparencia,
-				Anchored = true,
-				CanCollide = false,
-				CanQuery = false,
-				CanTouch = false,
-				CFrame = CFrame.new(base + Vector3.new(0, alto * 0.4, 0)),
-				Parent = workspace,
-			})
-			table.insert(flames, {
-				part = part, base = base, alto = alto, tamano = size, trans = transparencia,
-				speed = 1.6 + math.random() * 2.2, fase = math.random() * 6.28,
-			})
-		end
+	local FUEGO = "rbxasset://textures/particles/fire_main.dds"
+	local CHISPA = "rbxasset://textures/particles/sparkles_main.dds"
+	local piezas = {}
+	local function guardar(part)
+		table.insert(piezas, part)
+		return part
 	end
-	capa(14, cfg.radius * 0.78, 1.2, 2.5, Color3.fromRGB(168, 44, 16), 0.2)
-	capa(18, cfg.radius * 0.66, 2.0, 1.9, Color3.fromRGB(255, 116, 30), 0.12)
-	capa(10, cfg.radius * 0.44, 2.8, 1.2, Color3.fromRGB(255, 214, 96), 0.08)
-	-- Punta blanca del fuego: chispas brillantes bien arriba
-	capa(6, cfg.radius * 0.24, 3.6, 0.8, Color3.fromRGB(255, 246, 214), 0.04)
 
-	-- Luz calida: de noche la fogata se ve desde lejos
-	local glow = Instance.new("PointLight")
-	glow.Color = Color3.fromRGB(255, 138, 58)
-	glow.Brightness = 3.2
-	glow.Range = math.max(24, cfg.radius * 2)
-	glow.Parent = flames[1].part
-
-	-- Brasas que saltan y humo que se abre por encima: es lo que hace que
-	-- el fuego se vea vivo de verdad, no una calcomania
-	local brasas = {}
-	for i = 1, 10 do
-		local part = Util.makePart({
-			Name = "Brasa",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(0.24, 0.24, 0.24),
-			Color = Color3.fromRGB(255, 198, 96),
-			Material = Enum.Material.Neon,
-			Transparency = 0.1,
-			Anchored = true,
-			CanCollide = false,
-			CanQuery = false,
-			CanTouch = false,
-			CFrame = CFrame.new(pos + Vector3.new(0, 0.6, 0)),
-			Parent = workspace,
-		})
-		table.insert(brasas, { part = part, t = 99, vida = 1, vel = Vector3.new(0, 8, 0), origen = pos })
-	end
-	local humos = {}
-	for i = 1, 6 do
-		local part = Util.makePart({
-			Name = "Humo",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(2, 2, 2),
-			Color = Color3.fromRGB(58, 54, 52),
-			Material = Enum.Material.SmoothPlastic,
-			Transparency = 0.62,
-			Anchored = true,
-			CanCollide = false,
-			CanQuery = false,
-			CanTouch = false,
-			CFrame = CFrame.new(pos + Vector3.new(0, 1.4, 0)),
-			Parent = workspace,
-		})
-		table.insert(humos, {
-			part = part, t = math.random() * 2.4, vida = 2.4,
-			origen = pos, deriva = Vector3.new(0, 2.2, 0),
-		})
-	end
 	-- Mancha quemada en el piso bajo el fuego
-	local mancha = Util.makePart({
+	guardar(Util.makePart({
 		Name = "Quemado",
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(0.08, cfg.radius * 2.1, cfg.radius * 2.1),
@@ -8105,102 +8240,258 @@ local function fireZone(session, thrower, pos)
 		CanTouch = false,
 		CFrame = CFrame.new(pos + Vector3.new(0, 0.06, 0)) * CFrame.Angles(0, 0, math.rad(90)),
 		Parent = workspace,
-	})
+	}))
+
+	-- Focos de llama: cada uno larga lenguas, nucleo y chispas. Cuanto mas
+	-- cerca del centro, mas altas y mas fuertes salen.
+	local FOCOS = 7
+	for i = 1, FOCOS do
+		local ang = (i - 1) / FOCOS * math.pi * 2 + math.random() * 0.5
+		local dist = math.sqrt(math.random()) * cfg.radius * 0.72
+		local fuerza = 1.25 - (dist / cfg.radius) * 0.6
+		local base = pos + Vector3.new(math.cos(ang) * dist, 0, math.sin(ang) * dist)
+		local foco = guardar(Util.makePart({
+			Name = "Llama",
+			Size = Vector3.new(0.4, 0.4, 0.4),
+			Transparency = 1,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.new(base + Vector3.new(0, 0.5, 0)),
+			Parent = workspace,
+		}))
+
+		-- Lenguas: suben estirandose y pasan de amarillo a rojo oscuro
+		local llama = Instance.new("ParticleEmitter")
+		llama.Name = "Fuego"
+		llama.Texture = FUEGO
+		llama.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 238, 176)),
+			ColorSequenceKeypoint.new(0.35, Color3.fromRGB(255, 150, 54)),
+			ColorSequenceKeypoint.new(0.75, Color3.fromRGB(226, 82, 22)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(112, 22, 8)),
+		})
+		llama.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.08),
+			NumberSequenceKeypoint.new(0.65, 0.45),
+			NumberSequenceKeypoint.new(1, 0.9),
+		})
+		llama.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1.3 * fuerza),
+			NumberSequenceKeypoint.new(0.55, 2.6 * fuerza),
+			NumberSequenceKeypoint.new(1, 4.4 * fuerza),
+		})
+		llama.Lifetime = NumberRange.new(0.55, 1)
+		llama.Speed = NumberRange.new(2.6, 6.2)
+		llama.SpreadAngle = Vector2.new(24, 24)
+		llama.Acceleration = Vector3.new(0, 8.5, 0)
+		llama.Rotation = NumberRange.new(-180, 180)
+		llama.RotSpeed = NumberRange.new(-80, 80)
+		llama.LightEmission = 1
+		llama.LightInfluence = 0
+		llama.Rate = (14 + math.random() * 8) * fuerza
+		llama.Parent = foco
+
+		-- Nucleo: la parte mas caliente, corta y casi blanca
+		local nucleo = Instance.new("ParticleEmitter")
+		nucleo.Name = "Nucleo"
+		nucleo.Texture = FUEGO
+		nucleo.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 252, 236)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 232, 158)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 178, 80)),
+		})
+		nucleo.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.25),
+			NumberSequenceKeypoint.new(1, 0.95),
+		})
+		nucleo.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.5),
+			NumberSequenceKeypoint.new(1, 1.5),
+		})
+		nucleo.Lifetime = NumberRange.new(0.25, 0.5)
+		nucleo.Speed = NumberRange.new(3, 7)
+		nucleo.SpreadAngle = Vector2.new(14, 14)
+		nucleo.Acceleration = Vector3.new(0, 9, 0)
+		nucleo.LightEmission = 1
+		nucleo.LightInfluence = 0
+		nucleo.Rate = 8 * fuerza
+		nucleo.Parent = foco
+
+		-- Chispas: saltan del fuego y caen en parabola
+		local chispas = Instance.new("ParticleEmitter")
+		chispas.Name = "Chispas"
+		chispas.Texture = CHISPA
+		chispas.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 216, 140)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 108, 28)),
+		})
+		chispas.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.1),
+			NumberSequenceKeypoint.new(0.7, 0.4),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		chispas.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.34),
+			NumberSequenceKeypoint.new(1, 0.06),
+		})
+		chispas.Lifetime = NumberRange.new(0.5, 1.1)
+		chispas.Speed = NumberRange.new(9, 17)
+		chispas.SpreadAngle = Vector2.new(34, 34)
+		chispas.Acceleration = Vector3.new(0, -26, 0)
+		chispas.LightEmission = 1
+		chispas.LightInfluence = 0
+		chispas.Rate = 3 + math.random() * 3
+		chispas.Parent = foco
+	end
+
+	-- Brasas vivas sobre el piso: bolitas naranjas que laten y dan el
+	-- rescoldo caliente (de noche se ve la fogata desde lejos)
+	local brasas = {}
+	for i = 1, 12 do
+		local ang = math.random() * math.pi * 2
+		local dist = math.sqrt(math.random()) * cfg.radius * 0.85
+		local base = pos + Vector3.new(math.cos(ang) * dist, 0, math.sin(ang) * dist)
+		local tam = 0.28 + math.random() * 0.3
+		local part = guardar(Util.makePart({
+			Name = "Brasa",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(tam, tam, tam),
+			Color = Color3.fromRGB(255, 132 + math.random(0, 60), 60),
+			Material = Enum.Material.Neon,
+			Transparency = 0.15,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.new(base + Vector3.new(0, tam * 0.4, 0)),
+			Parent = workspace,
+		}))
+		table.insert(brasas, { part = part, tam = tam, fase = math.random() * 6.28, vel = 1.2 + math.random() })
+	end
+
+	-- Humo gris que sale del fuego: sube, se abre y se va
+	for i = 1, 3 do
+		local ang = math.random() * math.pi * 2
+		local dist = math.sqrt(math.random()) * cfg.radius * 0.5
+		local base = pos + Vector3.new(math.cos(ang) * dist, 0, math.sin(ang) * dist)
+		local foco = guardar(Util.makePart({
+			Name = "Humo",
+			Size = Vector3.new(0.5, 0.5, 0.5),
+			Transparency = 1,
+			Anchored = true,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+			CFrame = CFrame.new(base + Vector3.new(0, 2, 0)),
+			Parent = workspace,
+		}))
+		local humo = Instance.new("ParticleEmitter")
+		humo.Name = "HumoGris"
+		humo.Texture = FUEGO -- La misma textura de llama, apagada a gris
+		humo.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(96, 90, 84)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(46, 42, 40)),
+		})
+		humo.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.72),
+			NumberSequenceKeypoint.new(0.6, 0.86),
+			NumberSequenceKeypoint.new(1, 0.97),
+		})
+		humo.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 2.4),
+			NumberSequenceKeypoint.new(1, 7.2),
+		})
+		humo.Lifetime = NumberRange.new(1.4, 2.4)
+		humo.Speed = NumberRange.new(2.4, 4.8)
+		humo.SpreadAngle = Vector2.new(16, 16)
+		humo.Acceleration = Vector3.new(0, 2.4, 0)
+		humo.Rotation = NumberRange.new(-180, 180)
+		humo.RotSpeed = NumberRange.new(-30, 30)
+		humo.LightEmission = 0
+		humo.LightInfluence = 1
+		humo.Rate = 6 + math.random() * 4
+		humo.Parent = foco
+	end
+
+	-- Luz calida que titila, como una fogata de verdad
+	local luzFoco = guardar(Util.makePart({
+		Name = "LuzFuego",
+		Size = Vector3.new(0.3, 0.3, 0.3),
+		Transparency = 1,
+		Anchored = true,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CFrame = CFrame.new(pos + Vector3.new(0, 2.2, 0)),
+		Parent = workspace,
+	}))
+	local glow = Instance.new("PointLight")
+	glow.Color = Color3.fromRGB(255, 138, 58)
+	glow.Brightness = 3.2
+	glow.Range = math.max(26, cfg.radius * 2)
+	glow.Parent = luzFoco
 
 	local endsAt = os.clock() + cfg.time
 	local nextBurn = 0
+	local apagado = false
+	local function apagar()
+		if apagado then
+			return
+		end
+		apagado = true
+		for _, p in ipairs(piezas) do
+			if p and p.Parent then
+				p:Destroy()
+			end
+		end
+	end
 	task.spawn(function()
 		local t0 = os.clock()
-		while os.clock() &lt; endsAt do
+		while os.clock() &lt; endsAt and not session.finished do
 			task.wait(0.09)
-			local t = os.clock() - t0
-			for _, f in ipairs(flames) do
-				local p = f.part
-				if p and p.Parent then
-					-- Cada lengua late distinto y se estira hacia arriba
-					local onda = math.sin(t * f.speed * 3.1 + f.fase)
-					local subida = (math.sin(t * f.speed + f.fase) * 0.5 + 0.5) * f.alto
-					local alto = f.alto * (0.75 + math.random() * 0.5)
-					p.CFrame = CFrame.new(f.base + Vector3.new(0, alto * 0.4 + subida * 0.5, 0))
-					p.Size = Vector3.new(f.tamano * (0.9 + onda * 0.12), alto * 1.6, f.tamano * (0.9 + onda * 0.12))
-					p.Transparency = math.clamp(f.trans + math.abs(onda) * 0.08 + math.random() * 0.06, 0, 0.7)
-				end
-			end
-			-- Brasas: salen del fuego, suben en parabola y se apagan
-			for _, b in ipairs(brasas) do
-				local p = b.part
-				if p and p.Parent then
-					b.t = b.t + 0.09
-					if b.t &gt;= b.vida then
-						b.t = 0
-						b.vida = 0.7 + math.random() * 0.6
-						local ang = math.random() * math.pi * 2
-						local d = math.sqrt(math.random()) * cfg.radius * 0.55
-						b.origen = pos + Vector3.new(math.cos(ang) * d, 0.5 + math.random() * 1.3, math.sin(ang) * d)
-						b.vel = Vector3.new((math.random() - 0.5) * 5.5, 7 + math.random() * 4.5, (math.random() - 0.5) * 5.5)
+			-- Todo el latido va protegido: si la partida termino o algo dejo
+			-- de existir, el fuego igual se apaga solo (nunca queda prendido)
+			pcall(function()
+				local t = os.clock() - t0
+				-- El rescoldo late: las particulas del fuego se animan solas
+				for _, b in ipairs(brasas) do
+					local p = b.part
+					if p and p.Parent then
+						local latido = math.sin(t * b.vel * 2.6 + b.fase) * 0.5 + 0.5
+						local tam = b.tam * (0.82 + latido * 0.4)
+						p.Size = Vector3.new(tam, tam * 0.8, tam)
+						p.Transparency = 0.1 + (1 - latido) * 0.35
 					end
-					local esc = 1 - (b.t / b.vida) * 0.55
-					p.CFrame = CFrame.new(b.origen + b.vel * b.t + Vector3.new(0, -4.6 * b.t * b.t, 0))
-					p.Size = Vector3.new(0.24 * esc, 0.24 * esc, 0.24 * esc)
-					p.Transparency = math.clamp(0.08 + (b.t / b.vida) * 0.85, 0, 0.92)
 				end
-			end
-			-- Humo: sube abriendose y se va desvaneciendo
-			for _, h in ipairs(humos) do
-				local p = h.part
-				if p and p.Parent then
-					h.t = h.t + 0.09
-					if h.t &gt;= h.vida then
-						h.t = 0
-						h.vida = 2.1 + math.random() * 1.3
-						local ang = math.random() * math.pi * 2
-						local d = math.sqrt(math.random()) * cfg.radius * 0.45
-						h.origen = pos + Vector3.new(math.cos(ang) * d, 1.2 + math.random() * 1.6, math.sin(ang) * d)
-						h.deriva = Vector3.new((math.random() - 0.5) * 1.8, 2.2 + math.random() * 1.2, (math.random() - 0.5) * 1.8)
-					end
-					local crecer = 1.9 + h.t * 2.3
-					p.Size = Vector3.new(crecer, crecer, crecer)
-					p.CFrame = CFrame.new(h.origen + h.deriva * h.t)
-					p.Transparency = math.clamp(0.58 + (h.t / h.vida) * 0.4, 0, 0.96)
-				end
-			end
-			-- La luz tambien titila, como una fogata de verdad
-			glow.Brightness = 2.8 + math.random() * 1.6
-			if os.clock() &gt;= nextBurn then
-				nextBurn = os.clock() + cfg.burnEvery
-				for _, other in ipairs(session.players) do
-					local _, otherRoot = getRoot(other)
-					if otherRoot and not session.knocked[other] then
-						local away = otherRoot.Position - pos
-						local flatAway = Vector3.new(away.X, 0, away.Z)
-						if math.abs(away.Y) &lt; 8 and flatAway.Magnitude &lt;= cfg.radius then
-							if other == thrower or not friendlyShot(session, thrower, other) then
-								session:damagePlayer(other, thrower, cfg.name, cfg.burnDamage, pos)
+				-- La luz titila con rafagas, como una fogata de verdad
+				glow.Brightness = 2.8 + math.random() * 1.7
+				if os.clock() &gt;= nextBurn then
+					nextBurn = os.clock() + cfg.burnEvery
+					for _, other in ipairs(session.players) do
+						local _, otherRoot = getRoot(other)
+						if otherRoot and not session.knocked[other] then
+							local away = otherRoot.Position - pos
+							local flatAway = Vector3.new(away.X, 0, away.Z)
+							if math.abs(away.Y) &lt; 8 and flatAway.Magnitude &lt;= cfg.radius then
+								if other == thrower or not friendlyShot(session, thrower, other) then
+									session:damagePlayer(other, thrower, cfg.name, cfg.burnDamage, pos)
+								end
 							end
 						end
 					end
 				end
-			end
+			end)
 		end
-		for _, f in ipairs(flames) do
-			if f.part and f.part.Parent then
-				f.part:Destroy()
-			end
-		end
-		for _, b in ipairs(brasas) do
-			if b.part and b.part.Parent then
-				b.part:Destroy()
-			end
-		end
-		for _, h in ipairs(humos) do
-			if h.part and h.part.Parent then
-				h.part:Destroy()
-			end
-		end
-		if mancha and mancha.Parent then
-			mancha:Destroy()
-		end
+		apagar()
 	end)
+	-- Red de seguridad: aunque el latido se corte por un error, a los pocos
+	-- segundos el fuego se limpia igual (nunca queda una molotov prendida)
+	task.delay(cfg.time + 2, apagar)
+	-- Y la partida se lleva sus fuegos al terminar
+	session.fires = session.fires or {}
+	table.insert(session.fires, apagar)
 end
 
 -- Flashbang: pantalla blanca para quienes la ven sin pared en el medio.
@@ -9333,6 +9624,7 @@ function Session.new(modeId, rng, opts)
 	self.fort = nil        -- castillo del asedio (se destruye al terminar)
 	self.fortChests = nil
 	self.safeZoneFolder = nil -- zona segura del colosal (solo en su partida)
+	self.fires = {}        -- fuegos de molotov vivos (se apagan al terminar)
 
 	if modeId == "asedio" then
 		self.isMulti = false
@@ -10466,19 +10758,39 @@ function Session:spawnsFor(player)
 			end
 		end
 
-		-- Busca suelo firme en ese angulo (avisa si el punto esta tapado)
-		local function punto(radio)
-			local p = nest + Vector3.new(math.cos(angle) * radio, 0, math.sin(angle) * radio)
+		-- Suelo firme en un angulo/radio: si el rayo cae sobre una pared o
+		-- un techo (o no hay piso) devuelve nil y se prueba otro punto.
+		local params = RaycastParams.new()
+		params.IgnoreWater = true
+		local function sueloFirme(ang, radio)
+			local p = nest + Vector3.new(math.cos(ang) * radio, 0, math.sin(ang) * radio)
 			p = self.arena:clampToBounds(p)
-			local params = RaycastParams.new()
-			params.IgnoreWater = true
 			local ray = workspace:Raycast(Vector3.new(p.X, nest.Y + 70, p.Z), Vector3.new(0, -220, 0), params)
 			if ray then
 				local dy = ray.Position.Y - nest.Y
 				if dy &gt;= -1 and dy &lt;= 2.5 then
-					return ray.Position, true
+					return ray.Position
 				end
 			end
+			return nil
+		end
+
+		-- Busca suelo firme barriendo angulos y radios cercanos: asi nadie
+		-- aparece enterrado en una loma, arriba de un techo ni dentro de
+		-- una pared cuando el mapa tiene desniveles.
+		local function punto(radio)
+			for _, r in ipairs({ radio, radio - 8, radio + 8, radio - 16, radio + 16 }) do
+				if r &gt; 6 then
+					for _, da in ipairs({ 0, 0.2, -0.2, 0.4, -0.4, 0.6, -0.6 }) do
+						local hit = sueloFirme(angle + da, r)
+						if hit then
+							return hit, true
+						end
+					end
+				end
+			end
+			local p = nest + Vector3.new(math.cos(angle) * radio, 0, math.sin(angle) * radio)
+			p = self.arena:clampToBounds(p)
 			return Vector3.new(p.X, self.arena.floorY or nest.Y, p.Z), false
 		end
 
@@ -10790,6 +11102,13 @@ function Session:finish()
 	self:clearTraps()
 	Actions.clearPickups(self)
 
+	-- Los fuegos del molotov que sigan prendidos se apagan con la partida:
+	-- asi no queda ningun fuego suelto vivo en el modo siguiente
+	for _, apagar in ipairs(self.fires or {}) do
+		pcall(apagar)
+	end
+	self.fires = {}
+
 	if self.fort then
 		-- self.fort es la tabla del castillo { folder = ..., chests = ... }:
 		-- hay que destruir la carpeta, no la tabla
@@ -10842,12 +11161,17 @@ function Session:spawnKiwi()
 	local cfg = self.diff.kiwi
 	local opts
 	if self.isAsedio then
-		-- El kiwi vive en su casa: no se aleja del nido (modo 5 vs 5)
-		opts = { brain = "hider" }
-		local nest = self.arena and self.arena.nest
-		if nest then
-			opts.spawn = nest.pos
-			opts.leash = { pos = nest.pos, radius = Config.Asedio.nestRadius }
+		-- El kiwi espera quieto en su corral, adentro de su casa (5 vs 5)
+		opts = { brain = "hider", estatico = true }
+		local arena = self.arena
+		local spot = arena and arena.corral and arena.corral.pos
+		if not spot and arena and arena.nest then
+			spot = arena.nest.pos
+		end
+		if spot then
+			opts.spawn = spot
+			opts.floorY = spot.Y
+			opts.leash = { pos = spot, radius = (Config.Asedio.corralRadius or 4.2) + 1 }
 		end
 	elseif self.isColosal or self.isMulti then
 		if self.isMulti then
@@ -12331,6 +12655,37 @@ local function burst(position, color, count)
 	Debris:AddItem(holder, 2)
 end
 
+-- Fogonazo de luz que se apaga solo (explosiones y el molotov)
+local function lightFlash(position, color, brillo, alcance)
+	local holder = Instance.new("Part")
+	holder.Name = "FxLuz"
+	holder.Size = Vector3.new(0.2, 0.2, 0.2)
+	holder.Anchored = true
+	holder.CanCollide = false
+	holder.CanQuery = false
+	holder.CanTouch = false
+	holder.Transparency = 1
+	holder.Position = position
+	holder.Parent = workspace
+
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Brightness = brillo
+	light.Range = alcance
+	light.Shadows = false
+	light.Parent = holder
+
+	Debris:AddItem(holder, 0.6)
+	task.spawn(function()
+		for i = 1, 9 do
+			task.wait(0.05)
+			if light and light.Parent then
+				light.Brightness = brillo * (1 - i / 9)
+			end
+		end
+	end)
+end
+
 -- ===============================================================
 -- Lanzallamas: chorro de fuego visible (todo por codigo, sin assets)
 -- ===============================================================
@@ -13015,21 +13370,24 @@ local function fireTool(toolId)
 		revolver = 0.38, cohete = 0.55, arco = 0.28, cuchillo = 0.35, lanzallamas = 0.08,
 		ak = 0.44, m4 = 0.38, mp5 = 0.28, glock = 0.28, escopeta = 0.52,
 	}
+	local shootCfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[toolId]
+	-- Con la mira puesta el arma se afirma: menos patada de vista y de
+	-- camara (el AK-47 apuntado es mucho mas estable, como pidio el jefe)
+	local adsSoft = (scoped and shootCfg and shootCfg.adsRecoil) or 1
 	if toolId == "cuchillo" then
 		-- Cuchillo mariposa: pega un zarpazo (sin fogonazo ni patada de arma)
 		ViewModel.slash()
 	elseif Config.Grenades[toolId] then
 		-- La granada ya se tiró: sin patada de arma
 	else
-		ViewModel.recoil(RECOIL[toolId] or 0)
+		ViewModel.recoil((RECOIL[toolId] or 0) * adsSoft)
 		ViewModel.flash()
 	end
 
 	-- Patada de camara estilo Counter Blox: 0.9 * (1 - control) grados
 	-- (mas suave que la de Counter original: sube y vuelve sola)
-	local shootCfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[toolId]
 	local control = shootCfg and shootCfg.recoil or 72
-	local kick = math.rad(0.9 * (1 - control / 100))
+	local kick = math.rad(0.9 * (1 - control / 100)) * adsSoft
 	ViewModel.kickCamera(kick * (1 + math.random() * 0.4), kick * (math.random() * 2 - 1))
 
 	-- El chorro de fuego no abre la cruz como un balazo
@@ -13200,7 +13558,8 @@ local function spreadErrorLocal(weaponId)
 	end
 	local error = math.max(cfg.spread or 0, 0) + speed * (cfg.vel or 0)
 	if scoped then
-		error = cfg.adsPerfect and 0 or error * ((Config.Shoot and Config.Shoot.adsDiv) or 0.35)
+		-- adsDiv del arma: el AK-47 apuntado entra mucho mas fino
+		error = cfg.adsPerfect and 0 or error * (cfg.adsDiv or (Config.Shoot and Config.Shoot.adsDiv) or 0.35)
 	elseif sneaking then
 		error = error / ((Config.Shoot and Config.Shoot.crouchDiv) or 1.6)
 	end
@@ -13530,13 +13889,15 @@ remotes.WorldEvent.OnClientEvent:Connect(function(kind, data)
 			if tipo == "frag" then
 				soundAt(Config.Sounds.gunBoom, position, 1, 0.55)
 				burst(position, Color3.fromRGB(255, 180, 90), 46)
+				lightFlash(position, Color3.fromRGB(255, 188, 120), 7, 34)
 			elseif tipo == "humo" then
 				soundAt(Config.Sounds.dartHit, position, 0.7, 0.6)
-				burst(position, Color3.fromRGB(210, 214, 220), 36)
+				burst(position, Color3.fromRGB(210, 214, 220), 44)
 			elseif tipo == "molotov" then
 				soundAt(Config.Sounds.gunBoom, position, 0.8, 0.9)
 				soundAt(Config.Sounds.flame, position, 0.8, 0.75)
 				burst(position, Color3.fromRGB(255, 140, 60), 34)
+				lightFlash(position, Color3.fromRGB(255, 150, 60), 6, 28)
 			elseif tipo == "flash" then
 				soundAt(Config.Sounds.gunBoom, position, 0.9, 1.35)
 				soundAt(Config.Sounds.flush, position, 0.7, 1.5)
@@ -15914,6 +16275,9 @@ return HUD
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("KiwiShared")
+local Config = require(Shared.Config)
+
 local player = Players.LocalPlayer
 
 local ViewModel = {}
@@ -15937,6 +16301,24 @@ local reparentDirty = true -- hay que reacomodar piezas (arma/visibilidad)
 -- Animacion del cuchillo mariposa (estilo CS2): giro al equiparlo, F = inspeccion
 local FX = { kind = nil, t = 0, dur = 0 }
 local knifeOpen = 1    -- 1 = hoja abierta, 0 = plegada
+
+-- Sonidos del cuchillo mariposa: el latigazo de muneca al sacarlo y el
+-- clic del pestillo cuando la hoja se traba abierta (como en CS2)
+local knifeSounds = {}
+local function knifeSound(clave, id, velocidad, volumen)
+	local sonido = knifeSounds[clave]
+	if not sonido then
+		sonido = Instance.new("Sound")
+		sonido.Name = "Mariposa" .. clave
+		sonido.SoundId = id
+		sonido.Parent = player:FindFirstChildOfClass("PlayerGui") or workspace
+		knifeSounds[clave] = sonido
+	end
+	sonido.PlaybackSpeed = velocidad
+	sonido.Volume = volumen
+	sonido:Stop()
+	sonido:Play()
+end
 
 -- Posicion del arma respecto de la camara (estilo Counter Blox: al costado,
 -- bien abajo a la derecha y con una leve inclinacion, para no tapar la vista)
@@ -16405,10 +16787,11 @@ function ViewModel.setWeapon(id)
 		models[id] = BUILDERS[id]()
 	end
 	current = models[id]
-	-- Al sacar el cuchillo mariposa se abre con un giro (estilo CS2)
+	-- Al sacar el cuchillo mariposa se abre de un latigazo (estilo CS2)
 	if id == "cuchillo" then
-		FX = { kind = "draw", t = 0, dur = 0.85 }
+		FX = { kind = "draw", t = 0, dur = 0.7 }
 		knifeOpen = 0
+		knifeSound("Latigazo", Config.Sounds.netSwing, 1.35, 0.32)
 	end
 	-- Fogonazo: una bolita neon en la boca del canon
 	if current and not current.flash then
@@ -16461,6 +16844,7 @@ end
 function ViewModel.spin()
 	if currentId == "cuchillo" and visible and not hiddenByScope then
 		FX = { kind = "inspect", t = 0, dur = 1.1 }
+		knifeSound("Latigazo", Config.Sounds.netSwing, 1.1, 0.3)
 	end
 end
 
@@ -16576,15 +16960,29 @@ local function stepUnbound(dt)
 		FX.t = FX.t + dt
 		local raw = math.clamp(FX.t / FX.dur, 0, 1)
 		if FX.kind == "draw" then
-			-- Apertura de mariposa: sale desde abajo, la muneca gira y la
-			-- hoja se abre de un latigazo con un rebote corto al final
-			local e = 1 - (1 - raw) ^ 2.2
-			local rebote = math.sin(math.pi * math.min(raw * 1.6, 1)) * (1 - raw)
-			animCF = CFrame.Angles(math.rad(8) * (1 - e), 0,
-					math.rad(560) * (1 - e) + math.rad(18) * rebote)
-				* CFrame.new(0, -0.44 * (1 - e) + 0.10 * math.sin(math.pi * e), 0.32 * (1 - e))
-			local abre = math.clamp(e * 1.9, 0, 1)
-			knifeOpen = math.min(1, abre + math.sin(abre * math.pi) * 0.14)
+			-- Saque estilo CS2: el cuchillo cerrado sube de abajo a la
+			-- derecha con un giro de muneca, la mano le da un latigazo y
+			-- la hoja salta abierta con inercia; al trabarse suena el
+			-- pestillo y la mano se asienta con una ondita que se apaga
+			local subida = math.clamp(raw / 0.42, 0, 1)
+			local eSubida = 1 - (1 - subida) ^ 3
+			local latigo = math.clamp((raw - 0.38) / 0.2, 0, 1)
+			local eLatigo = latigo * latigo * (3 - 2 * latigo)
+			knifeOpen = math.min(1, eLatigo + math.sin(math.pi * latigo) * 0.05)
+			local asentar = math.clamp((raw - 0.58) / 0.42, 0, 1)
+			local ondita = math.sin(math.pi * 3.4 * asentar) * (1 - asentar) * (1 - asentar)
+			animCF = CFrame.Angles(
+					math.rad(-15) * (1 - eSubida) + math.rad(10) * math.sin(math.pi * latigo) + math.rad(3.5) * ondita,
+					math.rad(36) * (1 - eSubida) + math.rad(9) * ondita,
+					math.rad(430) * (1 - eSubida) - math.rad(42) * math.sin(math.pi * latigo) + math.rad(7) * ondita)
+				* CFrame.new(
+					0.10 * (1 - eSubida),
+					-0.52 * (1 - eSubida) + 0.07 * math.sin(math.pi * subida) + 0.028 * ondita,
+					0.32 * (1 - eSubida) - 0.05 * math.sin(math.pi * latigo))
+			if not FX.golpe and knifeOpen &gt; 0.9 then
+				FX.golpe = true
+				knifeSound("Pestillo", Config.Sounds.netHit, 1.5, 0.5)
+			end
 		elseif FX.kind == "slash" then
 			local swipe = math.sin(math.pi * raw)
 			animCF = CFrame.Angles(math.rad(-16 * swipe), math.rad(-150 * swipe), math.rad(30 * swipe))
@@ -16603,6 +17001,11 @@ local function stepUnbound(dt)
 					math.rad(540) * (1 - e))
 				* CFrame.new(0, 0.16 * math.sin(math.pi * raw), 0.06 * pliegue)
 			knifeOpen = 1 - pliegue * 0.9
+			-- El pestillo vuelve a trabarse cuando la hoja cae en la atajada
+			if not FX.golpe and raw &gt; 0.6 and knifeOpen &gt; 0.82 then
+				FX.golpe = true
+				knifeSound("Pestillo", Config.Sounds.netHit, 1.45, 0.45)
+			end
 		end
 		if raw &gt;= 1 then
 			FX.kind = nil

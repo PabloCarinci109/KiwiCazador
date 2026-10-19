@@ -53,15 +53,20 @@ function KiwiController.new(arena, kiwiCfg, rng, callbacks, opts)
 	self.brain = opts.brain or "hider"
 	self.giant = self.brain == "seeker"
 	self.leash = opts.leash
+	-- Kiwi de corral (asedio): espera plantado en su casa, girando apenas
+	-- para mirar a quien se arrima; no se pasea por el mapa.
+	self.estatico = opts.estatico and true or false
 
 	self.rig = KiwiModel.build(arena.folder, opts.scale)
 	self.model = self.rig.model
 	self.rideHeight = self.rig.rideHeight or KiwiModel.RideHeight
 
 	self.pos = opts.spawn or arena.kiwiSpawn or arena.center
-	self.pos = Vector3.new(self.pos.X, arena.floorY + self.rideHeight, self.pos.Z)
+	-- Piso local: el corral del asedio esta sobre el piso de la casa
+	self.baseY = opts.floorY or arena.floorY
+	self.pos = Vector3.new(self.pos.X, self.baseY + self.rideHeight, self.pos.Z)
 	self.facing = Vector3.new(0, 0, 1)
-	self.lastGroundY = arena.floorY
+	self.lastGroundY = self.baseY
 	self.animPhase = 0
 	self.alert = 0
 	self.stamina = kiwiCfg.stamina or 10
@@ -841,6 +846,48 @@ function KiwiController:step(dt, players, baits)
 		if self.sedateLeft <= 0 then
 			self:wake()
 		end
+		return
+	end
+
+	if self.estatico then
+		-- Kiwi del corral: quieto en su casa. Solo gira despacio para
+		-- mirar al que se arrima y pega el picotazo defensivo si lo
+		-- acorralan contra una pared (stepPeck se encarga del resto).
+		local best, bestDist = nil, math.huge
+		for _, entry in ipairs(players) do
+			if entry.pos and not entry.hidden then
+				local d = (entry.pos - self.pos).Magnitude
+				if d < bestDist then
+					best, bestDist = entry, d
+				end
+			end
+		end
+		self.threat = best
+		self.threatDist = bestDist
+		if best and bestDist < 24 then
+			local to = flat(best.pos - self.pos)
+			if to.Magnitude > 0.6 then
+				local goal = to.Unit
+				local paso = math.min(1, dt * 1.8)
+				local girado = flat(self.facing) * (1 - paso) + goal * paso
+				if girado.Magnitude > 0.01 then
+					self.facing = girado.Unit
+				end
+			end
+		end
+		self:stepPeck(dt)
+		self.animPhase = self.animPhase + dt * 2.5
+		local peck = 0
+		if self.peckAnim > 0 then
+			peck = math.sin((1 - self.peckAnim / 0.5) * math.pi)
+		end
+		local cabeza = 0.18 + math.sin(self.stateTime * 1.5) * 0.08
+		self.rig:update(CFrame.lookAt(self.pos, self.pos + self.facing), {
+			phase = 0,
+			legSwing = 0,
+			headPitch = cabeza + peck * 0.8,
+			beak = peck * 0.9,
+		})
 		return
 	end
 
