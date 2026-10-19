@@ -141,6 +141,13 @@ function KiwiController.new(arena, kiwiCfg, rng, callbacks, opts)
 		self.rig:setVisible(true)
 		self.state = "patrol"
 		self.goalPos = self:randomPointInArena()
+	elseif self.estatico then
+		-- Kiwi del corral (asedio): tiene que verse desde el arranque.
+		-- El cerebro hider nace invisible y recien se muestra al salir de
+		-- un escondite; este kiwi no se esconde nunca, asi que se prende aca.
+		self.rig:setVisible(true)
+		self.state = "wander"
+		self.goalPos = self.pos
 	else
 		self:goWander()
 	end

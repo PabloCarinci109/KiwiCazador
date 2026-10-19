@@ -372,6 +372,12 @@ local function extrasAsedio(sesion)
 		local p1 = sesion.kiwi:getPosition()
 		local dist = (p1 - sesion.fort.corral.pos).Magnitude
 		check(dist < (Config.Asedio.corralRadius + 3), "asedio: el kiwi arranca adentro del corral", string.format("%.1f", dist))
+		-- Tiene que verse: el cerebro hider nace invisible y sin este
+		-- chequeo el kiwi quedaba plantado pero transparente.
+		local rigK = sesion.kiwi.rig
+		check(rigK ~= nil and rigK.visible == true, "asedio: el kiwi del corral se ve (no esta invisible)")
+		check(rigK ~= nil and rigK.body ~= nil and rigK.body.Transparency == 0, "asedio: el cuerpo del kiwi no es transparente",
+			rigK and rigK.body and string.format("%.2f", rigK.body.Transparency) or "sin cuerpo")
 		task.wait(1.2)
 		local p2 = sesion.kiwi:getPosition()
 		check((p1 - p2).Magnitude < 1.5, "asedio: el kiwi no se pasea (sigue en el corral)")

@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.9.8"
+Config.Version = "1.9.9"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -167,6 +167,7 @@ Config.Scope = {
 	fov = 30,          -- campo de vision mientras apuntas (mas chico = mas zoom)
 	weapons = {
 		ak = 30,       -- AK-47: mira de clic derecho (mismo aumento que los rifles)
+		m4 = 30,       -- M4A1: mira de clic derecho, mismo aumento
 		sniper = 14,   -- 5x (70 / 14)
 		sniper2 = 7,   -- 10x (segundo clic derecho)
 		revolver = 34,
@@ -204,10 +205,11 @@ Config.Shoot = {
 		cohete = { recoil = 18 },
 		-- Arsenal estilo Counter Blox (baules): automaticas, MP5, pistola
 		-- y escopeta de perdigones.
-		-- El AK-47 con mira (clic derecho) entra mucho mas fino y patea
-		-- menos: mas precision y menos retroceso, como pidio el jefe.
+		-- El AK-47 y la M4A1 con mira (clic derecho) entran mucho mas
+		-- finas y patean menos: mas precision y menos retroceso, como
+		-- pidio el jefe. La M4A1 queda un toque mas firme que el AK.
 		ak = { vel = 0.55, spread = 1.1, dead = 1.6, recoil = 62, adsDiv = 0.22, adsRecoil = 0.45 },
-		m4 = { vel = 0.45, spread = 0.8, dead = 1.4, recoil = 70 },
+		m4 = { vel = 0.45, spread = 0.8, dead = 1.4, recoil = 70, adsDiv = 0.20, adsRecoil = 0.42 },
 		mp5 = { vel = 0.50, spread = 0.9, dead = 1.5, recoil = 78 },
 		glock = { vel = 0.42, spread = 0.5, dead = 1.5, recoil = 55 },
 		escopeta = { vel = 0.40, spread = 0.6, dead = 0, recoil = 40 },

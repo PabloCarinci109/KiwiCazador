@@ -56,6 +56,12 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 ### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
 
+> **1.9.9:** el **kiwi del corral ahora se ve**: al arrancar el asedio quedaba plantado en su
+> corralito pero **invisible** (el cerebro de escondite lo dejaba transparente), así que los
+> Cazadores no lo encontraban nunca; ahora se muestra desde que arranca la ronda. La **M4A1
+> con mira (clic derecho) también se afirma**: entra **más fina** (casi sin dispersión, incluso
+> caminando) y **patea bastante menos la cámara**, igual que el AK-47.
+>
 > **1.9.8:** en el **asedio el kiwi ahora espera quieto en un corralito** de madera adentro de
 > su casa, plantado en el castillo: se acabó el paseo por el fuerte y los Cazadores ya saben
 > dónde ir a buscarlo (el comedero y el pasto son de adorno, pero el picotazo sigue de pie).
@@ -423,7 +429,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.8 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.9 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):
