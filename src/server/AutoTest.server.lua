@@ -22,6 +22,7 @@ local WorldBuilder = require(modulos.WorldBuilder)
 -- Shared devuelve la carpeta ReplicatedStorage.KiwiShared: ahi vive Config
 local Shared = require(modulos.Shared)
 local Config = require(Shared.Config)
+local Net = require(Shared.Net)
 
 local pruebas, fallos = 0, 0
 
@@ -719,6 +720,49 @@ for _, caso in ipairs(casos) do
 		end
 		task.wait(1)
 	end
+end
+
+-- Menú de partida: cambiar de modo y de mapa sin esperar a morir.
+do
+	print("[AUTO-TEST] ===== MENU DE PARTIDA =====")
+	check(Net.get("RequestSwitch") ~= nil, "menu: remote para cambiar de partida")
+
+	local libres = esperar(function()
+		for _, arena in ipairs(GameManager.world.arenas) do
+			if arena.busy then
+				return false
+			end
+		end
+		return true
+	end, 15)
+	check(libres ~= nil, "menu: arenas libres para la prueba")
+
+	GameManager.requestJoin(player, "facil")
+	local s1 = GameManager.getSession(player)
+	check(s1 ~= nil and s1.modeId == "facil", "menu: entra a una partida de prueba")
+	task.wait(0.4)
+
+	local s2 = GameManager.requestSwitch(player, "normal", "dunas")
+	local actual = GameManager.getSession(player)
+	check(actual ~= nil and actual ~= s1 and actual.modeId == "normal",
+		"menu: cambia de modo sin morir")
+	check(actual ~= nil and actual.arena ~= nil and actual.arena.mapId == "dunas",
+		"menu: arranca en el mapa elegido", actual and actual.arena and actual.arena.mapId or "sin arena")
+	check(actual ~= nil and (actual.phase == "countdown" or actual.phase == "playing"),
+		"menu: la partida nueva arranca sola", actual and actual.phase or "?")
+
+	task.wait(1.6)
+	GameManager.requestSwitch(player, nil, "costa")
+	local actual2 = GameManager.getSession(player)
+	check(actual2 ~= nil and actual2 ~= actual and actual2.modeId == "normal",
+		"menu: cambia de mapa sin cambiar de modo")
+	check(actual2 ~= nil and actual2.arena ~= nil and actual2.arena.mapId == "costa",
+		"menu: queda en el mapa elegido", actual2 and actual2.arena and actual2.arena.mapId or "sin arena")
+
+	GameManager.requestLeave(player)
+	check(esperar(function()
+		return GameManager.getSession(player) == nil
+	end, 8) ~= nil, "menu: vuelve al lobby")
 end
 
 -- El fuego de los molotovs no deja restos: al terminar las partidas no

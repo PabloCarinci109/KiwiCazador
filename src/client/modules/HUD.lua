@@ -504,6 +504,26 @@ local function buildSessionHud(parent)
 	}, top)
 	parts.timer = timer
 
+	local menuButton = new("TextButton", {
+		Name = "MenuPartida",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -122, 0, 40),
+		Size = UDim2.new(0, 100, 0, 22),
+		BackgroundColor3 = Color3.fromRGB(38, 62, 46),
+		BorderSizePixel = 0,
+		AutoButtonColor = true,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 12,
+		TextColor3 = COLOR.text,
+		Text = "Menú (M)",
+	}, top)
+	corner(8, menuButton)
+	menuButton.MouseButton1Click:Connect(function()
+		if callbacks.onMenu then
+			callbacks.onMenu()
+		end
+	end)
+
 	local leave = new("TextButton", {
 		Name = "Salir",
 		AnchorPoint = Vector2.new(1, 0),
@@ -1229,6 +1249,298 @@ function HUD.hideVote()
 end
 
 -- ===============================================================
+-- MENU DE PARTIDA (M): cambiar de modo o de mapa sin esperar a morir
+-- ===============================================================
+local function marcarEntrada(entry, activo)
+	entry.button.BackgroundColor3 = activo and Color3.fromRGB(38, 54, 43) or COLOR.panelSoft
+	entry.button.Text = (activo and "• " or "") .. entry.name
+	entry.button.TextColor3 = activo and COLOR.accent or entry.color
+end
+
+local function buildGameMenu(parent)
+	local backdrop = new("TextButton", {
+		Name = "MenuJuego",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.fromRGB(5, 7, 10),
+		BackgroundTransparency = 0.42,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Text = "",
+		Visible = false,
+		ZIndex = 60,
+	}, parent)
+	parts.gameMenu = backdrop
+
+	local panel = new("Frame", {
+		Name = "Panel",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0, 760, 0, 500),
+		BackgroundColor3 = COLOR.panel,
+		BackgroundTransparency = 0.03,
+		BorderSizePixel = 0,
+		ZIndex = 61,
+	}, backdrop)
+	corner(18, panel)
+	stroke(COLOR.accent, 1.5, 0.4, panel)
+	padding(24, panel)
+
+	new("TextLabel", {
+		Name = "Titulo",
+		Size = UDim2.new(1, -44, 0, 32),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBlack,
+		TextSize = 24,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = COLOR.text,
+		Text = "MENÚ DE PARTIDA",
+		ZIndex = 62,
+	}, panel)
+
+	local info = new("TextLabel", {
+		Name = "Info",
+		Position = UDim2.new(0, 0, 0, 34),
+		Size = UDim2.new(1, 0, 0, 20),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = COLOR.muted,
+		Text = "Modo · Mapa",
+		ZIndex = 62,
+	}, panel)
+	parts.gameMenuInfo = info
+
+	local close = new("TextButton", {
+		Name = "Cerrar",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.new(0, 34, 0, 30),
+		BackgroundColor3 = Color3.fromRGB(44, 30, 30),
+		BorderSizePixel = 0,
+		AutoButtonColor = true,
+		Font = Enum.Font.GothamBold,
+		TextSize = 17,
+		TextColor3 = COLOR.text,
+		Text = "X",
+		ZIndex = 62,
+	}, panel)
+	corner(8, close)
+	close.MouseButton1Click:Connect(function()
+		if callbacks.onCloseGameMenu then
+			callbacks.onCloseGameMenu()
+		end
+	end)
+
+	new("TextLabel", {
+		Name = "TituloModos",
+		Position = UDim2.new(0, 0, 0, 64),
+		Size = UDim2.new(1, 0, 0, 18),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = COLOR.accent,
+		Text = "CAMBIAR MODO (reinicia tu partida)",
+		ZIndex = 62,
+	}, panel)
+
+	local modeGrid = new("Frame", {
+		Name = "Modos",
+		Position = UDim2.new(0, 0, 0, 86),
+		Size = UDim2.new(1, 0, 0, 92),
+		BackgroundTransparency = 1,
+		ZIndex = 62,
+	}, panel)
+	new("UIGridLayout", {
+		CellSize = UDim2.new(0, 220, 0, 42),
+		CellPadding = UDim2.new(0, 8, 0, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, modeGrid)
+
+	parts.gameMenuModeButtons = {}
+	for index, id in ipairs(Config.ModeOrder) do
+		local modeInfo = id == "multi" and Config.Multiplayer or Config.Difficulties[id]
+		if modeInfo then
+			local button = new("TextButton", {
+				Name = "Modo_" .. id,
+				LayoutOrder = index,
+				BackgroundColor3 = COLOR.panelSoft,
+				BorderSizePixel = 0,
+				AutoButtonColor = true,
+				Font = Enum.Font.GothamBold,
+				TextSize = 15,
+				TextColor3 = modeInfo.color,
+				Text = modeInfo.name,
+				ZIndex = 63,
+			}, modeGrid)
+			corner(9, button)
+			stroke(modeInfo.color, 1, 0.4, button)
+			button.MouseButton1Click:Connect(function()
+				if callbacks.onSwitchMode then
+					callbacks.onSwitchMode(id)
+				end
+			end)
+			parts.gameMenuModeButtons[id] = {
+				button = button,
+				name = modeInfo.name,
+				color = modeInfo.color,
+			}
+		end
+	end
+
+	new("TextLabel", {
+		Name = "TituloMapas",
+		Position = UDim2.new(0, 0, 0, 190),
+		Size = UDim2.new(1, 0, 0, 18),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(130, 190, 245),
+		Text = "CAMBIAR MAPA (reinicia tu partida)",
+		ZIndex = 62,
+	}, panel)
+
+	local mapGrid = new("Frame", {
+		Name = "Mapas",
+		Position = UDim2.new(0, 0, 0, 212),
+		Size = UDim2.new(1, 0, 0, 84),
+		BackgroundTransparency = 1,
+		ZIndex = 62,
+	}, panel)
+	new("UIGridLayout", {
+		CellSize = UDim2.new(0, 220, 0, 38),
+		CellPadding = UDim2.new(0, 8, 0, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, mapGrid)
+
+	parts.gameMenuMapButtons = {}
+	local mapList = {}
+	for _, zone in ipairs(Config.Zones) do
+		table.insert(mapList, { id = zone.id, name = zone.name })
+	end
+	table.insert(mapList, { id = "random", name = "Aleatorio" })
+	for index, zone in ipairs(mapList) do
+		local button = new("TextButton", {
+			Name = "Mapa_" .. zone.id,
+			LayoutOrder = index,
+			BackgroundColor3 = COLOR.panelSoft,
+			BorderSizePixel = 0,
+			AutoButtonColor = true,
+			Font = Enum.Font.GothamBold,
+			TextSize = 13,
+			TextColor3 = Color3.fromRGB(130, 190, 245),
+			Text = zone.name,
+			ZIndex = 63,
+		}, mapGrid)
+		corner(9, button)
+		stroke(Color3.fromRGB(80, 130, 175), 1, 0.45, button)
+		button.MouseButton1Click:Connect(function()
+			if callbacks.onSwitchMap then
+				callbacks.onSwitchMap(zone.id)
+			end
+		end)
+		parts.gameMenuMapButtons[zone.id] = {
+			button = button,
+			name = zone.name,
+			color = Color3.fromRGB(150, 200, 245),
+		}
+	end
+
+	local note = new("TextLabel", {
+		Name = "Nota",
+		Position = UDim2.new(0, 0, 0, 304),
+		Size = UDim2.new(1, 0, 0, 32),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextSize = 12,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(220, 180, 110),
+		Text = "Al cambiar de modo o de mapa se reinicia tu partida actual. "
+			.. "La partida sigue corriendo mientras el menú está abierto.",
+		ZIndex = 62,
+	}, panel)
+
+	local seguir = new("TextButton", {
+		Name = "Seguir",
+		Position = UDim2.new(0, 68, 0, 346),
+		Size = UDim2.new(0, 280, 0, 44),
+		BackgroundColor3 = Color3.fromRGB(38, 70, 48),
+		BorderSizePixel = 0,
+		AutoButtonColor = true,
+		Font = Enum.Font.GothamBold,
+		TextSize = 16,
+		TextColor3 = COLOR.text,
+		Text = "SEGUIR JUGANDO",
+		ZIndex = 62,
+	}, panel)
+	corner(10, seguir)
+	seguir.MouseButton1Click:Connect(function()
+		if callbacks.onCloseGameMenu then
+			callbacks.onCloseGameMenu()
+		end
+	end)
+
+	local salir = new("TextButton", {
+		Name = "Salir",
+		Position = UDim2.new(0, 364, 0, 346),
+		Size = UDim2.new(0, 280, 0, 44),
+		BackgroundColor3 = Color3.fromRGB(74, 38, 38),
+		BorderSizePixel = 0,
+		AutoButtonColor = true,
+		Font = Enum.Font.GothamBold,
+		TextSize = 16,
+		TextColor3 = COLOR.text,
+		Text = "SALIR AL LOBBY",
+		ZIndex = 62,
+	}, panel)
+	corner(10, salir)
+	salir.MouseButton1Click:Connect(function()
+		if callbacks.onLeave then
+			callbacks.onLeave()
+		end
+	end)
+
+	new("TextLabel", {
+		Name = "Pie",
+		Position = UDim2.new(0, 0, 0, 400),
+		Size = UDim2.new(1, 0, 0, 18),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextColor3 = COLOR.muted,
+		Text = "M o el botón Menú para abrir/cerrar  ·  Elegí un modo o un mapa para cambiar",
+		ZIndex = 62,
+	}, panel)
+end
+
+function HUD.setGameMenuVisible(visible)
+	if parts.gameMenu then
+		parts.gameMenu.Visible = visible == true
+	end
+	if visible then
+		HUD.setScoreboardVisible(false)
+	end
+end
+
+function HUD.setGameMenuInfo(modeId, modeName, arenaName, arenaId)
+	if not parts.gameMenuInfo then
+		return
+	end
+	parts.gameMenuInfo.Text = string.format("Modo: %s     ·     Mapa: %s",
+		modeName or modeId or "—", arenaName or "eligiendo mapa...")
+	for id, entry in pairs(parts.gameMenuModeButtons or {}) do
+		marcarEntrada(entry, id == modeId)
+	end
+	for id, entry in pairs(parts.gameMenuMapButtons or {}) do
+		marcarEntrada(entry, id == arenaId)
+	end
+end
+
+-- ===============================================================
 -- API
 -- ===============================================================
 -- Tabla de posiciones estilo Counter (se ve manteniendo Tab)
@@ -1330,6 +1642,7 @@ function HUD.init(playerGui, handlers)
 	buildScope(screen)
 	buildVote(screen)
 	buildScoreboard(screen)
+	buildGameMenu(screen)
 
 	local hurt = new("Frame", {
 		Name = "Dolor",
@@ -1541,6 +1854,7 @@ end
 
 function HUD.updateState(state)
 	if not state or not state.active then
+		HUD.setGameMenuVisible(false)
 		HUD.setMenuVisible(true)
 		HUD.setMenuStatus("")
 		return
@@ -1561,6 +1875,9 @@ function HUD.updateState(state)
 		else
 			parts.arenaLabel.Text = "Reserva: " .. (state.arenaName or "?")
 		end
+	end
+	if parts.gameMenuInfo then
+		HUD.setGameMenuInfo(state.modeId, state.modeName, state.arenaName, state.arenaId)
 	end
 	if parts.objective then
 		parts.objective.Text = state.objective or ""

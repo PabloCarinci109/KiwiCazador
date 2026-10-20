@@ -36,6 +36,8 @@ WeatherFX.start()
 local state = { active = false, phase = "none", diff = nil }
 local sprinting = false
 local sneaking = false
+local gameMenuOpen = false
+local switchPending = false
 local glockBurst = false -- la Glock-18 arranca tiro a tiro; el clic derecho la pone en ráfaga
 local shotBloom = 0 -- el punto de mira se abre un toque al disparar
 local speedFov = nil -- al correr la camara abre un poco el FOV (se siente mas rapido)
@@ -702,6 +704,14 @@ local function applySpeed()
 		return
 	end
 
+	-- Menú de partida abierto: el personaje queda quieto mientras elegís
+	if gameMenuOpen then
+		hum.WalkSpeed = 0
+		hum.JumpPower = 0
+		hum.UseJumpPower = true
+		return
+	end
+
 	-- Escondido en un escondite: quieto hasta que salgas con E
 	if hiddenNow then
 		hum.WalkSpeed = 0
@@ -935,6 +945,37 @@ local autoJob = nil
 local startAutoFire
 local lastFlameCrackle = 0
 
+-- Menú de partida (M): cambia de modo/mapa sin esperar a morir. Mientras
+-- está abierto el personaje se queda quieto y el mouse vuelve a la mano.
+local function setGameMenu(open)
+	open = open == true and state.active == true
+	if gameMenuOpen == open then
+		return
+	end
+	gameMenuOpen = open
+	if open then
+		setScope(false)
+		holdingFire = false
+		HUD.setGameMenuInfo(state.modeId, state.modeName, state.arenaName, state.arenaId)
+		HUD.setGameMenuVisible(true)
+		UserInputService.MouseIconEnabled = true
+		if UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		end
+	else
+		HUD.setGameMenuVisible(false)
+		local inRound = state.active and (state.phase == "playing" or state.phase == "countdown")
+		if inRound then
+			UserInputService.MouseIconEnabled = false
+			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+		else
+			UserInputService.MouseIconEnabled = true
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		end
+	end
+	applySpeed()
+end
+
 local function fireTool(toolId)
 	if not state.active or state.phase ~= "playing" then
 		sound2D(Config.Sounds.denied, 0.5)
@@ -1096,6 +1137,19 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then
 		return
 	end
+
+	-- M: abre o cierra el menú de partida para cambiar modo/mapa
+	if input.KeyCode == Enum.KeyCode.M then
+		if state.active then
+			setGameMenu(not gameMenuOpen)
+		end
+		return
+	end
+	-- Con el menú abierto no se dispara, no se apunta y no se camina
+	if gameMenuOpen then
+		return
+	end
+
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		holdingFire = true
 		local wcfg = equippedId and Config.Weapons[equippedId]
@@ -1255,8 +1309,16 @@ RunService.RenderStepped:Connect(function(dt)
 		end
 	end
 
-	-- En partida el mouse queda oculto y centrado: nada de manito sobre el punto
-	if inRound then
+	-- En partida el mouse queda oculto y centrado: nada de manito sobre el punto.
+	-- Con el menú de partida abierto vuelve a la mano para poder elegir.
+	if gameMenuOpen then
+		if not UserInputService.MouseIconEnabled then
+			UserInputService.MouseIconEnabled = true
+		end
+		if UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		end
+	elseif inRound then
 		if UserInputService.MouseIconEnabled then
 			UserInputService.MouseIconEnabled = false
 		end
@@ -1285,6 +1347,9 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 		hiddenNow = false
 		sprinting = false
 		sneaking = false
+		gameMenuOpen = false
+		switchPending = false
+		HUD.setGameMenuVisible(false)
 		setScope(false)
 		refreshViewmodel()
 		HUD.hideResult()
@@ -1300,6 +1365,9 @@ remotes.SessionUpdate.OnClientEvent:Connect(function(newState)
 	state.active = true
 	state.phase = newState.phase
 	state.modeId = newState.modeId
+	state.modeName = newState.modeName
+	state.arenaName = newState.arenaName
+	state.arenaId = newState.arenaId
 	state.diff = diffFor(newState.modeId)
 	state.hidden = newState.hidden == true
 	state.hideSpot = newState.hideSpot
@@ -1820,11 +1888,31 @@ end)
 -- ===============================================================
 -- Botones del menu
 -- ===============================================================
+-- Cambia de partida desde el menú de juego (modo y/o mapa) sin esperar
+-- a morir. El servidor saca al jugador de la sesión actual y lo mete en
+-- una nueva; si se eligió mapa, arranca directo en ese mapa.
+local function requestSwitch(modeId, mapId)
+	if switchPending then
+		return
+	end
+	switchPending = true
+	setGameMenu(false)
+	HUD.notify("Cambiando de partida...", Color3.fromRGB(238, 196, 92), 2)
+	remotes.RequestSwitch:FireServer(modeId, mapId)
+	task.delay(1.6, function()
+		switchPending = false
+	end)
+end
+
 HUD.init(player:WaitForChild("PlayerGui"), {
 	onJoin = function(modeId)
 		sound2D(Config.Sounds.ui, 0.6)
 		HUD.setMenuStatus("Entrando a la partida...", Color3.fromRGB(238, 196, 92))
-		remotes.RequestJoin:FireServer(modeId)
+		if state.active then
+			requestSwitch(modeId, nil)
+		else
+			remotes.RequestJoin:FireServer(modeId)
+		end
 	end,
 	onVote = function(mapId)
 		sound2D(Config.Sounds.ui, 0.5)
@@ -1832,7 +1920,38 @@ HUD.init(player:WaitForChild("PlayerGui"), {
 	end,
 	onLeave = function()
 		sound2D(Config.Sounds.ui, 0.5)
+		setGameMenu(false)
 		remotes.RequestLeave:FireServer()
+	end,
+	onMenu = function()
+		sound2D(Config.Sounds.ui, 0.4)
+		setGameMenu(not gameMenuOpen)
+	end,
+	onCloseGameMenu = function()
+		sound2D(Config.Sounds.ui, 0.4, 1.2)
+		setGameMenu(false)
+	end,
+	onSwitchMode = function(modeId)
+		if not state.active or not modeId then
+			return
+		end
+		if modeId == state.modeId then
+			setGameMenu(false)
+			return
+		end
+		sound2D(Config.Sounds.ui, 0.6)
+		requestSwitch(modeId, nil)
+	end,
+	onSwitchMap = function(mapId)
+		if not state.active or not mapId or not state.modeId then
+			return
+		end
+		if mapId == state.arenaId then
+			setGameMenu(false)
+			return
+		end
+		sound2D(Config.Sounds.ui, 0.6)
+		requestSwitch(state.modeId, mapId)
 	end,
 })
 

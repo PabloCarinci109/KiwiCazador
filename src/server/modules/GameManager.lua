@@ -34,6 +34,7 @@ local world
 local sessions = {}
 local playerSession = {}
 local rematchInvites = {}
+local lastSwitch = {}
 local sessionCounter = 0
 
 local COLOR = {
@@ -2405,6 +2406,7 @@ function Session:sendUpdate(player)
 		quota = quota,
 		kiwiState = self.diff.showKiwiState and self.kiwi and self.kiwi:getStateHint() or nil,
 		arenaName = self.arena and self.arena.name or nil,
+		arenaId = self.arena and self.arena.mapId or nil,
 		players = ranking,
 		playerCount = #self.players,
 		isMulti = self.isMulti,
@@ -2470,10 +2472,15 @@ function GameManager.init()
 			session:removePlayer(player, true)
 		end
 		playerSession[player] = nil
+		lastSwitch[player] = nil
 	end)
 
 	Net.get("RequestJoin").OnServerEvent:Connect(function(player, modeId)
 		GameManager.requestJoin(player, modeId)
+	end)
+
+	Net.get("RequestSwitch").OnServerEvent:Connect(function(player, modeId, mapId)
+		GameManager.requestSwitch(player, modeId, mapId)
 	end)
 
 	Net.get("RequestLeave").OnServerEvent:Connect(function(player)
@@ -2613,9 +2620,66 @@ function GameManager.requestJoin(player, modeId)
 	return GameManager.joinMode(player, modeId)
 end
 
+-- Menú de partida: cambia de modo y/o de mapa sin esperar a morir.
+-- Si mapId viene con valor se fuerza una partida nueva en ese mapa
+-- (aunque el modo sea multijugador o asedio).
+function GameManager.requestSwitch(player, modeId, mapId)
+	if not player or not player.Parent then
+		return nil
+	end
+	if modeId ~= nil and type(modeId) ~= "string" then
+		return nil
+	end
+	if mapId ~= nil and type(mapId) ~= "string" then
+		return nil
+	end
+
+	local current = playerSession[player]
+	local targetMode = modeId or (current and current.modeId)
+	if not targetMode then
+		return nil
+	end
+	if targetMode ~= "multi" and not Config.Difficulties[targetMode] then
+		return nil
+	end
+	if mapId ~= nil and mapId ~= "random" and not zoneById(mapId) then
+		return nil
+	end
+	if mapId == "random" then
+		mapId = Config.Zones[math.random(1, #Config.Zones)].id
+	end
+
+	-- Evita que un clic repetido cree varias partidas seguidas
+	local now = os.clock()
+	if lastSwitch[player] and now - lastSwitch[player] < 1.5 then
+		return nil
+	end
+	lastSwitch[player] = now
+
+	-- Elegir el modo en el que ya estas no reinicia nada
+	if current and targetMode == current.modeId and mapId == nil then
+		return current
+	end
+
+	rematchInvites[player] = nil
+	if current then
+		current:removePlayer(player, true)
+	end
+
+	local nueva = GameManager.joinMode(player, targetMode, mapId, mapId ~= nil)
+	if not nueva then
+		-- Si no se pudo entrar, avisa al cliente para que no quede
+		-- mostrando el HUD de una partida que ya no existe.
+		Net.get("SessionUpdate"):FireClient(player, { active = false })
+	end
+	return nueva
+end
+
 -- Une al jugador a una partida del modo pedido. Si viene de una revancha
--- y la arena esta libre, arranca directo en el mismo mapa.
-function GameManager.joinMode(player, modeId, mapId)
+-- y la arena esta libre, arranca directo en el mismo mapa. Con forceNew
+-- se crea una partida nueva aunque haya otra del mismo modo: asi el mapa
+-- elegido en el menu se respeta.
+function GameManager.joinMode(player, modeId, mapId, forceNew)
 	local current = playerSession[player]
 	if current then
 		if current.phase == "ended" then
@@ -2628,11 +2692,13 @@ function GameManager.joinMode(player, modeId, mapId)
 
 	if modeId == "multi" then
 		local session
-		for _, candidate in ipairs(sessions) do
-			if candidate.modeId == "multi" and not candidate.finished
-				and candidate.phase ~= "ended" and not candidate:isFull() then
-				session = candidate
-				break
+		if not forceNew then
+			for _, candidate in ipairs(sessions) do
+				if candidate.modeId == "multi" and not candidate.finished
+					and candidate.phase ~= "ended" and not candidate:isFull() then
+					session = candidate
+					break
+				end
 			end
 		end
 		if not session then
@@ -2645,11 +2711,13 @@ function GameManager.joinMode(player, modeId, mapId)
 
 	if modeId == "asedio" then
 		local session
-		for _, candidate in ipairs(sessions) do
-			if candidate.modeId == "asedio" and not candidate.finished
-				and candidate.phase ~= "ended" and not candidate:isFull() then
-				session = candidate
-				break
+		if not forceNew then
+			for _, candidate in ipairs(sessions) do
+				if candidate.modeId == "asedio" and not candidate.finished
+					and candidate.phase ~= "ended" and not candidate:isFull() then
+					session = candidate
+					break
+				end
 			end
 		end
 		if not session then

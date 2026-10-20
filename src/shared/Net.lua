@@ -14,6 +14,7 @@ local FOLDER_NAME = "KiwiRemotes"
 local REMOTE_NAMES = {
 	-- Cliente -> Servidor
 	"RequestJoin",     -- (modeId)
+	"RequestSwitch",   -- (modeId, mapId) cambia de partida sin esperar a morir
 	"RequestLeave",    -- ()
 	"RequestState",    -- ()
 	"ToolAction",      -- (toolId, data)
