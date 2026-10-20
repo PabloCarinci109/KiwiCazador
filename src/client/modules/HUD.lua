@@ -222,6 +222,20 @@ local function buildMenu(parent)
 		Text = "CÓMO JUGAR",
 	}, help)
 
+	-- Aviso fijo en el lobby: el menú de partida tambien se abre con M.
+	new("TextLabel", {
+		Name = "AvisoMenu",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.new(0, 260, 0, 18),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextColor3 = Color3.fromRGB(238, 196, 92),
+		Text = "M: menú de modo o de mapa",
+	}, help)
+
 	new("TextLabel", {
 		Position = UDim2.new(0, 0, 0, 22),
 		Size = UDim2.new(1, 0, 1, -22),
@@ -543,6 +557,56 @@ local function buildSessionHud(parent)
 			callbacks.onLeave()
 		end
 	end)
+
+	-- Aviso previo a la partida (votacion y cuenta atras): que todos sepan
+	-- que con M se puede cambiar de modo o de mapa sin esperar a morir.
+	local menuHint = new("Frame", {
+		Name = "AvisoMenu",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -18),
+		Size = UDim2.new(0, 620, 0, 32),
+		BackgroundColor3 = COLOR.panel,
+		BackgroundTransparency = 0.12,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 15,
+	}, hud)
+	corner(9, menuHint)
+	stroke(Color3.fromRGB(238, 196, 92), 1.5, 0.35, menuHint)
+
+	local key = new("Frame", {
+		Name = "Tecla",
+		Position = UDim2.new(0, 10, 0.5, -11),
+		Size = UDim2.new(0, 24, 0, 22),
+		BackgroundColor3 = Color3.fromRGB(238, 196, 92),
+		BorderSizePixel = 0,
+		ZIndex = 16,
+	}, menuHint)
+	corner(5, key)
+	new("TextLabel", {
+		Name = "Letra",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBlack,
+		TextSize = 15,
+		TextColor3 = Color3.fromRGB(24, 20, 10),
+		Text = "M",
+		ZIndex = 17,
+	}, key)
+
+	new("TextLabel", {
+		Name = "Texto",
+		Position = UDim2.new(0, 44, 0, 0),
+		Size = UDim2.new(1, -54, 1, 0),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = COLOR.text,
+		Text = "En cualquier momento cambiás de modo o de mapa, sin esperar a morir",
+		ZIndex = 16,
+	}, menuHint)
+	parts.menuHint = menuHint
 
 	-- Panel lateral: estado del kiwi, marcador y herramientas
 	local side = new("Frame", {
@@ -1857,11 +1921,20 @@ function HUD.updateState(state)
 		HUD.setGameMenuVisible(false)
 		HUD.setMenuVisible(true)
 		HUD.setMenuStatus("")
+		if parts.menuHint then
+			parts.menuHint.Visible = false
+		end
 		return
 	end
 
 	HUD.setMenuVisible(false)
 	HUD.setHealth(state.hp, state.maxHp)
+
+	-- El aviso de la M solo se muestra antes de empezar a jugar; durante la
+	-- partida queda el boton "Menu (M)" de la barra superior.
+	if parts.menuHint then
+		parts.menuHint.Visible = state.phase == "vote" or state.phase == "countdown"
+	end
 
 	local accent = Util.colorFromTable(state.modeColor)
 	if parts.modeLabel then

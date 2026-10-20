@@ -56,6 +56,10 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 
 ### Asedio 5 vs 5 (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
 
+> **1.9.12:** antes de empezar cada partida, la pantalla muestra un **aviso con la tecla M**:
+> **en cualquier momento podés cambiar de modo o de mapa**, sin esperar a morir. También aparece
+> en el **menú del lobby**, arriba de las instrucciones, para que se sepa desde el principio.
+>
 > **1.9.11:** nuevo **menú de partida** con **M** (o el botón **Menú** de arriba): durante una
 > partida podés **cambiar de modo o de mapa al instante**, sin esperar a que te maten ni a que
 > termine la ronda. Si elegís un modo, se reinicia tu partida en ese modo; si elegís un mapa,
@@ -218,6 +222,7 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
   **V** cambia a primera persona.
 - **Menú de partida:** con **M** o el botón **Menú** de arriba podés **cambiar de modo o de
   mapa** al instante (se reinicia tu partida en la elección nueva), sin esperar a morir.
+  Antes de arrancar, un **aviso con la tecla M** lo recuerda en la votación y la cuenta atrás.
   Desde ahí también podés **volver al lobby**.
 - **Clima y hora:** el día avanza solo (amanece, **oscurece** y vuelve a aclarar) y el tiempo
   cambia al azar: **sol, lluvia o nieve**. Con la nevada caen los copos, la nieve **se acumula en
@@ -453,7 +458,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.11 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.12 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):
