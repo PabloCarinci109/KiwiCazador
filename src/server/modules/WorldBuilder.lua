@@ -446,15 +446,16 @@ local function buildArena(index, zone, cfg, parent, rng)
 		local snowy = theme == "alpes"
 		local sideLen = half * 2
 		local count = math.floor(sideLen / 26)
-		local ringDist = half - 9
 		for side = 0, 3 do
 			local sideCF = CFrame.new(center) * CFrame.Angles(0, side * math.pi * 0.5, 0)
 			for i = 1, count do
 				local x = -half + (i - 0.5) * (sideLen / count) + rng:NextNumber(-3, 3)
-				local base = sideCF * CFrame.new(x, 0, -(ringDist + rng:NextNumber(-2, 4)))
 				local h = rng:NextNumber(22, 48)
 				local w = rng:NextNumber(26, 42)
 				local d = rng:NextNumber(14, 22)
+				-- La cara interna de la montaña queda pegada al borde del
+				-- mapa (no invade la arena ni tapa entradas ni spawns).
+				local base = sideCF * CFrame.new(x, 0, -(half + d * 0.5 - 1.5))
 				part({
 					Name = "Montana",
 					Size = Vector3.new(w, h, d),
@@ -484,7 +485,8 @@ local function buildArena(index, zone, cfg, parent, rng)
 				part({
 					Name = "MontanaEsquina",
 					Size = Vector3.new(44, 48, 44),
-					CFrame = CFrame.new(center + Vector3.new(sx * (half - 8), 21, sz * (half - 8))),
+					-- Centrada afuera: su cara interna apenas roza el borde.
+					CFrame = CFrame.new(center + Vector3.new(sx * (half + 20), 21, sz * (half + 20))),
 					Color = pal[2],
 					Material = Enum.Material.Rock,
 					CanCollide = true,
@@ -538,19 +540,25 @@ local function buildArena(index, zone, cfg, parent, rng)
 		end
 	end
 
-	-- ---------------- Colinas suaves (arena, nieve y medanos) ----------------
+	-- ---------------- Colinas de fondo (paisaje, fuera de la arena) ----------------
+	-- Antes eran 3 bolas gigantes adentro del area jugable: en Dunas se
+	-- veian como montañas en medio del mapa, tapaban las entradas de las
+	-- casas y el rayo de la zona de extraccion terminaba sobre ellas. Ahora
+	-- son solo paisaje detras de las montañas del borde y no colisionan.
 	if zone.theme ~= "ciudad" then
 		for i = 1, 3 do
-			local angle = rng:NextNumber(0, math.pi * 2)
-			local radius = rng:NextNumber(half * 0.35, half * 0.7)
-			local hillSize = rng:NextNumber(70, 110)
+			local angle = (i / 3) * math.pi * 2 + rng:NextNumber(-0.3, 0.3)
+			local radius = half + rng:NextNumber(110, 180)
+			local hillSize = rng:NextNumber(120, 180)
 			part({
-				Name = "Colina",
+				Name = "ColinaFondo",
 				Shape = Enum.PartType.Ball,
 				Size = Vector3.new(hillSize, hillSize * 0.9, hillSize),
-				Position = center + Vector3.new(math.cos(angle) * radius, -hillSize * 0.32, math.sin(angle) * radius),
+				Position = center + Vector3.new(math.cos(angle) * radius, -hillSize * 0.34, math.sin(angle) * radius),
 				Color = Color3.fromRGB(zone.grass.R * 240, zone.grass.G * 240, zone.grass.B * 240),
 				Material = zone.ground or Enum.Material.Ground,
+				CanCollide = false,
+				CanQuery = false,
 				Parent = props,
 			})
 		end
@@ -565,6 +573,8 @@ local function buildArena(index, zone, cfg, parent, rng)
 		local radius = rng:NextNumber(half * 0.25, half * 0.55)
 		local pondPos = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
 		local pondR = 26 * scale
+		-- Se guarda para que props y casas no se generen arriba del agua.
+		self.pond = { pos = pondPos, radius = pondR + 4 }
 		local icy = zone.theme == "alpes"
 
 		-- Fondo (para que no se vea el pasto a traves del agua)
@@ -1610,8 +1620,32 @@ local function buildArena(index, zone, cfg, parent, rng)
 	-- ===============================================================
 	local occupied = {}
 
-	local function freeSpot(minDist, margin)
+	-- Piso limpio: el rayo vertical no puede pegarle a algo alto (colina,
+	-- techo, copa de arbol, cactu, medano). Las capas finas del piso
+	-- (calle, vereda, pasto) si se permiten.
+	local paramsDespejado = RaycastParams.new()
+	paramsDespejado.IgnoreWater = true
+	paramsDespejado.FilterType = Enum.RaycastFilterType.Exclude
+	paramsDespejado.FilterDescendantsInstances = { self.ground }
+
+	local function puntoDespejado(x, z)
+		local hit = workspace:Raycast(Vector3.new(x, floorY + 150, z), Vector3.new(0, -300, 0), paramsDespejado)
+		return (not hit) or (hit.Position.Y - floorY <= 2.5)
+	end
+
+	local function lejosDelEstanque(x, z, margen)
+		local pond = self.pond
+		if not pond then
+			return true
+		end
+		local dx, dz = x - pond.pos.X, z - pond.pos.Z
+		local minimo = pond.radius + (margen or 0)
+		return dx * dx + dz * dz >= minimo * minimo
+	end
+
+	local function freeSpot(minDist, margin, radio)
 		margin = margin or 34
+		radio = radio or 0
 		for _ = 1, 70 do
 			local point = self:randomPoint(rng, half - margin)
 			local ok = true
@@ -1619,6 +1653,32 @@ local function buildArena(index, zone, cfg, parent, rng)
 				if (point - other).Magnitude < minDist then
 					ok = false
 					break
+				end
+			end
+			if ok and not lejosDelEstanque(point.X, point.Z, radio + 8) then
+				ok = false
+			end
+			-- Deja libre el patio del castillo del asedio (nido + 8 studs).
+			if ok and self.nest then
+				local dx, dz = point.X - self.nest.pos.X, point.Z - self.nest.pos.Z
+				if dx * dx + dz * dz < 50 * 50 then
+					ok = false
+				end
+			end
+			if ok then
+				-- Para casas se revisa todo el radio, no solo el centro.
+				local muestras = { Vector2.new(0, 0) }
+				if radio > 0 then
+					for k = 0, 7 do
+						local a = k * math.pi / 4
+						table.insert(muestras, Vector2.new(math.cos(a) * radio, math.sin(a) * radio))
+					end
+				end
+				for _, off in ipairs(muestras) do
+					if not puntoDespejado(point.X + off.X, point.Z + off.Y) then
+						ok = false
+						break
+					end
 				end
 			end
 			if ok then
@@ -2173,9 +2233,9 @@ local function buildArena(index, zone, cfg, parent, rng)
 	end
 
 	do
-		local function freeSpotFallback(minDist, margins)
+		local function freeSpotFallback(minDist, margins, radio)
 			for _, margin in ipairs(margins) do
-				local point = freeSpot(minDist, margin)
+				local point = freeSpot(minDist, margin, radio)
 				if point then
 					return point
 				end
@@ -2199,6 +2259,26 @@ local function buildArena(index, zone, cfg, parent, rng)
 							break
 						end
 					end
+					-- Tampoco arriba del agua ni dentro del patio del castillo.
+					if clear and not lejosDelEstanque(cand.X, cand.Z, 32) then
+						clear = false
+					end
+					if clear and self.nest then
+						local dx, dz = cand.X - self.nest.pos.X, cand.Z - self.nest.pos.Z
+						if dx * dx + dz * dz < 50 * 50 then
+							clear = false
+						end
+					end
+					-- Piso limpio en todo el radio de la casa (24 studs).
+					if clear then
+						for k = 0, 7 do
+							local a = k * math.pi / 4
+							if not puntoDespejado(cand.X + math.cos(a) * 24, cand.Z + math.sin(a) * 24) then
+								clear = false
+								break
+							end
+						end
+					end
 					if clear then
 						table.insert(occupied, cand)
 						build(cand)
@@ -2210,7 +2290,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 		end
 
 		-- La aldea: casa, casona y granero (con interiores y baules)
-		local anchor = freeSpotFallback(56, { 78, 56, 36, 22 })
+		local anchor = freeSpotFallback(56, { 78, 56, 36 }, 26)
 		if anchor then
 			makeHouse(anchor, faceCenter(anchor), "cabin")
 			placeNear(anchor, { 48, 54, 60, 40 }, 50, function(cand)
@@ -2223,7 +2303,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 
 		-- Casa del Nido: la usa el modo Asedio (5 vs 5) como guarida del
 		-- kiwi. Existe en todos los mapas para que el asedio tenga su casa.
-		local nestSpot = freeSpotFallback(58, { 84, 58, 40, 26 })
+		local nestSpot = freeSpotFallback(58, { 84, 70, 58 }, 26)
 		if nestSpot then
 			makeHouse(nestSpot, faceCenter(nestSpot), "farm")
 			self.nest = { pos = nestSpot }
@@ -2232,7 +2312,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 		end
 
 		-- Una casa mas lejos para variar el mapa
-		local farHouse = freeSpotFallback(52, { 72, 52, 34, 20 })
+		local farHouse = freeSpotFallback(52, { 72, 52, 34, 20 }, 24)
 		if farHouse then
 			makeHouse(farHouse, faceCenter(farHouse), rng:NextNumber(0, 1) < 0.5 and "cabin" or "farm")
 		end
@@ -2242,7 +2322,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 			placeNear(anchor, { 64, 74, 50, 36 }, 52, function(cand)
 				makeHouse(cand, faceCenter(cand), "farm")
 			end)
-			local skySpot = freeSpotFallback(54, { 82, 60, 40, 24 })
+			local skySpot = freeSpotFallback(54, { 82, 60, 40, 24 }, 12)
 			if skySpot then
 				makeSkyTower(skySpot)
 			end
@@ -2250,7 +2330,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 
 		-- Baules sueltos por el mapa
 		for i = 1, 2 do
-			local chestSpot = freeSpotFallback(30, { 60, 42, 26 })
+			local chestSpot = freeSpotFallback(30, { 60, 42, 26 }, 2)
 			if chestSpot then
 				makeChestProp(CFrame.new(chestSpot) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0), "Baúl")
 			end
@@ -2258,7 +2338,7 @@ local function buildArena(index, zone, cfg, parent, rng)
 
 		-- Torre mirador de madera (en la ciudad la reemplaza la torre alta)
 		if theme ~= "ciudad" then
-			local towerPos = freeSpotFallback(44, { 70, 48, 30, 18 })
+			local towerPos = freeSpotFallback(44, { 70, 48, 30, 18 }, 8)
 			if towerPos then
 				makeTower(towerPos)
 			end
@@ -2453,6 +2533,91 @@ local FORT_MURO = Color3.fromRGB(118, 120, 114)
 local FORT_OSCURO = Color3.fromRGB(66, 70, 74)
 local FORT_BOLSA = Color3.fromRGB(178, 160, 118)
 
+-- Media medida del castillo del asedio: se achica si el nido quedo cerca
+-- del borde para que todas las paredes entren en la arena.
+function WorldBuilder.asedioFortHalf(arena, centro)
+	local H = Config.Asedio.bunkerHalf or 34
+	local borde = math.max(math.abs(centro.X - arena.center.X), math.abs(centro.Z - arena.center.Z))
+	return math.min(H, arena.halfSize - borde - 8)
+end
+
+-- Busca un lugar plano y despejado para la zona de extraccion, en el
+-- frente del castillo. Antes se usaba el primer impacto de un rayo
+-- vertical: si tocaba un medano, una copa o una colina, la zona quedaba
+-- flotando. Ahora se apoya siempre en el piso de la arena y se prueban
+-- varias distancias y angulos hasta encontrar un lugar libre de props.
+function WorldBuilder.findExtractionSpot(arena, centro, dirFrente, H, ignore)
+	local radio = 9
+	local distancias = { H + 26, H + 34, H + 42, H + 50, H + 58 }
+	local angulos = { 0, -12, 12, -24, 24, -36, 36 }
+	local excluir = { arena.ground }
+	if ignore then
+		table.insert(excluir, ignore)
+	end
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = excluir
+	params.RespectCanCollide = true
+
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	rayParams.FilterDescendantsInstances = excluir
+	rayParams.IgnoreWater = true
+
+	local function despejadoVisual(pos)
+		local hit = workspace:Raycast(Vector3.new(pos.X, centro.Y + 90, pos.Z), Vector3.new(0, -180, 0), rayParams)
+		return (not hit) or (hit.Position.Y - centro.Y <= 2.5)
+	end
+
+	local function enEstanque(pos)
+		local pond = arena.pond
+		if not pond then
+			return false
+		end
+		local dx, dz = pos.X - pond.pos.X, pos.Z - pond.pos.Z
+		local minimo = pond.radius + radio + 4
+		return dx * dx + dz * dz < minimo * minimo
+	end
+
+	-- Solo cuentan los obstaculos altos (paredes, troncos, postes). Las
+	-- calles, veredas y demas capas finas del piso no bloquean la zona.
+	local function sinBloqueos(partes, pos)
+		for _, p in ipairs(partes) do
+			local alto = (p.Position.Y + p.Size.Y * 0.5) - pos.Y
+			local bajo = (p.Position.Y - p.Size.Y * 0.5) - pos.Y
+			if alto > 2.5 and bajo < 4 then
+				return false
+			end
+		end
+		return true
+	end
+
+	-- Primera pasada: limpio tambien a la vista. Segunda: si el mapa esta
+	-- muy cargado, alcanza con que no haya props solidos; la zona igual
+	-- queda apoyada en el piso.
+	for pasada = 1, 2 do
+		for _, dist in ipairs(distancias) do
+			for _, grados in ipairs(angulos) do
+				local a = math.rad(grados)
+				local ca, sa = math.cos(a), math.sin(a)
+				local dir = Vector3.new(
+					dirFrente.X * ca - dirFrente.Z * sa,
+					0,
+					dirFrente.X * sa + dirFrente.Z * ca)
+				local cand = arena:clampToBounds(centro + dir * dist)
+				local pos = Vector3.new(cand.X, centro.Y, cand.Z)
+				if not enEstanque(pos) and (pasada == 2 or despejadoVisual(pos)) then
+					local partes = workspace:GetPartBoundsInRadius(pos + Vector3.new(0, 4, 0), radio, params)
+					if sinBloqueos(partes, pos) then
+						return pos
+					end
+				end
+			end
+		end
+	end
+	return nil
+end
+
 function WorldBuilder.buildAsedioFort(arena)
 	if not arena or not arena.nest then
 		return nil
@@ -2469,9 +2634,7 @@ function WorldBuilder.buildAsedioFort(arena)
 
 	-- El bunker tiene que entrar en la arena: si el nido quedo muy al
 	-- borde, se achica un poco (y si no hay lugar, no se arma)
-	local H = Config.Asedio.bunkerHalf or 34
-	local borde = math.max(math.abs(centro.X - arena.center.X), math.abs(centro.Z - arena.center.Z))
-	H = math.min(H, arena.halfSize - borde - 8)
+	local H = WorldBuilder.asedioFortHalf(arena, centro)
 	if H < 22 then
 		return nil
 	end
@@ -2783,10 +2946,14 @@ function WorldBuilder.buildAsedioFort(arena)
 
 	-- Zona de extraccion: adonde los Cazadores tienen que llevar al kiwi
 	-- capturado y aguantarlo 2 minutos. Queda marcada con un haz de luz
-	-- que se ve desde todo el mapa y un anillo.
-	local posZona = arena:clampToBounds(centro + dirAtaque * (H + 26))
-	posZona = pisoEn(posZona.X, posZona.Z)
+	-- que se ve desde todo el mapa y un anillo. Se apoya siempre en el
+	-- piso de la arena y se busca un lugar despejado en el frente.
 	local radioZona = 9
+	local posZona = WorldBuilder.findExtractionSpot(arena, centro, dirAtaque, H, folder)
+	if not posZona then
+		local p = arena:clampToBounds(centro + dirAtaque * (H + 26))
+		posZona = Vector3.new(p.X, centro.Y, p.Z)
+	end
 	part({
 		Name = "ZonaAnillo",
 		Shape = Enum.PartType.Cylinder,

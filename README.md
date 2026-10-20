@@ -54,8 +54,19 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 - Las **casas ahora son de dos pisos** (con escalera, planta alta decorada y un **baúl extra**
   arriba) y el granero tiene **silos** de metal al lado. Se puede subir a mirar el mapa desde arriba.
 
-### Asedio 5 vs 5 y estilo Counter (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
+### Asedio 5 vs 5 (nuevo en 1.4.0, arreglo de arranque en 1.4.1)
 
+> **1.9.10:** se revisaron **los 5 mapas**: las **colinas gigantes** que aparecían adentro
+> de la arena (sobre todo en **Dunas**) ahora son **paisaje de fondo**, detrás de las montañas
+> del borde: ya no tapan las entradas de las casas y **no se puede caminar a través de ellas**.
+> Las casas, el nido del asedio y los props se eligen con **piso limpio**: no se generan arriba
+> de colinas, techos, árboles ni el estanque. La **zona de extracción** se apoya siempre en el
+> piso y se busca un lugar **despejado** en el frente del castillo (antes podía quedar flotando
+> sobre un médano o una colina). La **escopeta** ahora hace **100 de daño a corta distancia**
+> (8 perdigones de 12,5) y va **perdiendo daño** a medida que el enemigo se aleja. La
+> **precisión** quedó así: **quieto o caminando (Shift) el tiro es exacto**; **corriendo se
+> dispersa**, incluso con la mira puesta.
+>
 > **1.9.9:** el **kiwi del corral ahora se ve**: al arrancar el asedio quedaba plantado en su
 > corralito pero **invisible** (el cerebro de escondite lo dejaba transparente), así que los
 > Cazadores no lo encontraban nunca; ahora se muestra desde que arranca la ronda. La **M4A1
@@ -73,7 +84,7 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 > busca piso firme y el **fuego del molotov nunca queda prendido** al terminar una partida
 > (se apaga solo y con la partida, con red de seguridad).
 >
-> **1.9.7:** el **cuchillo mariposa se saca como en CS2**: sale cerrado desde abajo con un giro
+> **1.9.7:** el **cuchillo mariposa se saca con un giro de muñeca**: sale cerrado desde abajo con un giro
 > de muñeca, la mano le da un **latigazo** y la hoja **salta abierta con inercia**, se asienta
 > con una ondita y suena el **clic del pestillo** al trabarse (y también al plegarlo en el
 > molinete de la tecla F). El **molotov ahora es fuego de partículas de verdad**: **lenguas**
@@ -120,7 +131,7 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 > que no llegaba a armarse por un material que no existe en Roblox.
 > **1.9.3:** llegaron las **granadas**: cada baúl suelta un **pack** (1 fragmentación, 1 humo,
 > 1 molotov y 2 flashes) que se lanza con clic y vuela con física real. La **Glock-18 ya no
-> tiene mira**: su clic derecho cambia entre tiro a tiro y **ráfaga de 3 (estilo CS2)**. El
+> tiene mira**: su clic derecho cambia entre tiro a tiro y **ráfaga de 3**. El
 > **rifle tranquilizante inmoviliza 3 s** al rival que toca y el **francotirador noquea de un
 > solo disparo**. La **M4A1 ahora tiene silenciador** (en la mano y en el modelo) y sus tiros
 > **apenas se escuchan**. Además se sacó de todos los mapas el **cartel gigante con el nombre
@@ -140,7 +151,7 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 > **Shift** (caminar) o **Ctrl** (agachado) vas en silencio, y se apagó el sonido de pasos que
 > Roblox trae por defecto. Además llegó el **cuchillo mariposa**: va **de fábrica para todos**
 > (no sale de los baúles), se **abre con un giro** al equiparlo, el **clic** pega un **zarpazo**
-> corto y con **F** lo hacés **girar en la mano** (estilo CS2). Y el mundo ahora tiene **clima y
+> corto y con **F** lo hacés **girar en la mano**. Y el mundo ahora tiene **clima y
 > hora**: el sol va **oscureciendo** con el correr de la partida y cada tanto cambia el tiempo
 > al azar (**sol, lluvia o nieve**); cuando **nieva**, caen los copos y la nieve **se acumula en
 > el piso y los techos** (el mapa se ve nevado) hasta que para y se derrite sola.
@@ -171,9 +182,9 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 > ahora es **solo del francotirador** (5x, segundo clic 10x); el resto de las armas apunta
 > directo con el puntito.
 
-> **1.5.0:** primera persona **fija** durante la partida (estilo Counter Blox), el arma pasa
+> **1.5.0:** primera persona **fija** durante la partida, el arma pasa
 > **al costado** de la pantalla para no tapar la vista, la **cruz es más chica** y los baúles
-> ahora sueltan el **arsenal Counter**: **AK-47, M4A1, MP5, Glock-18 y Escopeta** (además del
+> ahora sueltan un **arsenal nuevo**: **AK-47, M4A1, MP5, Glock-18 y Escopeta** (además del
 > revólver, francotirador, arco, cuchillo, lanzallamas y lanzacohetes de siempre).
 
 > **1.4.1:** el juego **no iniciaba en ningún modo** (WorldBuilder no importaba Config y el armado
@@ -186,14 +197,16 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
   enganchado). **Ronda de 150 segundos**, punto para quien capture / para los Defensores si se
   acaba el tiempo, y **gana el primero a 2 rondas**. Al noquearte, **volvés a tu spawn a los 7 s**.
   No hay **fuego amigo** y los equipos se identifican con **colores y brillo entre paredes**.
-- **Tiros estilo Counter Blox:** la dispersión depende del **movimiento**, hay **zona muerta**,
-  **reducción al apuntar/agacharse**, **retroceso con patada de arma y de cámara** (vuelve sola),
-  **caída de daño por distancia** y **¡TIRO A LA CABEZA!** (aviso dorado y multiplicador fuerte).
+- **Tiros con dispersión:** la dispersión depende de la **velocidad**: **quieto o caminando
+  (Shift) el tiro sale exacto**; **corriendo se abre**, y **apuntar o agacharse** la reduce.
+  Hay **zona muerta**, **retroceso con patada de arma y de cámara** (vuelve sola), **caída de
+  daño por distancia** y **¡TIRO A LA CABEZA!** (aviso dorado y multiplicador fuerte).
 - **Miras de verdad:** con el francotirador, clic derecho cicla **5x → 10x → sin mira**; sin mira
-  es un **noscope impreciso** y con mira el disparo sale **perfecto** (y caminás más lento).
+  es un **noscope impreciso** y con mira el disparo sale **perfecto quieto o caminando**
+  (corriendo se dispersa; además caminás más lento).
   El rifle tranquilizante, el de pintura y el ralentizador también tienen su **mira** (clic derecho).
-- **HUD estilo Counter:** barra de **marcador de equipos y ronda** arriba, **vida grande** abajo a
-  la izquierda (verde → ámbar → roja), **punto de mira dinámico** que se abre al moverse o
+- **HUD de combate:** barra de **marcador de equipos y ronda** arriba, **vida grande** abajo a
+  la izquierda (verde → ámbar → roja), **punto de mira dinámico** que se abre al correr o
   disparar, **tabla de posiciones con Tab** y **fogonazo** del cañón en el arma en primera persona.
 - **Movilidad:** el personaje **corre siempre**; **Shift** lo hace **caminar despacio** y
   **Ctrl / Alt / C** agacharse en sigilo (la cámara baja y el arma se afirma: menos dispersión).
@@ -202,7 +215,8 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
   cambia al azar: **sol, lluvia o nieve**. Con la nevada caen los copos, la nieve **se acumula en
   el piso** y blanquea el mapa entero; cuando para, se derrite sola.
 - **Créditos:** las fórmulas de disparo, retroceso, cabeza y zoom están inspiradas en el código
-  público de **Counter Blox: Sauce - Restored** (licencia MIT) — ver [`LICENSE-CB.md`](LICENSE-CB.md).
+  público de un proyecto de shooters (licencia MIT). El aviso de licencia está en
+  [`LICENSE-CB.md`](LICENSE-CB.md).
 
 ---
 
@@ -219,11 +233,11 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 | **1 / 2 / 3 / 4 / 5** | Cambiar de herramienta (red / rifle / rastreador / trampa / pintura; en Colosal: rastreador / ralentizador) |
 | **Shift** | Caminar despacio (hacés menos ruido; por defecto corrés, y el kiwi te oye antes) |
 | **Ctrl**, **Alt** o **C** | Agachado en sigilo (casi no te oye; la cámara baja y el arma se afirma: menos dispersión) |
-| **F** | Con el **cuchillo mariposa** (de fábrica, barra 2): **molinete** girando en la mano, estilo CS2 |
+| **F** | Con el **cuchillo mariposa** (de fábrica, barra 2): **molinete** girando en la mano |
 | **E** | **Esconderte** en un armario, barril o pajar / **abrir un baúl**. Dentro del escondite, E otra vez te saca |
-| **Tab** | **Tabla estilo Counter** (equipos, marcador y capturas en Asedio) + tabla de jugadores de Roblox |
+| **Tab** | **Tabla de equipos** (marcador y capturas en Asedio) + tabla de jugadores de Roblox |
 
-> **Vista estilo Counter Blox:** durante la partida la cámara es **siempre en primera persona**
+> **Vista en primera persona:** durante la partida la cámara es **siempre en primera persona**
 > (en el lobby y la votación queda libre), con el **arma al costado** para no tapar la pantalla
 > y una **cruz chica** que se abre solo cuando te movés o disparás. Al apuntar el arma se
 > corre **bien abajo** y queda nada más que el **puntito central** para tirar preciso.
@@ -252,14 +266,15 @@ un aviso y puedes intentarlo de nuevo en unos segundos.
 - **Rifle ralentizador** 🧊 — aparece **solo en Kiwi Colosal** (tecla junto al rastreador) y tiene
   **mira**. Sus agujas **no duermen** al gigante: lo dejan **lento 8 segundos** con un tinte frío,
   ojos celestes y un cartel **"¡RALENTIZADO!"** que se ve entre paredes. Tu ventana para escapar.
-- **Arsenal estilo Counter Blox** 🔫 — sale de los **baúles** y trae las clásicas de Counter:
+- **Arsenal de baúles** 🔫 — sale de los **baúles** y trae:
   **AK-47** (34 de daño, automática), **M4A1** (30, automática y precisa), **MP5** (22, muy
-  manejable), **Glock-18** (26, pistola) y **Escopeta** (8 perdigones: de cerca es letal).
+  manejable), **Glock-18** (26, pistola) y **Escopeta** (8 perdigones: **100 de daño de cerca**
+  y menos daño a medida que el enemigo se aleja).
   Las automáticas **se disparan dejando el clic apretado**; con **clic derecho** apuntás y la
   dispersión se cierra. Junto al **Revólver**, el **Francotirador**, el **Arco**, el
   **Lanzallamas** y el **Lanzacohetes** (y el **tranquilizante** de siempre).
 - **Cuchillo mariposa** 🔪 — no sale de los baúles: lo llevan **todos de fábrica** en cualquier
-  modo. Al equiparlo se **abre con un giro** (estilo CS2), el **clic** pega un **zarpazo** rápido
+  modo. Al equiparlo se **abre con un giro**, el **clic** pega un **zarpazo** rápido
   y **F** lo hace **girar en la mano**.
 
 ### Escondites y baúles (1.2.0, ampliados en 1.3.0)
@@ -429,7 +444,7 @@ Consejos para el lugar en Studio:
 > [Vinegar](https://vinegarhq.org) (o abrir el `.rbxlx` en una PC con Windows/Mac).
 
 1. Abre `KiwiCazador.rbxlx` en Studio y dale **Play** un minuto para probar.
-   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.9 listo para cazar`.
+   Mira la ventana **Output**: debe aparecer `[Kiwi Cazador] v1.9.10 listo para cazar`.
 2. `File → Publish to Roblox`: pon el nombre (`Kiwi Cazador`), una descripción y elige los
    dispositivos. La primera vez te crea la experiencia y ya queda subida.
 3. Configura la página del juego en [create.roblox.com](https://create.roblox.com):

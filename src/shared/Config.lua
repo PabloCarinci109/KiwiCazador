@@ -10,7 +10,7 @@
 
 local Config = {}
 
-Config.Version = "1.9.9"
+Config.Version = "1.9.10"
 Config.GameName = "Kiwi Cazador"
 Config.GameTagline = "Reserva de vida silvestre de Nueva Zelanda"
 
@@ -177,9 +177,11 @@ Config.Scope = {
 
 -- Estilo Counter: los disparos son instantaneos (rayo) y el error sale de
 -- la formula de Counter Blox: Sauce - Restored (MIT, ver LICENSE-CB.md):
---   error = spread del arma + velocidad * vel
---   con la mira puesta el error se divide (adsDiv del arma o el general;
---   el francotirador es perfecto)
+--   error = spread del arma + velocidad * vel (solo al correr)
+--   quieto o caminando con Shift el castigo por movimiento es cero:
+--   el arma tiene precision absoluta; corriendo se dispersa
+--   con la mira puesta se reduce la dispersion base, pero correr sigue
+--   castigando (el francotirador es perfecto quieto o caminando)
 --   si el error queda por debajo del minimo, el disparo sale perfecto
 -- La patada de camara tambien es la de Counter:
 --   grados = 0.9 * (1 - recoil/100), sube y vuelve sola (mas suave).
@@ -202,7 +204,7 @@ Config.Shoot = {
 		arco = { vel = 0.60, spread = 0.3, dead = 1.2, recoil = 72 },
 		cuchillo = { recoil = 92 },
 		lanzallamas = { vel = 0.5, recoil = 96 },
-		cohete = { recoil = 18 },
+		cohete = { vel = 0.50, spread = 0.2, recoil = 18 },
 		-- Arsenal estilo Counter Blox (baules): automaticas, MP5, pistola
 		-- y escopeta de perdigones.
 		-- El AK-47 y la M4A1 con mira (clic derecho) entran mucho mas
@@ -521,14 +523,15 @@ Config.Weapons = {
 		name = "Escopeta",
 		color = Color3.fromRGB(200, 170, 120),
 		cooldown = 1.05,
-		pellets = 8,       -- perdigones por disparo (estilo Counter)
+		pellets = 8,       -- perdigones por disparo
 		spreadHalf = 3.6,  -- medio angulo del cono de perdigones
 		speed = 240,
 		life = 0.8,
 		blast = 0,
-		damage = 14,       -- por perdigon: de cerca es letal
-		minDamage = 4,
-		falloff = 2.4,     -- de lejos casi no llega
+		damage = 12.5,     -- por perdigon: 8 x 12,5 = 100 de cerca
+		falloffNear = 12,  -- hasta aca pega los 100 completos
+		falloffFar = 64,   -- a partir de aca pega el minimo
+		falloffMin = 0.30, -- 30% del daño a larga distancia
 		headMult = 1.6,
 		knockback = 34,
 		slowFactor = 0.45,

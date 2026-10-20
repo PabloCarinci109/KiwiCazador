@@ -18,6 +18,7 @@ local GameManager = require(modulos.GameManager)
 local Weather = require(modulos.Weather)
 local Destruction = require(modulos.Destruction)
 local Actions = require(modulos.Actions)
+local WorldBuilder = require(modulos.WorldBuilder)
 -- Shared devuelve la carpeta ReplicatedStorage.KiwiShared: ahi vive Config
 local Shared = require(modulos.Shared)
 local Config = require(Shared.Config)
@@ -431,6 +432,24 @@ local function extrasAsedio(sesion)
 	check(okCap, "asedio: capturar al kiwi sin errores")
 	check(sesion.carry ~= nil, "asedio: el kiwi queda en brazos")
 	check(sesion.fort ~= nil and sesion.fort.zone ~= nil and sesion.fort.zone.pos ~= nil, "asedio: zona de extraccion marcada")
+	if sesion.fort and sesion.fort.zone and sesion.arena then
+		local zona = sesion.fort.zone.pos
+		check(math.abs(zona.Y - sesion.arena.floorY) < 0.01, "asedio: la zona de extraccion esta apoyada en el piso",
+			string.format("dy=%.2f", zona.Y - sesion.arena.floorY))
+		local params = OverlapParams.new()
+		params.FilterType = Enum.RaycastFilterType.Include
+		params.FilterDescendantsInstances = { sesion.arena.folder }
+		params.RespectCanCollide = true
+		local blockers = 0
+		for _, p in ipairs(workspace:GetPartBoundsInRadius(zona + Vector3.new(0, 4, 0), 9, params)) do
+			local alto = (p.Position.Y + p.Size.Y * 0.5) - zona.Y
+			local bajo = (p.Position.Y - p.Size.Y * 0.5) - zona.Y
+			if p ~= sesion.arena.ground and not p:IsDescendantOf(sesion.fort.folder) and alto > 2.5 and bajo < 4 then
+				blockers = blockers + 1
+			end
+		end
+		check(blockers == 0, "asedio: la zona de extraccion esta despejada", "bloqueos=" .. blockers)
+	end
 	local character = player.Character
 	if side == "attack" then
 		-- Llevarlo a la zona: al entrar el portador lo deja plantado ahi
@@ -538,6 +557,115 @@ if not player then
 end
 task.wait(8)
 print("[AUTO-TEST] jugador: " .. player.Name .. " (v" .. Config.Version .. ")")
+
+-- Mapas: las 5 arenas tienen que quedar sin montañas adentro (antes las
+-- colinas tapaban las entradas de las casas) y con un lugar despejado y
+-- apoyado en el piso para la zona de extracción del asedio.
+do
+	local world = GameManager.world
+	if not world then
+		esperar(function()
+			return GameManager.world
+		end, 15)
+		world = GameManager.world
+	end
+	local arenas = world and world.arenas or {}
+	check(#arenas == Config.World.ArenaCount, "mapas: estan las " .. Config.World.ArenaCount .. " arenas", "n=" .. #arenas)
+	for _, arena in ipairs(arenas) do
+		local label = "mapa " .. tostring(arena.mapId or "?")
+		local adentro = 0
+		if arena.propsFolder then
+			for _, item in ipairs(arena.propsFolder:GetChildren()) do
+				if item.Name == "Colina" then
+					adentro = adentro + 1
+				elseif item.Name == "Montana" or item.Name == "MontanaEsquina" then
+					local semi = math.max(item.Size.X, item.Size.Z) * 0.5
+					if math.abs(item.Position.X - arena.center.X) < arena.halfSize - semi
+						and math.abs(item.Position.Z - arena.center.Z) < arena.halfSize - semi then
+						adentro = adentro + 1
+					end
+				end
+			end
+		end
+		check(adentro == 0, label .. ": sin montañas adentro de la arena", "n=" .. adentro)
+
+		local tieneNido = arena.nest ~= nil and arena.nest.pos ~= nil
+		check(tieneNido, label .. ": tiene nido del asedio")
+		if tieneNido then
+			local centro = Vector3.new(arena.nest.pos.X, arena.floorY, arena.nest.pos.Z)
+			local H = WorldBuilder.asedioFortHalf(arena, centro)
+			check(H >= 22, label .. ": entra el castillo del asedio", string.format("H=%.0f", H))
+			local dir = arena.center - centro
+			dir = Vector3.new(dir.X, 0, dir.Z)
+			if dir.Magnitude < 1 then
+				dir = Vector3.new(0, 0, 1)
+			end
+			dir = dir.Unit
+			local pos = WorldBuilder.findExtractionSpot(arena, centro, dir, H)
+			check(pos ~= nil, label .. ": hay lugar despejado para la extraccion")
+			if pos then
+				check(math.abs(pos.Y - arena.floorY) < 0.01, label .. ": la extraccion esta apoyada en el piso",
+					string.format("dy=%.2f", pos.Y - arena.floorY))
+				local params = OverlapParams.new()
+				params.FilterType = Enum.RaycastFilterType.Include
+				params.FilterDescendantsInstances = { arena.folder }
+				params.RespectCanCollide = true
+				local blockers = 0
+				for _, p in ipairs(workspace:GetPartBoundsInRadius(pos + Vector3.new(0, 4, 0), 9, params)) do
+					local alto = (p.Position.Y + p.Size.Y * 0.5) - pos.Y
+					local bajo = (p.Position.Y - p.Size.Y * 0.5) - pos.Y
+					if p ~= arena.ground and alto > 2.5 and bajo < 4 then
+						blockers = blockers + 1
+					end
+				end
+				check(blockers == 0, label .. ": la extraccion esta despejada", "bloqueos=" .. blockers)
+			end
+		end
+	end
+end
+
+-- Escopeta: 100 de daño de cerca (8 perdigones de 12,5) y menos daño
+-- a medida que el enemigo se aleja.
+do
+	local esc = Config.Weapons.escopeta
+	local total = (esc.damage or 0) * (esc.pellets or 0)
+	check(math.abs(total - 100) < 0.01, "escopeta: 100 de daño a corta distancia", string.format("%.1f", total))
+	local cerca = Actions.damageAtDistance("escopeta", 5)
+	local medio = Actions.damageAtDistance("escopeta", 32)
+	local lejos = Actions.damageAtDistance("escopeta", 64)
+	check(math.abs(cerca - 100) < 0.01, "escopeta: a 5 studs pega 100", string.format("%.1f", cerca))
+	check(medio < cerca and lejos < medio, "escopeta: el daño baja con la distancia",
+		string.format("5=%.1f 32=%.1f 64=%.1f", cerca, medio, lejos))
+end
+
+-- Precisión: quieto o caminando (Shift) el tiro es exacto; corriendo se
+-- dispersa. Con la mira puesta pasa lo mismo.
+do
+	local quieto = { AssemblyLinearVelocity = Vector3.new(0, 0, 0) }
+	local caminando = { AssemblyLinearVelocity = Vector3.new(Config.Player.walkSpeed, 0, 0) }
+	local corriendo = { AssemblyLinearVelocity = Vector3.new(Config.Player.sprintSpeed, 0, 0) }
+	local datos = { scoped = false }
+	for _, id in ipairs({ "ak", "m4", "mp5", "glock", "escopeta", "revolver", "arco", "sniper", "cohete" }) do
+		local eQuieto = Actions.spreadError(id, quieto, datos)
+		local eCaminando = Actions.spreadError(id, caminando, datos)
+		local eCorriendo = Actions.spreadError(id, corriendo, datos)
+		check(eCaminando == eQuieto and eCorriendo > eCaminando,
+			"armas: " .. id .. " pierde precision al correr",
+			string.format("quieto=%.2f caminando=%.2f corriendo=%.2f", eQuieto, eCaminando, eCorriendo))
+	end
+	local adsQuieto = Actions.spreadError("m4", quieto, { scoped = true })
+	local adsCaminando = Actions.spreadError("m4", caminando, { scoped = true })
+	local adsCorriendo = Actions.spreadError("m4", corriendo, { scoped = true })
+	check(adsQuieto == 0 and adsCaminando == 0 and adsCorriendo > 0,
+		"armas: con la mira y corriendo tambien se dispersa",
+		string.format("quieto=%.2f caminando=%.2f corriendo=%.2f", adsQuieto, adsCaminando, adsCorriendo))
+	local sniperQuieto = Actions.spreadError("sniper", quieto, { scoped = true })
+	local sniperCaminando = Actions.spreadError("sniper", caminando, { scoped = true })
+	local sniperCorriendo = Actions.spreadError("sniper", corriendo, { scoped = true })
+	check(sniperQuieto == 0 and sniperCaminando == 0 and sniperCorriendo > 0,
+		"armas: el francotirador con mira es exacto quieto o caminando",
+		string.format("quieto=%.2f caminando=%.2f corriendo=%.2f", sniperQuieto, sniperCaminando, sniperCorriendo))
+end
 
 -- Clima: estado publicado y una nevada de prueba (despues vuelve el sol)
 check(workspace:GetAttribute("Clima") ~= nil, "clima: estado publicado en el workspace")

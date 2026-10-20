@@ -28,9 +28,11 @@ local DART_THICKNESS = 0.22
 local NET_HALF_ANGLE = math.rad(55)   -- medio cono de la red
 local AIM_TOLERANCE = math.rad(75)    -- cuanto puede desviarse la mira del dardo
 
--- Dispersion estilo Counter Blox (licencia MIT, ver LICENSE-CB.md):
---   error = spread del arma + velocidad * vel
---   con la mira puesta: error = spread * adsDiv (el sniper es perfecto)
+-- Dispersion de las armas:
+--   error = spread del arma + velocidad * vel (solo al correr)
+--   quieto o caminando con Shift el castigo por movimiento es cero;
+--   con la mira puesta se reduce la dispersion base, pero correr sigue
+--   castigando (el francotirador es perfecto quieto o caminando)
 --   si el error queda por debajo del minimo, el disparo sale perfecto
 -- En asedio no se lastima (ni se prende fuego) al propio equipo
 local function friendlyShot(session, shooter, victim)
@@ -49,26 +51,71 @@ function Actions.spreadError(weaponId, root, data)
 	if root then
 		local velocity = root.AssemblyLinearVelocity
 		speed = math.sqrt(velocity.X * velocity.X + velocity.Z * velocity.Z)
+		-- Si el servidor no recibio bien la velocidad fisica, la direccion
+		-- de movimiento del Humanoid alcanza para detectar que corre.
+		if speed < 1 then
+			local humanoid = root.Parent and root.Parent:FindFirstChildOfClass("Humanoid")
+			if humanoid and humanoid.MoveDirection.Magnitude > 0.05 then
+				speed = math.max(speed, humanoid.WalkSpeed or 0)
+			end
+		end
 	end
 
-	local error = math.max(cfg.spread or 0, 0) + speed * (cfg.vel or 0)
-	-- Agachado (Ctrl) el arma se afirma, como en Counter
-	if data and data.sneak and not (data and data.scoped) then
-		error = error / ((Config.Shoot and Config.Shoot.crouchDiv) or 1.6)
+	local walkSpeed = (Config.Player and Config.Player.walkSpeed) or 16
+	local sprintSpeed = (Config.Player and Config.Player.sprintSpeed) or 24
+	-- Quieto o caminando (Shift) no hay castigo. Al correr, el castigo
+	-- crece desde la velocidad de caminata hasta la de carrera.
+	local moveFactor = 0
+	if speed > walkSpeed + 0.75 then
+		moveFactor = math.clamp((speed - walkSpeed) / math.max(1, sprintSpeed - walkSpeed), 0, 1.5)
 	end
+	local base = math.max(cfg.spread or 0, 0)
+	local move = speed * (cfg.vel or 0) * moveFactor
+
+	local crouchDiv = shoot.crouchDiv or 1.6
+	-- Agachado (Ctrl) el arma se afirma
+	if data and data.sneak and not (data and data.scoped) then
+		base = base / crouchDiv
+		move = move / crouchDiv
+	end
+
+	local error
 	if data and data.scoped then
 		if cfg.adsPerfect then
-			error = 0
+			-- La telescopica es perfecta quieto o caminando; corriendo no.
+			error = move
 		else
-			-- adsDiv del arma (el AK-47 apuntado es mucho mas fino)
-			error = error * (cfg.adsDiv or shoot.adsDiv or 0.35)
+			local ads = cfg.adsDiv or shoot.adsDiv or 0.35
+			-- La mira mejora la dispersion base, pero correr sigue castigando.
+			error = base * ads + move * (cfg.adsMoveDiv or shoot.adsMoveDiv or 0.7)
 		end
+	else
+		error = base + move
 	end
 	local dead = cfg.dead or shoot.dead or 0
 	if error < dead then
 		error = 0
 	end
 	return error
+end
+
+-- Daño total de un arma a una distancia dada (lo usa el AutoTest y sirve
+-- para balancear). En la escopeta suma los 8 perdigones.
+function Actions.damageAtDistance(weaponId, dist)
+	local cfg = Config.Weapons[weaponId]
+	if not cfg then
+		return 0
+	end
+	local damage = cfg.damage or 0
+	if (cfg.falloffNear or 0) > 0 then
+		local span = math.max(1, (cfg.falloffFar or 64) - cfg.falloffNear)
+		local t = math.clamp((dist - cfg.falloffNear) / span, 0, 1)
+		damage = damage * (1 - (1 - (cfg.falloffMin or 0.3)) * t)
+	elseif (cfg.falloff or 0) > 0 then
+		local loss = math.max(0, dist / 1.9 - 1) * cfg.falloff
+		damage = math.max(cfg.minDamage or damage * 0.5, damage - loss)
+	end
+	return damage * (cfg.pellets or 1)
 end
 
 -- Igual que Fire() de Counter Blox: el error se convierte en grados, el
@@ -886,9 +933,17 @@ function Actions.weaponHit(session, dart, pos, victim, hitPart)
 	local damage = cfg.damage or 0
 	local headshot = false
 
-	-- Caida de daño con la distancia (como Counter): de lejos pega menos
-	if victim and (cfg.falloff or 0) > 0 then
-		local _, shooterRoot = getRoot(dart.player)
+	-- Caida de daño con la distancia: la escopeta pega 100 de cerca y va
+	-- perdiendo fuerza a medida que el enemigo se aleja.
+	local _, shooterRoot = getRoot(dart.player)
+	if victim and (cfg.falloffNear or 0) > 0 then
+		if shooterRoot then
+			local dist = (pos - shooterRoot.Position).Magnitude
+			local span = math.max(1, (cfg.falloffFar or 64) - cfg.falloffNear)
+			local t = math.clamp((dist - cfg.falloffNear) / span, 0, 1)
+			damage = damage * (1 - (1 - (cfg.falloffMin or 0.3)) * t)
+		end
+	elseif victim and (cfg.falloff or 0) > 0 then
 		if shooterRoot then
 			local dist = (pos - shooterRoot.Position).Magnitude
 			local loss = math.max(0, dist / 1.9 - 1) * cfg.falloff

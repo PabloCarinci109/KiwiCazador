@@ -1165,7 +1165,9 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 -- ===============================================================
--- Punto de mira estilo Counter: se abre al moverse o disparar
+-- Punto de mira: se abre solo al correr o disparar. Quieto o caminando
+-- (Shift) queda cerrado porque el tiro sale exacto, igual que en el
+-- servidor.
 -- ===============================================================
 local function spreadErrorLocal(weaponId)
 	local cfg = Config.Shoot and Config.Shoot.weapons and Config.Shoot.weapons[weaponId]
@@ -1179,12 +1181,29 @@ local function spreadErrorLocal(weaponId)
 		local v = root.AssemblyLinearVelocity
 		speed = math.sqrt(v.X * v.X + v.Z * v.Z)
 	end
-	local error = math.max(cfg.spread or 0, 0) + speed * (cfg.vel or 0)
+	local walkSpeed = (Config.Player and Config.Player.walkSpeed) or 16
+	local sprintSpeed = (Config.Player and Config.Player.sprintSpeed) or 24
+	local moveFactor = 0
+	if speed > walkSpeed + 0.75 then
+		moveFactor = math.clamp((speed - walkSpeed) / math.max(1, sprintSpeed - walkSpeed), 0, 1.5)
+	end
+	local base = math.max(cfg.spread or 0, 0)
+	local move = speed * (cfg.vel or 0) * moveFactor
+	local crouchDiv = (Config.Shoot and Config.Shoot.crouchDiv) or 1.6
+	if sneaking and not scoped then
+		base = base / crouchDiv
+		move = move / crouchDiv
+	end
+	local error
 	if scoped then
-		-- adsDiv del arma: el AK-47 apuntado entra mucho mas fino
-		error = cfg.adsPerfect and 0 or error * (cfg.adsDiv or (Config.Shoot and Config.Shoot.adsDiv) or 0.35)
-	elseif sneaking then
-		error = error / ((Config.Shoot and Config.Shoot.crouchDiv) or 1.6)
+		if cfg.adsPerfect then
+			error = move
+		else
+			local ads = cfg.adsDiv or (Config.Shoot and Config.Shoot.adsDiv) or 0.35
+			error = base * ads + move * (cfg.adsMoveDiv or (Config.Shoot and Config.Shoot.adsMoveDiv) or 0.7)
+		end
+	else
+		error = base + move
 	end
 	local dead = cfg.dead or (Config.Shoot and Config.Shoot.dead) or 0
 	if error < dead then
